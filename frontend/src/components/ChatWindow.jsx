@@ -103,6 +103,13 @@ export default function ChatWindow({
     await onExportConversation(format);
   }
 
+  const modeBadgeLabel =
+    conversation?.mode === "learn"
+      ? "Learn mode"
+      : conversation?.mode === "interview"
+        ? "Interview mode"
+        : null;
+
   return (
     <main className="chat-shell">
       <header className="chat-header">
@@ -111,12 +118,12 @@ export default function ChatWindow({
           <h1>{conversation?.title || "Select or start a chat"}</h1>
         </div>
         <div className="chat-actions">
-          {conversation?.mode === "learn" ? <span className="mode-badge">Learn mode</span> : null}
+          {modeBadgeLabel ? <span className="mode-badge">{modeBadgeLabel}</span> : null}
           {conversation ? (
             <div className="mode-toggle" aria-label="Conversation mode">
               <button
                 type="button"
-                className={conversation.mode !== "learn" ? "active" : ""}
+                className={conversation.mode === "chat" ? "active" : ""}
                 onClick={() => onUpdateMode(conversation, "chat")}
                 disabled={isStreaming}
               >
@@ -129,6 +136,14 @@ export default function ChatWindow({
                 disabled={isStreaming}
               >
                 Learn
+              </button>
+              <button
+                type="button"
+                className={conversation.mode === "interview" ? "active" : ""}
+                onClick={() => onUpdateMode(conversation, "interview")}
+                disabled={isStreaming}
+              >
+                Interview
               </button>
             </div>
           ) : null}

@@ -110,6 +110,20 @@ def test_owner_can_update_conversation_mode_to_learn(client):
     assert response.json()["mode"] == "learn"
 
 
+def test_owner_can_update_conversation_mode_to_interview(client):
+    token = _register_and_login(client, "owner@example.com")
+    conversation = _create_conversation(client, token)
+
+    response = client.patch(
+        f"/conversations/{conversation['id']}/mode",
+        json={"mode": "interview"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["mode"] == "interview"
+
+
 def test_invalid_conversation_mode_returns_400(client):
     token = _register_and_login(client, "owner@example.com")
     conversation = _create_conversation(client, token)

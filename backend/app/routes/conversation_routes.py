@@ -9,7 +9,7 @@ from app.database import get_db
 
 
 router = APIRouter(prefix="/conversations", tags=["conversations"])
-ALLOWED_CONVERSATION_MODES = {"chat", "learn"}
+ALLOWED_CONVERSATION_MODES = {"chat", "learn", "interview"}
 EXPORT_FORMATS = {"txt", "md", "json"}
 
 

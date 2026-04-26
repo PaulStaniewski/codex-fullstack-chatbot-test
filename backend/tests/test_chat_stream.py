@@ -77,6 +77,40 @@ def test_chat_stream_normal_streaming_still_works(client, monkeypatch):
     assert "Error:" not in response.text
 
 
+def test_chat_stream_uses_interview_system_prompt(client, monkeypatch):
+    captured_input = None
+
+    async def capture_openai_input(openai_input):
+        nonlocal captured_input
+        captured_input = openai_input
+        yield "Interview question"
+
+    monkeypatch.setattr("app.routes.chat_routes._stream_openai_text", capture_openai_input)
+    token, conversation_id = _create_authenticated_conversation(client)
+    mode_response = client.patch(
+        f"/conversations/{conversation_id}/mode",
+        json={"mode": "interview"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    response = client.get(
+        "/chat-stream",
+        params={
+            "conversation_id": conversation_id,
+            "message": "Practice FastAPI interviews",
+            "token": token,
+        },
+    )
+
+    assert mode_response.status_code == 200
+    assert response.status_code == 200
+    assert captured_input[0]["role"] == "system"
+    assert "You are a technical interviewer." in captured_input[0]["content"]
+    assert "Do not reveal ideal answers before the candidate attempts to answer." in (
+        captured_input[0]["content"]
+    )
+
+
 def test_chat_stream_persists_user_and_assistant_messages(client, monkeypatch):
     monkeypatch.setattr("app.routes.chat_routes._stream_openai_text", _fake_openai_stream)
     token, conversation_id = _create_authenticated_conversation(client)

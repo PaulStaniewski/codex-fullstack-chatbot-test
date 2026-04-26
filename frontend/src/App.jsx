@@ -121,6 +121,81 @@ export default function App() {
     await loadMessages(conversation.id);
   }
 
+  async function renameConversation(conversation, title) {
+    const cleanTitle = title.trim();
+    if (!cleanTitle) {
+      return;
+    }
+
+    setError("");
+    try {
+      const updatedConversation = await apiFetch(`/conversations/${conversation.id}`, {
+        method: "PATCH",
+        token,
+        body: JSON.stringify({ title: cleanTitle }),
+      });
+
+      setConversations((current) =>
+        current.map((item) =>
+          item.id === updatedConversation.id ? updatedConversation : item,
+        ),
+      );
+
+      if (selectedConversation?.id === updatedConversation.id) {
+        setSelectedConversation(updatedConversation);
+      }
+    } catch (err) {
+      handleRequestError(err);
+    }
+  }
+
+  async function deleteConversation(conversation) {
+    setError("");
+    try {
+      await apiFetch(`/conversations/${conversation.id}`, {
+        method: "DELETE",
+        token,
+      });
+
+      setConversations((current) => current.filter((item) => item.id !== conversation.id));
+
+      if (selectedConversation?.id === conversation.id) {
+        eventSourceRef.current?.close();
+        eventSourceRef.current = null;
+        localStorage.removeItem(ACTIVE_CONVERSATION_KEY);
+        setSelectedConversation(null);
+        setMessages([]);
+        setIsStreaming(false);
+      }
+    } catch (err) {
+      handleRequestError(err);
+    }
+  }
+
+  async function updateConversationMode(conversation, mode) {
+    if (!conversation || conversation.mode === mode) {
+      return;
+    }
+
+    setError("");
+    try {
+      const updatedConversation = await apiFetch(`/conversations/${conversation.id}/mode`, {
+        method: "PATCH",
+        token,
+        body: JSON.stringify({ mode }),
+      });
+
+      setConversations((current) =>
+        current.map((item) =>
+          item.id === updatedConversation.id ? updatedConversation : item,
+        ),
+      );
+      setSelectedConversation(updatedConversation);
+    } catch (err) {
+      handleRequestError(err);
+    }
+  }
+
   async function loadMessages(conversationId) {
     setIsMessagesLoading(true);
     setError("");
@@ -169,6 +244,7 @@ export default function App() {
 
       stream.onmessage = (event) => {
         assistantContent += event.data;
+        const isStreamError = assistantContent.startsWith("Error:");
         setMessages((current) =>
           current.map((message) =>
             message.id === tempAssistantMessage.id
@@ -176,6 +252,13 @@ export default function App() {
               : message,
           ),
         );
+
+        if (isStreamError) {
+          didFinalizeStream = true;
+          stream.close();
+          eventSourceRef.current = null;
+          setIsStreaming(false);
+        }
       };
 
       stream.onerror = () => {
@@ -232,6 +315,8 @@ export default function App() {
         selectedConversationId={selectedConversation?.id}
         onCreateConversation={() => createConversation().catch(handleRequestError)}
         onSelectConversation={selectConversation}
+        onRenameConversation={renameConversation}
+        onDeleteConversation={deleteConversation}
         onLogout={logout}
         isLoading={isConversationsLoading}
       />
@@ -240,6 +325,7 @@ export default function App() {
         conversation={selectedConversation}
         messages={messages}
         onSendMessage={sendMessage}
+        onUpdateMode={updateConversationMode}
         isStreaming={isStreaming}
         isLoading={isMessagesLoading}
         theme={theme}

@@ -3,9 +3,27 @@ export default function Sidebar({
   selectedConversationId,
   onCreateConversation,
   onSelectConversation,
+  onRenameConversation,
+  onDeleteConversation,
   onLogout,
   isLoading,
 }) {
+  function handleRename(event, conversation) {
+    event.stopPropagation();
+    const nextTitle = window.prompt("Rename conversation", conversation.title);
+    if (nextTitle !== null) {
+      onRenameConversation(conversation, nextTitle);
+    }
+  }
+
+  function handleDelete(event, conversation) {
+    event.stopPropagation();
+    const shouldDelete = window.confirm(`Delete "${conversation.title}"?`);
+    if (shouldDelete) {
+      onDeleteConversation(conversation);
+    }
+  }
+
   return (
     <aside className="sidebar">
       <div className="sidebar-header">
@@ -25,21 +43,43 @@ export default function Sidebar({
         ) : null}
 
         {conversations.map((conversation) => (
-          <button
+          <div
             key={conversation.id}
-            type="button"
             className={
               conversation.id === selectedConversationId
-                ? "conversation-item active"
-                : "conversation-item"
+                ? "conversation-row active"
+                : "conversation-row"
             }
-            onClick={() => onSelectConversation(conversation)}
           >
-            <span className="conversation-title">{conversation.title}</span>
-            <time dateTime={conversation.created_at}>
-              {new Date(conversation.created_at).toLocaleDateString()}
-            </time>
-          </button>
+            <button
+              type="button"
+              className="conversation-item"
+              onClick={() => onSelectConversation(conversation)}
+            >
+              <span className="conversation-title">{conversation.title}</span>
+              <time dateTime={conversation.created_at}>
+                {new Date(conversation.created_at).toLocaleDateString()}
+              </time>
+            </button>
+            <div className="conversation-actions">
+              <button
+                type="button"
+                className="conversation-action"
+                onClick={(event) => handleRename(event, conversation)}
+                aria-label={`Rename ${conversation.title}`}
+              >
+                Edit
+              </button>
+              <button
+                type="button"
+                className="conversation-action danger"
+                onClick={(event) => handleDelete(event, conversation)}
+                aria-label={`Delete ${conversation.title}`}
+              >
+                Del
+              </button>
+            </div>
+          </div>
         ))}
       </nav>
 

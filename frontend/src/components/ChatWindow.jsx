@@ -5,6 +5,7 @@ export default function ChatWindow({
   conversation,
   messages,
   onSendMessage,
+  onUpdateMode,
   isStreaming,
   isLoading,
   theme,
@@ -39,6 +40,27 @@ export default function ChatWindow({
           <h1>{conversation?.title || "Select or start a chat"}</h1>
         </div>
         <div className="chat-actions">
+          {conversation?.mode === "learn" ? <span className="mode-badge">Learn mode</span> : null}
+          {conversation ? (
+            <div className="mode-toggle" aria-label="Conversation mode">
+              <button
+                type="button"
+                className={conversation.mode !== "learn" ? "active" : ""}
+                onClick={() => onUpdateMode(conversation, "chat")}
+                disabled={isStreaming}
+              >
+                Chat
+              </button>
+              <button
+                type="button"
+                className={conversation.mode === "learn" ? "active" : ""}
+                onClick={() => onUpdateMode(conversation, "learn")}
+                disabled={isStreaming}
+              >
+                Learn
+              </button>
+            </div>
+          ) : null}
           {isStreaming ? <span className="status-pill">Streaming</span> : null}
           <ThemeToggle theme={theme} onToggleTheme={onToggleTheme} />
         </div>

@@ -6,6 +6,7 @@ from app.database import get_db
 
 
 router = APIRouter(prefix="/conversations", tags=["conversations"])
+ALLOWED_CONVERSATION_MODES = {"chat", "learn"}
 
 
 def _get_owned_conversation(db: Session, conversation_id: int, user_id: int) -> models.Conversation:
@@ -57,6 +58,23 @@ def update_conversation(
 ):
     conversation = _get_owned_conversation(db, conversation_id, current_user.id)
     conversation.title = conversation_in.title
+    db.commit()
+    db.refresh(conversation)
+    return conversation
+
+
+@router.patch("/{conversation_id}/mode", response_model=schemas.ConversationRead)
+def update_conversation_mode(
+    conversation_id: int,
+    mode_in: schemas.ConversationModeUpdate,
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db),
+):
+    if mode_in.mode not in ALLOWED_CONVERSATION_MODES:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid conversation mode")
+
+    conversation = _get_owned_conversation(db, conversation_id, current_user.id)
+    conversation.mode = mode_in.mode
     db.commit()
     db.refresh(conversation)
     return conversation

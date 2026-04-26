@@ -86,3 +86,52 @@ def test_non_owner_cannot_delete_conversation(client):
     )
 
     assert response.status_code == 404
+
+
+def test_default_conversation_mode_is_chat(client):
+    token = _register_and_login(client, "owner@example.com")
+
+    conversation = _create_conversation(client, token)
+
+    assert conversation["mode"] == "chat"
+
+
+def test_owner_can_update_conversation_mode_to_learn(client):
+    token = _register_and_login(client, "owner@example.com")
+    conversation = _create_conversation(client, token)
+
+    response = client.patch(
+        f"/conversations/{conversation['id']}/mode",
+        json={"mode": "learn"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["mode"] == "learn"
+
+
+def test_invalid_conversation_mode_returns_400(client):
+    token = _register_and_login(client, "owner@example.com")
+    conversation = _create_conversation(client, token)
+
+    response = client.patch(
+        f"/conversations/{conversation['id']}/mode",
+        json={"mode": "invalid"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 400
+
+
+def test_non_owner_cannot_update_conversation_mode(client):
+    owner_token = _register_and_login(client, "owner@example.com")
+    other_token = _register_and_login(client, "other@example.com")
+    conversation = _create_conversation(client, owner_token)
+
+    response = client.patch(
+        f"/conversations/{conversation['id']}/mode",
+        json={"mode": "learn"},
+        headers={"Authorization": f"Bearer {other_token}"},
+    )
+
+    assert response.status_code == 404

@@ -51,8 +51,22 @@ def _format_sse_data(value: str) -> str:
     return "".join(f"data: {line}\n" for line in lines) + "\n"
 
 
+def build_system_prompt(mode: str) -> str:
+    if mode == "learn":
+        return (
+            "You are an AI tutor.\n"
+            "Teach the user step by step.\n"
+            "Ask one question at a time.\n"
+            "Wait for the user's answer.\n"
+            "Give feedback.\n"
+            "Guide the user forward.\n"
+            "Do not give full solutions immediately."
+        )
+    return "You are a helpful AI assistant."
+
+
 def _build_openai_input(
-    db: Session, conversation_id: int, current_message: str
+    db: Session, conversation_id: int, current_message: str, mode: str
 ) -> list[dict[str, str]]:
     previous_messages = (
         db.query(models.Message)
@@ -60,11 +74,12 @@ def _build_openai_input(
         .order_by(models.Message.created_at.asc())
         .all()
     )
-    openai_input = [
+    openai_input = [{"role": "system", "content": build_system_prompt(mode)}]
+    openai_input.extend([
         {"role": message.role, "content": message.content}
         for message in previous_messages
         if message.role in {"user", "assistant"} and message.content
-    ]
+    ])
     openai_input.append({"role": "user", "content": current_message})
     return openai_input
 
@@ -120,7 +135,7 @@ async def chat_stream(
 
     current_user = auth.get_user_from_token(db, token)
     user_id = current_user.id
-    _get_owned_conversation(db, conversation_id, user_id)
+    conversation = _get_owned_conversation(db, conversation_id, user_id)
 
     if len(clean_message) > MAX_CHAT_MESSAGE_LENGTH:
         logger.info(
@@ -142,7 +157,7 @@ async def chat_stream(
             media_type="text/event-stream",
         )
 
-    openai_input = _build_openai_input(db, conversation_id, clean_message)
+    openai_input = _build_openai_input(db, conversation_id, clean_message, conversation.mode)
 
     user_message = models.Message(
         conversation_id=conversation_id,

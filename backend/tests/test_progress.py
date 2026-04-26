@@ -1,7 +1,12 @@
 from datetime import datetime, timezone
 
 from app import models
-from app.progress import update_learning_streak, update_time_spent
+from app.progress import (
+    award_earned_achievements,
+    get_progress_condition_value,
+    update_learning_streak,
+    update_time_spent,
+)
 
 
 def _register_and_login(client, email="progress@example.com"):
@@ -148,3 +153,80 @@ def test_update_learning_streak_gap_resets():
 
     assert progress.current_streak_days == 1
     assert progress.last_streak_date.isoformat() == "2026-04-26"
+
+
+def test_achievement_granted_when_threshold_reached(client):
+    token = _register_and_login(client)
+    response = client.post(
+        "/conversations",
+        json={"title": "Practice"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 201
+
+    from app.database import get_db
+
+    db = next(client.app.dependency_overrides[get_db]())
+    try:
+        progress = db.query(models.UserProgress).first()
+        progress.current_streak_days = 3
+        award_earned_achievements(db, progress)
+        db.commit()
+
+        earned_names = {
+            item.achievement.name
+            for item in db.query(models.UserAchievement)
+            .filter(models.UserAchievement.user_id == progress.user_id)
+            .all()
+        }
+    finally:
+        db.close()
+
+    assert "Consistent Learner" in earned_names
+
+
+def test_achievement_not_granted_twice(client):
+    token = _register_and_login(client)
+    response = client.post(
+        "/conversations",
+        json={"title": "Practice"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 201
+
+    from app.database import get_db
+
+    db = next(client.app.dependency_overrides[get_db]())
+    try:
+        progress = db.query(models.UserProgress).first()
+        progress.current_streak_days = 3
+        award_earned_achievements(db, progress)
+        award_earned_achievements(db, progress)
+        db.commit()
+
+        achievements = (
+            db.query(models.UserAchievement)
+            .join(models.Achievement)
+            .filter(
+                models.UserAchievement.user_id == progress.user_id,
+                models.Achievement.name == "Consistent Learner",
+            )
+            .all()
+        )
+    finally:
+        db.close()
+
+    assert len(achievements) == 1
+
+
+def test_progress_condition_mapping():
+    progress = models.UserProgress(
+        user_id=1,
+        current_streak_days=7,
+        time_spent_seconds=3600,
+        messages_count=50,
+    )
+
+    assert get_progress_condition_value(progress, "streak_days") == 7
+    assert get_progress_condition_value(progress, "time_spent_seconds") == 3600
+    assert get_progress_condition_value(progress, "messages_count") == 50

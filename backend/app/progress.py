@@ -32,6 +32,46 @@ DEFAULT_ACHIEVEMENTS = [
         "condition_type": "messages_count",
         "condition_value": 10,
     },
+    {
+        "id": 4,
+        "name": "Consistent Learner",
+        "description": "Practice for 3 days in a row.",
+        "icon": "streak",
+        "condition_type": "streak_days",
+        "condition_value": 3,
+    },
+    {
+        "id": 5,
+        "name": "Dedicated",
+        "description": "Practice for 7 days in a row.",
+        "icon": "flame",
+        "condition_type": "streak_days",
+        "condition_value": 7,
+    },
+    {
+        "id": 6,
+        "name": "Machine",
+        "description": "Practice for 30 days in a row.",
+        "icon": "gear",
+        "condition_type": "streak_days",
+        "condition_value": 30,
+    },
+    {
+        "id": 7,
+        "name": "Marathon",
+        "description": "Spend 1 hour actively learning.",
+        "icon": "timer",
+        "condition_type": "time_spent_seconds",
+        "condition_value": 3600,
+    },
+    {
+        "id": 8,
+        "name": "Communicator",
+        "description": "Send 50 messages.",
+        "icon": "chat",
+        "condition_type": "messages_count",
+        "condition_value": 50,
+    },
 ]
 
 
@@ -110,6 +150,12 @@ def update_learning_streak(progress: models.UserProgress, now: datetime | None =
     progress.last_streak_date = today
 
 
+def get_progress_condition_value(progress: models.UserProgress, condition_type: str) -> int:
+    if condition_type == "streak_days":
+        return progress.current_streak_days
+    return getattr(progress, condition_type, 0)
+
+
 def award_earned_achievements(db: Session, progress: models.UserProgress) -> None:
     ensure_default_achievements(db)
     achievements = db.query(models.Achievement).all()
@@ -119,11 +165,16 @@ def award_earned_achievements(db: Session, progress: models.UserProgress) -> Non
         .filter(models.UserAchievement.user_id == progress.user_id)
         .all()
     }
+    earned_ids.update(
+        item.achievement_id
+        for item in db.new
+        if isinstance(item, models.UserAchievement) and item.user_id == progress.user_id
+    )
 
     for achievement in achievements:
         if achievement.id in earned_ids:
             continue
-        current_value = getattr(progress, achievement.condition_type, 0)
+        current_value = get_progress_condition_value(progress, achievement.condition_type)
         if current_value >= achievement.condition_value:
             db.add(
                 models.UserAchievement(
@@ -131,3 +182,4 @@ def award_earned_achievements(db: Session, progress: models.UserProgress) -> Non
                     achievement_id=achievement.id,
                 )
             )
+            earned_ids.add(achievement.id)

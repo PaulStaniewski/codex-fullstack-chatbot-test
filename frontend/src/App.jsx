@@ -146,6 +146,7 @@ export default function App() {
       }
     } catch (err) {
       handleRequestError(err);
+      throw err;
     }
   }
 
@@ -169,6 +170,7 @@ export default function App() {
       }
     } catch (err) {
       handleRequestError(err);
+      throw err;
     }
   }
 

@@ -1,3 +1,6 @@
+import { useState } from "react";
+import Modal from "./Modal.jsx";
+
 export default function Sidebar({
   conversations,
   selectedConversationId,
@@ -8,19 +11,60 @@ export default function Sidebar({
   onLogout,
   isLoading,
 }) {
-  function handleRename(event, conversation) {
-    event.stopPropagation();
-    const nextTitle = window.prompt("Rename conversation", conversation.title);
-    if (nextTitle !== null) {
-      onRenameConversation(conversation, nextTitle);
+  const [modalState, setModalState] = useState(null);
+  const [draftTitle, setDraftTitle] = useState("");
+  const [modalError, setModalError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  function openRename(conversation) {
+    setDraftTitle(conversation.title);
+    setModalError("");
+    setModalState({ type: "rename", conversation });
+  }
+
+  function openDelete(conversation) {
+    setModalError("");
+    setModalState({ type: "delete", conversation });
+  }
+
+  function closeModal() {
+    if (isSubmitting) {
+      return;
+    }
+    setModalState(null);
+    setDraftTitle("");
+    setModalError("");
+  }
+
+  async function confirmRename() {
+    const cleanTitle = draftTitle.trim();
+    if (!cleanTitle) {
+      setModalError("Conversation title cannot be empty.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    setModalError("");
+    try {
+      await onRenameConversation(modalState.conversation, cleanTitle);
+      closeModal();
+    } catch (err) {
+      setModalError(err.message || "Unable to rename conversation.");
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
-  function handleDelete(event, conversation) {
-    event.stopPropagation();
-    const shouldDelete = window.confirm(`Delete "${conversation.title}"?`);
-    if (shouldDelete) {
-      onDeleteConversation(conversation);
+  async function confirmDelete() {
+    setIsSubmitting(true);
+    setModalError("");
+    try {
+      await onDeleteConversation(modalState.conversation);
+      closeModal();
+    } catch (err) {
+      setModalError(err.message || "Unable to delete conversation.");
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
@@ -65,7 +109,7 @@ export default function Sidebar({
               <button
                 type="button"
                 className="conversation-action"
-                onClick={(event) => handleRename(event, conversation)}
+                onClick={() => openRename(conversation)}
                 aria-label={`Rename ${conversation.title}`}
               >
                 Edit
@@ -73,7 +117,7 @@ export default function Sidebar({
               <button
                 type="button"
                 className="conversation-action danger"
-                onClick={(event) => handleDelete(event, conversation)}
+                onClick={() => openDelete(conversation)}
                 aria-label={`Delete ${conversation.title}`}
               >
                 Del
@@ -88,6 +132,41 @@ export default function Sidebar({
           Log out
         </button>
       </div>
+
+      {modalState?.type === "rename" ? (
+        <Modal
+          title="Rename conversation"
+          description="Choose a short, recognizable title."
+          confirmLabel="Save"
+          isLoading={isSubmitting}
+          error={modalError}
+          onClose={closeModal}
+          onConfirm={confirmRename}
+        >
+          <label>
+            Conversation title
+            <input
+              value={draftTitle}
+              onChange={(event) => setDraftTitle(event.target.value)}
+              autoFocus
+              maxLength={255}
+            />
+          </label>
+        </Modal>
+      ) : null}
+
+      {modalState?.type === "delete" ? (
+        <Modal
+          title="Delete conversation"
+          description={`This will permanently delete "${modalState.conversation.title}" and its messages.`}
+          confirmLabel="Delete"
+          destructive
+          isLoading={isSubmitting}
+          error={modalError}
+          onClose={closeModal}
+          onConfirm={confirmDelete}
+        />
+      ) : null}
     </aside>
   );
 }

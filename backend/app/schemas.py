@@ -78,7 +78,7 @@ class AchievementRead(BaseModel):
     earned_at: datetime | None = None
 
 
-class UserProgressRead(BaseModel):
+class UserProgressStats(BaseModel):
     sessions_count: int
     messages_count: int
     correct_answers: int
@@ -87,4 +87,13 @@ class UserProgressRead(BaseModel):
     current_streak_days: int
     last_streak_date: date | None
     last_activity_at: datetime | None
+
+
+class UserProgressRead(UserProgressStats):
     achievements: list[AchievementRead]
+
+
+class ProgressResponse(BaseModel):
+    progress: UserProgressStats
+    achievements: list[AchievementRead]
+    new_achievements: list[AchievementRead]

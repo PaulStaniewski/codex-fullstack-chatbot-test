@@ -170,7 +170,10 @@ def get_progress_condition_value(progress: models.UserProgress, condition_type: 
     return 0
 
 
-def evaluate_achievements(user_progress: models.UserProgress, db: Session) -> None:
+def evaluate_achievements(
+    user_progress: models.UserProgress,
+    db: Session,
+) -> list[models.Achievement]:
     """
     Check all achievements and grant missing ones
     when progress thresholds are met.
@@ -189,6 +192,7 @@ def evaluate_achievements(user_progress: models.UserProgress, db: Session) -> No
         if isinstance(item, models.UserAchievement) and item.user_id == user_progress.user_id
     )
 
+    newly_earned = []
     for achievement in achievements:
         if achievement.id in earned_ids:
             continue
@@ -198,9 +202,13 @@ def evaluate_achievements(user_progress: models.UserProgress, db: Session) -> No
                 models.UserAchievement(
                     user_id=user_progress.user_id,
                     achievement_id=achievement.id,
+                    notified=False,
                 )
             )
             earned_ids.add(achievement.id)
+            newly_earned.append(achievement)
+
+    return newly_earned
 
 
 def award_earned_achievements(db: Session, progress: models.UserProgress) -> None:

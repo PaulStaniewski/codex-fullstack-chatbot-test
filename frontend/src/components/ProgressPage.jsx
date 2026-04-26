@@ -15,7 +15,18 @@ function formatTime(seconds) {
   return `${minutes}m`;
 }
 
-export default function ProgressPage({ token, theme, onToggleTheme }) {
+function normalizeProgressResponse(data) {
+  if (data?.progress) {
+    return {
+      ...data.progress,
+      achievements: data.achievements || [],
+    };
+  }
+
+  return data;
+}
+
+export default function ProgressPage({ token, theme, onToggleTheme, onAchievementUnlocked }) {
   const [progress, setProgress] = useState(null);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
@@ -29,7 +40,8 @@ export default function ProgressPage({ token, theme, onToggleTheme }) {
       try {
         const data = await apiFetch("/progress", { token });
         if (isMounted) {
-          setProgress(data);
+          setProgress(normalizeProgressResponse(data));
+          onAchievementUnlocked?.(data?.new_achievements || []);
         }
       } catch (err) {
         if (isMounted) {

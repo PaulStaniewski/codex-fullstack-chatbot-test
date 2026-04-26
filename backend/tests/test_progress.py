@@ -32,14 +32,15 @@ def test_progress_defaults(client):
 
     assert response.status_code == 200
     data = response.json()
-    assert data["sessions_count"] == 0
-    assert data["messages_count"] == 0
-    assert data["correct_answers"] == 0
-    assert data["incorrect_answers"] == 0
-    assert data["time_spent_seconds"] == 0
-    assert data["current_streak_days"] == 0
-    assert data["last_streak_date"] is None
+    assert data["progress"]["sessions_count"] == 0
+    assert data["progress"]["messages_count"] == 0
+    assert data["progress"]["correct_answers"] == 0
+    assert data["progress"]["incorrect_answers"] == 0
+    assert data["progress"]["time_spent_seconds"] == 0
+    assert data["progress"]["current_streak_days"] == 0
+    assert data["progress"]["last_streak_date"] is None
     assert data["achievements"] == []
+    assert data["new_achievements"] == []
 
 
 def test_progress_tracks_sessions_messages_and_achievements(client, monkeypatch):
@@ -62,13 +63,20 @@ def test_progress_tracks_sessions_messages_and_achievements(client, monkeypatch)
     assert response.status_code == 200
     data = response.json()
     achievement_names = {achievement["name"] for achievement in data["achievements"]}
-    assert data["sessions_count"] == 1
-    assert data["messages_count"] == 1
-    assert data["current_streak_days"] == 1
-    assert data["last_streak_date"] is not None
-    assert data["last_activity_at"] is not None
+    new_achievement_names = {achievement["name"] for achievement in data["new_achievements"]}
+    assert data["progress"]["sessions_count"] == 1
+    assert data["progress"]["messages_count"] == 1
+    assert data["progress"]["current_streak_days"] == 1
+    assert data["progress"]["last_streak_date"] is not None
+    assert data["progress"]["last_activity_at"] is not None
     assert "First Session" in achievement_names
     assert "Conversation Starter" in achievement_names
+    assert "First Session" in new_achievement_names
+    assert "Conversation Starter" in new_achievement_names
+
+    second_response = client.get("/progress", headers={"Authorization": f"Bearer {token}"})
+    assert second_response.status_code == 200
+    assert second_response.json()["new_achievements"] == []
 
 
 def test_progress_requires_auth(client):

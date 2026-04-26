@@ -48,6 +48,7 @@ def upgrade() -> None:
         sa.Column("user_id", sa.Integer(), nullable=False),
         sa.Column("achievement_id", sa.Integer(), nullable=False),
         sa.Column("earned_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column("notified", sa.Boolean(), nullable=False, server_default=sa.false()),
         sa.ForeignKeyConstraint(["achievement_id"], ["achievements.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("user_id", "achievement_id"),

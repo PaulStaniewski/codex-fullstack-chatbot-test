@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { apiFetch, getApiBaseUrl, getStreamUrl } from "./api.js";
+import AchievementToast from "./components/AchievementToast.jsx";
 import AuthView from "./components/AuthView.jsx";
 import ChatWindow from "./components/ChatWindow.jsx";
 import ProgressPage from "./components/ProgressPage.jsx";
@@ -33,6 +34,7 @@ export default function App() {
   const [isExporting, setIsExporting] = useState(false);
   const [failedMessage, setFailedMessage] = useState(null);
   const [activeView, setActiveView] = useState("chat");
+  const [achievementToast, setAchievementToast] = useState(null);
   const eventSourceRef = useRef(null);
 
   useEffect(() => {
@@ -79,6 +81,7 @@ export default function App() {
     setError("");
     setIsStreaming(false);
     setActiveView("chat");
+    setAchievementToast(null);
   }
 
   function toggleTheme() {
@@ -95,6 +98,25 @@ export default function App() {
 
   function dismissToast(id) {
     setToasts((current) => current.filter((toast) => toast.id !== id));
+  }
+
+  function showAchievementToast(achievements = []) {
+    if (achievements.length > 0) {
+      setAchievementToast(achievements[0]);
+    }
+  }
+
+  async function checkProgressAchievements() {
+    if (!token) {
+      return;
+    }
+
+    try {
+      const data = await apiFetch("/progress", { token });
+      showAchievementToast(data?.new_achievements || []);
+    } catch {
+      // Achievement notifications should never interrupt chat or navigation flows.
+    }
   }
 
   async function loadConversations() {
@@ -145,6 +167,7 @@ export default function App() {
     setSelectedConversation(conversation);
     setMessages([]);
     setActiveView("chat");
+    await checkProgressAchievements();
     return conversation;
   }
 
@@ -429,6 +452,7 @@ export default function App() {
         } else {
           setFailedMessage(null);
           loadConversations();
+          checkProgressAchievements();
         }
       };
     } catch (err) {
@@ -494,7 +518,12 @@ export default function App() {
       />
 
       {activeView === "progress" ? (
-        <ProgressPage token={token} theme={theme} onToggleTheme={toggleTheme} />
+        <ProgressPage
+          token={token}
+          theme={theme}
+          onToggleTheme={toggleTheme}
+          onAchievementUnlocked={showAchievementToast}
+        />
       ) : (
         <ChatWindow
           conversation={selectedConversation}
@@ -512,6 +541,12 @@ export default function App() {
       )}
 
       <ToastStack toasts={toasts} onDismiss={dismissToast} />
+      {achievementToast ? (
+        <AchievementToast
+          achievement={achievementToast}
+          onClose={() => setAchievementToast(null)}
+        />
+      ) : null}
     </div>
   );
 }

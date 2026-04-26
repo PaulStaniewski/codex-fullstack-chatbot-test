@@ -111,6 +111,7 @@ class UserAchievement(Base):
     earned_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+    notified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     user: Mapped[User] = relationship(back_populates="achievements")
     achievement: Mapped[Achievement] = relationship(back_populates="users")

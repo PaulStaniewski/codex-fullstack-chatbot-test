@@ -100,7 +100,14 @@ export default function App() {
     try {
       const data = await apiFetch("/conversations", { token });
       setConversations(sortConversations(data));
-      if (!selectedConversation) {
+      if (selectedConversation) {
+        const updatedSelectedConversation = data.find(
+          (conversation) => conversation.id === selectedConversation.id,
+        );
+        if (updatedSelectedConversation) {
+          setSelectedConversation(updatedSelectedConversation);
+        }
+      } else {
         const savedConversationId = Number(localStorage.getItem(ACTIVE_CONVERSATION_KEY));
         const savedConversation = data.find(
           (conversation) => conversation.id === savedConversationId,
@@ -393,6 +400,8 @@ export default function App() {
         );
         if (!assistantContent) {
           showToast("error", "Streaming failed. Please try again.");
+        } else {
+          loadConversations();
         }
       };
     } catch (err) {

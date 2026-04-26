@@ -197,3 +197,40 @@ def test_chat_stream_rate_limit_exceeded(client, monkeypatch):
     assert limited_response.status_code == 200
     assert "data: Error: Too many requests. Please wait a moment." in limited_response.text
     assert calls == 2
+
+
+def test_chat_stream_generates_title_for_empty_conversation_title(client, monkeypatch):
+    monkeypatch.setattr("app.routes.chat_routes._stream_openai_text", _fake_openai_stream)
+    client.post(
+        "/register",
+        json={"email": "title@example.com", "password": "password123"},
+    )
+    login_response = client.post(
+        "/login",
+        json={"email": "title@example.com", "password": "password123"},
+    )
+    token = login_response.json()["access_token"]
+    conversation_response = client.post(
+        "/conversations",
+        json={"title": ""},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    conversation_id = conversation_response.json()["id"]
+
+    stream_response = client.get(
+        "/chat-stream",
+        params={
+            "conversation_id": conversation_id,
+            "message": "explain Docker networking!",
+            "token": token,
+        },
+    )
+    conversations_response = client.get(
+        "/conversations",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert stream_response.status_code == 200
+    conversation = conversations_response.json()[0]
+    assert conversation["id"] == conversation_id
+    assert conversation["title"] == "Explain Docker networking"

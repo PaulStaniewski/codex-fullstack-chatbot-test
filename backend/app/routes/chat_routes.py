@@ -27,6 +27,7 @@ SAFE_STREAM_ERROR = "Error: Unable to generate response."
 MESSAGE_TOO_LONG_ERROR = "Error: Message is too long. Please keep it under 2000 characters."
 RATE_LIMIT_ERROR = "Error: Too many requests. Please wait a moment."
 MAX_CHAT_MESSAGE_LENGTH = 2000
+MAX_GENERATED_TITLE_LENGTH = 60
 CHAT_STREAM_RATE_LIMIT = 10
 CHAT_STREAM_RATE_WINDOW_SECONDS = 60
 _rate_limit_buckets: dict[int, list[float]] = {}
@@ -63,6 +64,17 @@ def build_system_prompt(mode: str) -> str:
             "Do not give full solutions immediately."
         )
     return "You are a helpful AI assistant."
+
+
+def generate_conversation_title(text: str) -> str:
+    title = " ".join(text.strip().split())
+    title = title.rstrip(".,!?;:-")
+    if len(title) > MAX_GENERATED_TITLE_LENGTH:
+        title = title[:MAX_GENERATED_TITLE_LENGTH].rstrip()
+        title = title.rstrip(".,!?;:-")
+    if not title:
+        return "New conversation"
+    return title[0].upper() + title[1:]
 
 
 def _build_openai_input(
@@ -136,6 +148,7 @@ async def chat_stream(
     current_user = auth.get_user_from_token(db, token)
     user_id = current_user.id
     conversation = _get_owned_conversation(db, conversation_id, user_id)
+    should_generate_title = not conversation.title.strip()
 
     if len(clean_message) > MAX_CHAT_MESSAGE_LENGTH:
         logger.info(
@@ -224,6 +237,15 @@ async def chat_stream(
                 content=assistant_content,
             )
             db.add(assistant_message)
+            if should_generate_title:
+                (
+                    db.query(models.Conversation)
+                    .filter(
+                        models.Conversation.id == conversation_id,
+                        models.Conversation.user_id == user_id,
+                    )
+                    .update({"title": generate_conversation_title(clean_message)})
+                )
             db.commit()
         finally:
             db.close()

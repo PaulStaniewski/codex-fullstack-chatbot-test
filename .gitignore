@@ -18,3 +18,5 @@ uploads/
 .env.production
 
 .DS_Store
+.venv/
+backend/.venv/

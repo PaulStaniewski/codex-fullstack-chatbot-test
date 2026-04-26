@@ -18,6 +18,11 @@ def _create_authenticated_conversation(client):
     return token, conversation_id
 
 
+async def _fake_openai_stream(_openai_input):
+    for chunk in ["This ", "is ", "a streamed assistant response."]:
+        yield chunk
+
+
 def test_chat_stream_requires_token(client):
     response = client.get(
         "/chat-stream",
@@ -38,7 +43,8 @@ def test_chat_stream_invalid_conversation_returns_404(client):
     assert response.status_code == 404
 
 
-def test_chat_stream_returns_sse_data(client):
+def test_chat_stream_returns_sse_data(client, monkeypatch):
+    monkeypatch.setattr("app.routes.chat_routes._stream_openai_text", _fake_openai_stream)
     token, conversation_id = _create_authenticated_conversation(client)
 
     response = client.get(
@@ -48,11 +54,12 @@ def test_chat_stream_returns_sse_data(client):
 
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/event-stream")
-    assert "data: This" in response.text
-    assert "data: response." in response.text
+    assert "data: This " in response.text
+    assert "data: a streamed assistant response." in response.text
 
 
-def test_chat_stream_persists_user_and_assistant_messages(client):
+def test_chat_stream_persists_user_and_assistant_messages(client, monkeypatch):
+    monkeypatch.setattr("app.routes.chat_routes._stream_openai_text", _fake_openai_stream)
     token, conversation_id = _create_authenticated_conversation(client)
 
     stream_response = client.get(

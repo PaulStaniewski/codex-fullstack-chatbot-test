@@ -1,6 +1,17 @@
 import { useState } from "react";
 import Modal from "./Modal.jsx";
 
+const COLLAPSED_SECTIONS_STORAGE_KEY = "sidebar.collapsedSections";
+
+function loadCollapsedSections() {
+  try {
+    const savedSections = localStorage.getItem(COLLAPSED_SECTIONS_STORAGE_KEY);
+    return savedSections ? JSON.parse(savedSections) : {};
+  } catch {
+    return {};
+  }
+}
+
 export default function Sidebar({
   conversations,
   selectedConversationId,
@@ -19,6 +30,7 @@ export default function Sidebar({
   const [modalError, setModalError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [collapsedSections, setCollapsedSections] = useState(loadCollapsedSections);
   const cleanSearchQuery = searchQuery.trim().toLowerCase();
   const filteredConversations = cleanSearchQuery
     ? conversations.filter((conversation) =>
@@ -141,6 +153,22 @@ export default function Sidebar({
       .filter((group) => group.conversations.length > 0);
   }
 
+  function getSectionId(label) {
+    return label.toLowerCase().replaceAll(" ", "-");
+  }
+
+  function toggleSection(sectionId) {
+    setCollapsedSections((currentSections) => {
+      const nextSections = {
+        ...currentSections,
+        [sectionId]: !currentSections[sectionId],
+      };
+
+      localStorage.setItem(COLLAPSED_SECTIONS_STORAGE_KEY, JSON.stringify(nextSections));
+      return nextSections;
+    });
+  }
+
   function renderConversation(conversation) {
     const isActive = conversation.id === selectedConversationId;
 
@@ -199,6 +227,46 @@ export default function Sidebar({
           </button>
         </div>
       </div>
+    );
+  }
+
+  function renderSection(label, sectionId, sectionConversations) {
+    const isCollapsed = Boolean(collapsedSections[sectionId]);
+    const headingId = `conversations-${sectionId}`;
+    const listId = `${headingId}-list`;
+
+    return (
+      <section className="conversation-section" aria-labelledby={headingId} key={sectionId}>
+        <button
+          type="button"
+          className="conversation-section-label"
+          id={headingId}
+          aria-expanded={!isCollapsed}
+          aria-controls={listId}
+          onClick={() => toggleSection(sectionId)}
+        >
+          <span className="section-label-text">
+            <span className="section-chevron" aria-hidden="true">
+              ›
+            </span>
+            <span>{label}</span>
+          </span>
+          <span className="section-count">{sectionConversations.length}</span>
+        </button>
+        <div
+          className={
+            isCollapsed
+              ? "conversation-section-body collapsed"
+              : "conversation-section-body"
+          }
+          id={listId}
+          aria-hidden={isCollapsed}
+        >
+          <div className="conversation-section-list">
+            {sectionConversations.map(renderConversation)}
+          </div>
+        </div>
+      </section>
     );
   }
 
@@ -263,34 +331,13 @@ export default function Sidebar({
         ) : null}
 
         {!isLoading && pinnedConversations.length > 0 ? (
-          <section className="conversation-section" aria-labelledby="pinned-conversations">
-            <div className="conversation-section-label" id="pinned-conversations">
-              Pinned
-            </div>
-            <div className="conversation-section-list">
-              {pinnedConversations.map(renderConversation)}
-            </div>
-          </section>
+          renderSection("Pinned", "pinned", pinnedConversations)
         ) : null}
 
         {!isLoading
-          ? groupedRecentConversations.map((group) => (
-              <section
-                className="conversation-section"
-                aria-labelledby={`conversations-${group.label.toLowerCase().replaceAll(" ", "-")}`}
-                key={group.label}
-              >
-                <div
-                  className="conversation-section-label"
-                  id={`conversations-${group.label.toLowerCase().replaceAll(" ", "-")}`}
-                >
-                  {group.label}
-                </div>
-                <div className="conversation-section-list">
-                  {group.conversations.map(renderConversation)}
-                </div>
-              </section>
-            ))
+          ? groupedRecentConversations.map((group) =>
+              renderSection(group.label, getSectionId(group.label), group.conversations),
+            )
           : null}
       </nav>
 

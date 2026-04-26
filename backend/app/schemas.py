@@ -64,3 +64,25 @@ class MessageRead(BaseModel):
     role: str
     content: str
     created_at: datetime
+
+
+class AchievementRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    description: str
+    icon: str
+    condition_type: str
+    condition_value: int
+    earned_at: datetime | None = None
+
+
+class UserProgressRead(BaseModel):
+    sessions_count: int
+    messages_count: int
+    correct_answers: int
+    incorrect_answers: int
+    time_spent_seconds: int
+    last_activity_at: datetime | None
+    achievements: list[AchievementRead]

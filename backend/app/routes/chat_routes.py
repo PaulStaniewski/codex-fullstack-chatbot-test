@@ -15,7 +15,7 @@ from openai import (
 )
 from sqlalchemy.orm import Session
 
-from app import auth, models
+from app import auth, models, progress as progress_service
 from app.database import get_db
 
 
@@ -193,6 +193,7 @@ async def chat_stream(
         content=clean_message,
     )
     db.add(user_message)
+    progress_service.update_progress_activity(db, user_id, messages_delta=1)
     db.commit()
 
     async def event_generator():

@@ -261,44 +261,50 @@ export default function ChatWindow({
           </div>
         ) : null}
 
-        {messages.map((message) => (
-          <article
-            key={message.id}
-            className={`message ${message.role}${isStreaming && message.role === "assistant" && !message.content ? " streaming" : ""}`}
-          >
-            <div className="message-meta">
-              <span>{message.role === "assistant" ? "Assistant" : "You"}</span>
-              <div className="message-actions">
-                {isStreaming && message.role === "assistant" ? <span>typing</span> : null}
-                {message.content ? (
-                  <button type="button" onClick={() => copyMessage(message)}>
-                    {copiedMessageId === message.id ? "Copied" : "Copy"}
-                  </button>
-                ) : null}
-              </div>
-            </div>
-            {message.content ? (
-              renderMessageContent(message)
-            ) : (
-              <div className="typing-dots" aria-label="Assistant is typing">
-                <span></span>
-                <span></span>
-                <span></span>
-              </div>
-            )}
-            {message.failed ? (
-              <div className="message-retry">
-                <button
-                  type="button"
-                  onClick={() => onRetryMessage(message.retryContent)}
-                  disabled={isStreaming}
-                >
-                  Retry
-                </button>
-              </div>
-            ) : null}
-          </article>
-        ))}
+        {messages.length > 0 ? (
+          <div className="message-thread">
+            {messages.map((message) => (
+              <article
+                key={message.id}
+                className={`message-row ${message.role}${isStreaming && message.role === "assistant" && !message.content ? " streaming" : ""}`}
+              >
+                <div className="message-bubble">
+                  <div className="message-meta">
+                    <span>{message.role === "assistant" ? "Assistant" : "You"}</span>
+                    <div className="message-actions">
+                      {isStreaming && message.role === "assistant" ? <span>typing</span> : null}
+                      {message.content ? (
+                        <button type="button" onClick={() => copyMessage(message)}>
+                          {copiedMessageId === message.id ? "Copied" : "Copy"}
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
+                  {message.content ? (
+                    renderMessageContent(message)
+                  ) : (
+                    <div className="typing-dots" aria-label="Assistant is typing">
+                      <span></span>
+                      <span></span>
+                      <span></span>
+                    </div>
+                  )}
+                  {message.failed ? (
+                    <div className="message-retry">
+                      <button
+                        type="button"
+                        onClick={() => onRetryMessage(message.retryContent)}
+                        disabled={isStreaming}
+                      >
+                        Retry
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : null}
       </section>
 
       {!isNearBottom && hasNewActivityAwayFromBottom ? (

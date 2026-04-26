@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { apiFetch, getApiBaseUrl, getStreamUrl } from "./api.js";
 import AuthView from "./components/AuthView.jsx";
 import ChatWindow from "./components/ChatWindow.jsx";
+import ProgressPage from "./components/ProgressPage.jsx";
 import Sidebar from "./components/Sidebar.jsx";
 import ToastStack from "./components/ToastStack.jsx";
 
@@ -31,6 +32,7 @@ export default function App() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [failedMessage, setFailedMessage] = useState(null);
+  const [activeView, setActiveView] = useState("chat");
   const eventSourceRef = useRef(null);
 
   useEffect(() => {
@@ -76,6 +78,7 @@ export default function App() {
     setMessages([]);
     setError("");
     setIsStreaming(false);
+    setActiveView("chat");
   }
 
   function toggleTheme() {
@@ -141,6 +144,7 @@ export default function App() {
     localStorage.setItem(ACTIVE_CONVERSATION_KEY, String(conversation.id));
     setSelectedConversation(conversation);
     setMessages([]);
+    setActiveView("chat");
     return conversation;
   }
 
@@ -150,7 +154,12 @@ export default function App() {
     setIsStreaming(false);
     localStorage.setItem(ACTIVE_CONVERSATION_KEY, String(conversation.id));
     setSelectedConversation(conversation);
+    setActiveView("chat");
     await loadMessages(conversation.id);
+  }
+
+  function showProgress() {
+    setActiveView("progress");
   }
 
   async function renameConversation(conversation, title) {
@@ -476,25 +485,31 @@ export default function App() {
         onRenameConversation={renameConversation}
         onDeleteConversation={deleteConversation}
         onTogglePin={toggleConversationPin}
+        onShowProgress={showProgress}
         onLogout={logout}
+        isProgressActive={activeView === "progress"}
         isLoading={isConversationsLoading}
         isMessagesLoading={isMessagesLoading}
         isStreaming={isStreaming}
       />
 
-      <ChatWindow
-        conversation={selectedConversation}
-        messages={messages}
-        onSendMessage={sendMessage}
-        onRetryMessage={retryMessage}
-        onUpdateMode={updateConversationMode}
-        onExportConversation={exportConversation}
-        isStreaming={isStreaming}
-        isLoading={isMessagesLoading}
-        isExporting={isExporting}
-        theme={theme}
-        onToggleTheme={toggleTheme}
-      />
+      {activeView === "progress" ? (
+        <ProgressPage token={token} theme={theme} onToggleTheme={toggleTheme} />
+      ) : (
+        <ChatWindow
+          conversation={selectedConversation}
+          messages={messages}
+          onSendMessage={sendMessage}
+          onRetryMessage={retryMessage}
+          onUpdateMode={updateConversationMode}
+          onExportConversation={exportConversation}
+          isStreaming={isStreaming}
+          isLoading={isMessagesLoading}
+          isExporting={isExporting}
+          theme={theme}
+          onToggleTheme={toggleTheme}
+        />
+      )}
 
       <ToastStack toasts={toasts} onDismiss={dismissToast} />
     </div>

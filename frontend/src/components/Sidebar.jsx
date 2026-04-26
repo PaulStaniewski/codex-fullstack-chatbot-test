@@ -20,7 +20,9 @@ export default function Sidebar({
   onRenameConversation,
   onDeleteConversation,
   onTogglePin,
+  onShowProgress,
   onLogout,
+  isProgressActive,
   isLoading,
   isMessagesLoading,
   isStreaming,
@@ -297,6 +299,14 @@ export default function Sidebar({
         >
           <span>New chat</span>
           <span aria-hidden="true">+</span>
+        </button>
+        <button
+          className={isProgressActive ? "sidebar-nav-button active" : "sidebar-nav-button"}
+          type="button"
+          onClick={onShowProgress}
+        >
+          <span aria-hidden="true">📘</span>
+          <span>Progress</span>
         </button>
       </div>
 

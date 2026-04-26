@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
-from app import auth, models, schemas
+from app import auth, models, progress as progress_service, schemas
 from app.database import get_db
 
 
@@ -91,6 +91,7 @@ def create_conversation(
 ):
     conversation = models.Conversation(title=conversation_in.title, user_id=current_user.id)
     db.add(conversation)
+    progress_service.update_progress_activity(db, current_user.id, sessions_delta=1)
     db.commit()
     db.refresh(conversation)
     return conversation

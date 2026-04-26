@@ -30,3 +30,26 @@ This project is intentionally designed as a benchmark to evaluate:
 The system will be built incrementally using AI coding agents.
 
 Each feature will be implemented as a separate task.
+
+## Backend
+
+The backend lives in `backend/` and exposes a FastAPI API with JWT authentication,
+PostgreSQL persistence, SQLAlchemy models, and Alembic migrations.
+
+Run locally:
+
+```bash
+cd backend
+python -m pip install -r requirements.txt
+alembic upgrade head
+uvicorn app.main:app --reload
+```
+
+Run with Docker Compose:
+
+```bash
+docker compose up --build
+```
+
+The API is available at `http://localhost:8000`, with interactive docs at
+`http://localhost:8000/docs`.

@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 
 from app import models
 from app.progress import (
-    award_earned_achievements,
+    evaluate_achievements,
     get_progress_condition_value,
     update_learning_streak,
     update_time_spent,
@@ -170,7 +170,7 @@ def test_achievement_granted_when_threshold_reached(client):
     try:
         progress = db.query(models.UserProgress).first()
         progress.current_streak_days = 3
-        award_earned_achievements(db, progress)
+        evaluate_achievements(progress, db)
         db.commit()
 
         earned_names = {
@@ -183,6 +183,38 @@ def test_achievement_granted_when_threshold_reached(client):
         db.close()
 
     assert "Consistent Learner" in earned_names
+
+
+def test_achievement_not_granted_before_threshold(client):
+    token = _register_and_login(client)
+    response = client.post(
+        "/conversations",
+        json={"title": "Practice"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 201
+
+    from app.database import get_db
+
+    db = next(client.app.dependency_overrides[get_db]())
+    try:
+        progress = db.query(models.UserProgress).first()
+        progress.messages_count = 49
+        progress.current_streak_days = 2
+        evaluate_achievements(progress, db)
+        db.commit()
+
+        earned_names = {
+            item.achievement.name
+            for item in db.query(models.UserAchievement)
+            .filter(models.UserAchievement.user_id == progress.user_id)
+            .all()
+        }
+    finally:
+        db.close()
+
+    assert "Communicator" not in earned_names
+    assert "Consistent Learner" not in earned_names
 
 
 def test_achievement_not_granted_twice(client):
@@ -200,8 +232,8 @@ def test_achievement_not_granted_twice(client):
     try:
         progress = db.query(models.UserProgress).first()
         progress.current_streak_days = 3
-        award_earned_achievements(db, progress)
-        award_earned_achievements(db, progress)
+        evaluate_achievements(progress, db)
+        evaluate_achievements(progress, db)
         db.commit()
 
         achievements = (
@@ -219,14 +251,53 @@ def test_achievement_not_granted_twice(client):
     assert len(achievements) == 1
 
 
+def test_multiple_achievements_triggered_in_one_update(client):
+    token = _register_and_login(client)
+    response = client.post(
+        "/conversations",
+        json={"title": "Practice"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 201
+
+    from app.database import get_db
+
+    db = next(client.app.dependency_overrides[get_db]())
+    try:
+        progress = db.query(models.UserProgress).first()
+        progress.sessions_count = 5
+        progress.messages_count = 50
+        progress.current_streak_days = 7
+        progress.time_spent_seconds = 3600
+        evaluate_achievements(progress, db)
+        db.commit()
+
+        earned_names = {
+            item.achievement.name
+            for item in db.query(models.UserAchievement)
+            .filter(models.UserAchievement.user_id == progress.user_id)
+            .all()
+        }
+    finally:
+        db.close()
+
+    assert "Explorer" in earned_names
+    assert "Communicator" in earned_names
+    assert "Consistent Learner" in earned_names
+    assert "Dedicated" in earned_names
+    assert "Marathon" in earned_names
+
+
 def test_progress_condition_mapping():
     progress = models.UserProgress(
         user_id=1,
         current_streak_days=7,
         time_spent_seconds=3600,
         messages_count=50,
+        sessions_count=5,
     )
 
     assert get_progress_condition_value(progress, "streak_days") == 7
     assert get_progress_condition_value(progress, "time_spent_seconds") == 3600
     assert get_progress_condition_value(progress, "messages_count") == 50
+    assert get_progress_condition_value(progress, "sessions_count") == 5

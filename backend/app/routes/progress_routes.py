@@ -14,7 +14,7 @@ def get_progress(
     db: Session = Depends(get_db),
 ):
     progress = progress_service.get_or_create_progress(db, current_user.id)
-    progress_service.award_earned_achievements(db, progress)
+    progress_service.evaluate_achievements(progress, db)
     db.commit()
     db.refresh(progress)
 

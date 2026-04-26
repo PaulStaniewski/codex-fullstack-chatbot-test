@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app import auth, models, schemas
@@ -6,6 +6,20 @@ from app.database import get_db
 
 
 router = APIRouter(prefix="/conversations", tags=["conversations"])
+
+
+def _get_owned_conversation(db: Session, conversation_id: int, user_id: int) -> models.Conversation:
+    conversation = (
+        db.query(models.Conversation)
+        .filter(
+            models.Conversation.id == conversation_id,
+            models.Conversation.user_id == user_id,
+        )
+        .first()
+    )
+    if not conversation:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found")
+    return conversation
 
 
 @router.post("", response_model=schemas.ConversationRead, status_code=status.HTTP_201_CREATED)
@@ -32,3 +46,29 @@ def list_conversations(
         .order_by(models.Conversation.created_at.desc())
         .all()
     )
+
+
+@router.patch("/{conversation_id}", response_model=schemas.ConversationRead)
+def update_conversation(
+    conversation_id: int,
+    conversation_in: schemas.ConversationUpdate,
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db),
+):
+    conversation = _get_owned_conversation(db, conversation_id, current_user.id)
+    conversation.title = conversation_in.title
+    db.commit()
+    db.refresh(conversation)
+    return conversation
+
+
+@router.delete("/{conversation_id}")
+def delete_conversation(
+    conversation_id: int,
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db),
+):
+    conversation = _get_owned_conversation(db, conversation_id, current_user.id)
+    db.delete(conversation)
+    db.commit()
+    return {"success": True}

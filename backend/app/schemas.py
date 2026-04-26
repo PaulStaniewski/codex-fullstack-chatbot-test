@@ -30,6 +30,10 @@ class ConversationCreate(BaseModel):
     title: str = Field(default="New conversation", max_length=255)
 
 
+class ConversationUpdate(BaseModel):
+    title: str = Field(min_length=1, max_length=255)
+
+
 class ConversationRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

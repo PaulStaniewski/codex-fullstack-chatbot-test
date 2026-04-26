@@ -40,9 +40,7 @@ def authenticate_user(db: Session, email: str, password: str) -> models.User | N
     return user
 
 
-def get_current_user(
-    token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)
-) -> models.User:
+def get_user_from_token(db: Session, token: str) -> models.User:
     credentials_error = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -61,3 +59,9 @@ def get_current_user(
     if user is None:
         raise credentials_error
     return user
+
+
+def get_current_user(
+    token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)
+) -> models.User:
+    return get_user_from_token(db, token)

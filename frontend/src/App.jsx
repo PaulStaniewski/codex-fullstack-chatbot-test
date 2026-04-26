@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { apiFetch, getStreamUrl } from "./api.js";
+import { apiFetch, getApiBaseUrl, getStreamUrl } from "./api.js";
 import AuthView from "./components/AuthView.jsx";
 import ChatWindow from "./components/ChatWindow.jsx";
 import Sidebar from "./components/Sidebar.jsx";
@@ -20,6 +20,7 @@ export default function App() {
   const [isConversationsLoading, setIsConversationsLoading] = useState(false);
   const [isMessagesLoading, setIsMessagesLoading] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const eventSourceRef = useRef(null);
 
   useEffect(() => {
@@ -216,6 +217,55 @@ export default function App() {
     }
   }
 
+  async function exportConversation(format) {
+    if (!selectedConversation) {
+      return;
+    }
+
+    setIsExporting(true);
+    setError("");
+    try {
+      const response = await fetch(
+        `${getApiBaseUrl()}/conversations/${selectedConversation.id}/export?format=${encodeURIComponent(format)}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
+
+      if (!response.ok) {
+        let message = "Unable to export conversation.";
+        try {
+          const data = await response.json();
+          message = data?.detail || message;
+        } catch {
+          // Keep the generic message when the response is not JSON.
+        }
+        throw new Error(message);
+      }
+
+      const blob = await response.blob();
+      const contentDisposition = response.headers.get("content-disposition") || "";
+      const filenameMatch = contentDisposition.match(/filename="([^"]+)"/);
+      const filename = filenameMatch?.[1] || `conversation-${selectedConversation.id}.${format}`;
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      showToast("success", "Conversation exported.");
+    } catch (err) {
+      handleRequestError(err);
+      showToast("error", "Unable to export conversation.");
+    } finally {
+      setIsExporting(false);
+    }
+  }
+
   async function loadMessages(conversationId) {
     setIsMessagesLoading(true);
     setError("");
@@ -358,8 +408,10 @@ export default function App() {
         messages={messages}
         onSendMessage={sendMessage}
         onUpdateMode={updateConversationMode}
+        onExportConversation={exportConversation}
         isStreaming={isStreaming}
         isLoading={isMessagesLoading}
+        isExporting={isExporting}
         theme={theme}
         onToggleTheme={toggleTheme}
       />

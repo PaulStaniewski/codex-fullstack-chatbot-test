@@ -135,3 +135,47 @@ def test_non_owner_cannot_update_conversation_mode(client):
     )
 
     assert response.status_code == 404
+
+
+def test_owner_can_export_conversation(client, monkeypatch):
+    async def fake_stream(_openai_input):
+        yield "Assistant reply"
+
+    monkeypatch.setattr("app.routes.chat_routes._stream_openai_text", fake_stream)
+    token = _register_and_login(client, "owner@example.com")
+    conversation = _create_conversation(client, token, title="Export me")
+
+    client.get(
+        "/chat-stream",
+        params={"conversation_id": conversation["id"], "message": "hello", "token": token},
+    )
+    response = client.get(
+        f"/conversations/{conversation['id']}/export",
+        params={"format": "txt"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 200
+    assert response.headers["content-disposition"] == (
+        f'attachment; filename="conversation-{conversation["id"]}.txt"'
+    )
+    assert response.headers["content-type"].startswith("text/plain")
+    assert "Export me" in response.text
+    assert "User (" in response.text
+    assert "hello" in response.text
+    assert "Assistant (" in response.text
+    assert "Assistant reply" in response.text
+
+
+def test_non_owner_cannot_export_conversation(client):
+    owner_token = _register_and_login(client, "owner@example.com")
+    other_token = _register_and_login(client, "other@example.com")
+    conversation = _create_conversation(client, owner_token)
+
+    response = client.get(
+        f"/conversations/{conversation['id']}/export",
+        params={"format": "json"},
+        headers={"Authorization": f"Bearer {other_token}"},
+    )
+
+    assert response.status_code == 404

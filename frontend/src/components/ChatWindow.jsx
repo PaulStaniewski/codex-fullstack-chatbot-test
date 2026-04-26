@@ -6,13 +6,16 @@ export default function ChatWindow({
   messages,
   onSendMessage,
   onUpdateMode,
+  onExportConversation,
   isStreaming,
   isLoading,
+  isExporting,
   theme,
   onToggleTheme,
 }) {
   const [draft, setDraft] = useState("");
   const [copiedMessageId, setCopiedMessageId] = useState(null);
+  const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
   const listRef = useRef(null);
 
   useEffect(() => {
@@ -49,6 +52,11 @@ export default function ChatWindow({
     }
   }
 
+  async function handleExport(format) {
+    setIsExportMenuOpen(false);
+    await onExportConversation(format);
+  }
+
   return (
     <main className="chat-shell">
       <header className="chat-header">
@@ -76,6 +84,32 @@ export default function ChatWindow({
               >
                 Learn
               </button>
+            </div>
+          ) : null}
+          {conversation ? (
+            <div className="export-menu">
+              <button
+                className="export-button"
+                type="button"
+                onClick={() => setIsExportMenuOpen((isOpen) => !isOpen)}
+                disabled={isStreaming || isExporting}
+                aria-expanded={isExportMenuOpen}
+              >
+                {isExporting ? "Exporting" : "Export"}
+              </button>
+              {isExportMenuOpen ? (
+                <div className="export-options">
+                  <button type="button" onClick={() => handleExport("txt")}>
+                    Export as TXT
+                  </button>
+                  <button type="button" onClick={() => handleExport("md")}>
+                    Export as Markdown
+                  </button>
+                  <button type="button" onClick={() => handleExport("json")}>
+                    Export as JSON
+                  </button>
+                </div>
+              ) : null}
             </div>
           ) : null}
           {isStreaming ? <span className="status-pill">Streaming</span> : null}

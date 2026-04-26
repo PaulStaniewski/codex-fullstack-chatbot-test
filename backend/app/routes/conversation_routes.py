@@ -1,4 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+import json
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
 from app import auth, models, schemas
@@ -7,6 +10,7 @@ from app.database import get_db
 
 router = APIRouter(prefix="/conversations", tags=["conversations"])
 ALLOWED_CONVERSATION_MODES = {"chat", "learn"}
+EXPORT_FORMATS = {"txt", "md", "json"}
 
 
 def _get_owned_conversation(db: Session, conversation_id: int, user_id: int) -> models.Conversation:
@@ -21,6 +25,62 @@ def _get_owned_conversation(db: Session, conversation_id: int, user_id: int) -> 
     if not conversation:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found")
     return conversation
+
+
+def _build_export_content(
+    conversation: models.Conversation,
+    messages: list[models.Message],
+    export_format: str,
+) -> tuple[str, str]:
+    if export_format == "json":
+        content = json.dumps(
+            {
+                "conversation": {
+                    "id": conversation.id,
+                    "title": conversation.title,
+                    "mode": conversation.mode,
+                    "created_at": conversation.created_at.isoformat(),
+                },
+                "messages": [
+                    {
+                        "id": message.id,
+                        "role": message.role,
+                        "content": message.content,
+                        "created_at": message.created_at.isoformat(),
+                    }
+                    for message in messages
+                ],
+            },
+            indent=2,
+        )
+        return content, "application/json"
+
+    if export_format == "md":
+        lines = [f"# {conversation.title}", ""]
+        for message in messages:
+            role = "User" if message.role == "user" else "Assistant"
+            lines.extend(
+                [
+                    f"## {role}",
+                    f"_ {message.created_at.isoformat()} _",
+                    "",
+                    message.content,
+                    "",
+                ]
+            )
+        return "\n".join(lines), "text/markdown; charset=utf-8"
+
+    lines = [conversation.title, ""]
+    for message in messages:
+        role = "User" if message.role == "user" else "Assistant"
+        lines.extend(
+            [
+                f"{role} ({message.created_at.isoformat()}):",
+                message.content,
+                "",
+            ]
+        )
+    return "\n".join(lines), "text/plain; charset=utf-8"
 
 
 @router.post("", response_model=schemas.ConversationRead, status_code=status.HTTP_201_CREATED)
@@ -46,6 +106,35 @@ def list_conversations(
         .filter(models.Conversation.user_id == current_user.id)
         .order_by(models.Conversation.created_at.desc())
         .all()
+    )
+
+
+@router.get("/{conversation_id}/export")
+def export_conversation(
+    conversation_id: int,
+    format: str = Query(default="txt"),
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db),
+):
+    if format not in EXPORT_FORMATS:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid export format")
+
+    conversation = _get_owned_conversation(db, conversation_id, current_user.id)
+    messages = (
+        db.query(models.Message)
+        .filter(
+            models.Message.conversation_id == conversation.id,
+            models.Message.user_id == current_user.id,
+        )
+        .order_by(models.Message.created_at.asc())
+        .all()
+    )
+    content, media_type = _build_export_content(conversation, messages, format)
+    filename = f"conversation-{conversation.id}.{format}"
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
 

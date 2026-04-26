@@ -659,6 +659,63 @@ input:focus,
   transform: translateY(-1px);
 }
 
+.export-menu {
+  position: relative;
+}
+
+.export-button {
+  min-height: 40px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 0 12px;
+  background: var(--hover);
+  color: var(--text);
+  font-size: 0.78rem;
+  font-weight: 900;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    transform 160ms ease;
+}
+
+.export-button:hover:not(:disabled) {
+  border-color: var(--border-strong);
+  background: var(--surface-soft);
+  transform: translateY(-1px);
+}
+
+.export-options {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 10;
+  display: grid;
+  min-width: 190px;
+  gap: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 6px;
+  background: var(--panel-strong);
+  box-shadow: var(--shadow-soft);
+}
+
+.export-options button {
+  min-height: 34px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  padding: 0 10px;
+  background: transparent;
+  color: var(--text-soft);
+  font-size: 0.82rem;
+  font-weight: 800;
+  text-align: left;
+}
+
+.export-options button:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
 .message-list {
   display: flex;
   min-height: 0;
@@ -1125,6 +1182,11 @@ input:focus,
 
   .chat-actions {
     gap: 8px;
+  }
+
+  .export-options {
+    right: auto;
+    left: 0;
   }
 
   .composer {

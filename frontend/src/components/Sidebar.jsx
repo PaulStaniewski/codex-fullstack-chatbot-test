@@ -31,6 +31,7 @@ export default function Sidebar({
   const recentConversations = filteredConversations.filter(
     (conversation) => !conversation.is_pinned,
   );
+  const groupedRecentConversations = groupConversationsByRecency(recentConversations);
 
   function openRename(conversation) {
     setDraftTitle(conversation.title);
@@ -86,6 +87,58 @@ export default function Sidebar({
     } finally {
       setIsSubmitting(false);
     }
+  }
+
+  function getConversationTimestamp(conversation) {
+    return conversation.updated_at || conversation.created_at;
+  }
+
+  function startOfDay(date) {
+    return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  }
+
+  function getRecencyGroup(conversation) {
+    const timestamp = getConversationTimestamp(conversation);
+    const conversationDate = timestamp ? new Date(timestamp) : null;
+
+    if (!conversationDate || Number.isNaN(conversationDate.getTime())) {
+      return "Older";
+    }
+
+    const today = startOfDay(new Date());
+    const conversationDay = startOfDay(conversationDate);
+    const ageInDays = Math.floor((today - conversationDay) / 86400000);
+
+    if (ageInDays === 0) {
+      return "Today";
+    }
+
+    if (ageInDays === 1) {
+      return "Yesterday";
+    }
+
+    if (ageInDays > 1 && ageInDays < 7) {
+      return "Last 7 days";
+    }
+
+    return "Older";
+  }
+
+  function groupConversationsByRecency(items) {
+    const groups = {
+      Today: [],
+      Yesterday: [],
+      "Last 7 days": [],
+      Older: [],
+    };
+
+    items.forEach((conversation) => {
+      groups[getRecencyGroup(conversation)].push(conversation);
+    });
+
+    return Object.entries(groups)
+      .map(([label, groupConversations]) => ({ label, conversations: groupConversations }))
+      .filter((group) => group.conversations.length > 0);
   }
 
   function renderConversation(conversation) {
@@ -220,16 +273,25 @@ export default function Sidebar({
           </section>
         ) : null}
 
-        {!isLoading && recentConversations.length > 0 ? (
-          <section className="conversation-section" aria-labelledby="recent-conversations">
-            <div className="conversation-section-label" id="recent-conversations">
-              Recent
-            </div>
-            <div className="conversation-section-list">
-              {recentConversations.map(renderConversation)}
-            </div>
-          </section>
-        ) : null}
+        {!isLoading
+          ? groupedRecentConversations.map((group) => (
+              <section
+                className="conversation-section"
+                aria-labelledby={`conversations-${group.label.toLowerCase().replaceAll(" ", "-")}`}
+                key={group.label}
+              >
+                <div
+                  className="conversation-section-label"
+                  id={`conversations-${group.label.toLowerCase().replaceAll(" ", "-")}`}
+                >
+                  {group.label}
+                </div>
+                <div className="conversation-section-list">
+                  {group.conversations.map(renderConversation)}
+                </div>
+              </section>
+            ))
+          : null}
       </nav>
 
       <div className="sidebar-footer">

@@ -471,11 +471,32 @@ input:focus,
 }
 
 .conversation-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-weight: 850;
+}
+
+.conversation-title > span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pin-marker {
+  flex: 0 0 auto;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px 6px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 0.62rem;
+  font-weight: 950;
+  text-transform: uppercase;
 }
 
 .conversation-item time,

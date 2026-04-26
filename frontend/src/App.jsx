@@ -9,6 +9,15 @@ const TOKEN_KEY = "chatbot_access_token";
 const ACTIVE_CONVERSATION_KEY = "chatbot_active_conversation_id";
 const THEME_KEY = "chatbot_theme";
 
+function sortConversations(conversations) {
+  return [...conversations].sort((a, b) => {
+    if (a.is_pinned !== b.is_pinned) {
+      return a.is_pinned ? -1 : 1;
+    }
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+  });
+}
+
 export default function App() {
   const [token, setToken] = useState(() => localStorage.getItem(TOKEN_KEY) || "");
   const [theme, setTheme] = useState(() => localStorage.getItem(THEME_KEY) || "dark");
@@ -90,7 +99,7 @@ export default function App() {
 
     try {
       const data = await apiFetch("/conversations", { token });
-      setConversations(data);
+      setConversations(sortConversations(data));
       if (!selectedConversation) {
         const savedConversationId = Number(localStorage.getItem(ACTIVE_CONVERSATION_KEY));
         const savedConversation = data.find(
@@ -120,7 +129,7 @@ export default function App() {
       token,
       body: JSON.stringify({ title }),
     });
-    setConversations((current) => [conversation, ...current]);
+    setConversations((current) => sortConversations([conversation, ...current]));
     localStorage.setItem(ACTIVE_CONVERSATION_KEY, String(conversation.id));
     setSelectedConversation(conversation);
     setMessages([]);
@@ -151,8 +160,10 @@ export default function App() {
       });
 
       setConversations((current) =>
-        current.map((item) =>
-          item.id === updatedConversation.id ? updatedConversation : item,
+        sortConversations(
+          current.map((item) =>
+            item.id === updatedConversation.id ? updatedConversation : item,
+          ),
         ),
       );
 
@@ -207,8 +218,10 @@ export default function App() {
       });
 
       setConversations((current) =>
-        current.map((item) =>
-          item.id === updatedConversation.id ? updatedConversation : item,
+        sortConversations(
+          current.map((item) =>
+            item.id === updatedConversation.id ? updatedConversation : item,
+          ),
         ),
       );
       setSelectedConversation(updatedConversation);
@@ -263,6 +276,36 @@ export default function App() {
       showToast("error", "Unable to export conversation.");
     } finally {
       setIsExporting(false);
+    }
+  }
+
+  async function toggleConversationPin(conversation) {
+    setError("");
+    try {
+      const updatedConversation = await apiFetch(`/conversations/${conversation.id}/pin`, {
+        method: "PATCH",
+        token,
+      });
+
+      setConversations((current) =>
+        sortConversations(
+          current.map((item) =>
+            item.id === updatedConversation.id ? updatedConversation : item,
+          ),
+        ),
+      );
+
+      if (selectedConversation?.id === updatedConversation.id) {
+        setSelectedConversation(updatedConversation);
+      }
+
+      showToast(
+        "success",
+        updatedConversation.is_pinned ? "Conversation pinned." : "Conversation unpinned.",
+      );
+    } catch (err) {
+      handleRequestError(err);
+      showToast("error", "Unable to update pin.");
     }
   }
 
@@ -397,6 +440,7 @@ export default function App() {
         onSelectConversation={selectConversation}
         onRenameConversation={renameConversation}
         onDeleteConversation={deleteConversation}
+        onTogglePin={toggleConversationPin}
         onLogout={logout}
         isLoading={isConversationsLoading}
         isMessagesLoading={isMessagesLoading}

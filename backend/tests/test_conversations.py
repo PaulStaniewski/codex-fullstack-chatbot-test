@@ -179,3 +179,64 @@ def test_non_owner_cannot_export_conversation(client):
     )
 
     assert response.status_code == 404
+
+
+def test_default_conversation_is_not_pinned(client):
+    token = _register_and_login(client, "owner@example.com")
+
+    conversation = _create_conversation(client, token)
+
+    assert conversation["is_pinned"] is False
+
+
+def test_owner_can_toggle_conversation_pin(client):
+    token = _register_and_login(client, "owner@example.com")
+    conversation = _create_conversation(client, token)
+
+    pinned_response = client.patch(
+        f"/conversations/{conversation['id']}/pin",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    unpinned_response = client.patch(
+        f"/conversations/{conversation['id']}/pin",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert pinned_response.status_code == 200
+    assert pinned_response.json()["is_pinned"] is True
+    assert unpinned_response.status_code == 200
+    assert unpinned_response.json()["is_pinned"] is False
+
+
+def test_non_owner_cannot_toggle_conversation_pin(client):
+    owner_token = _register_and_login(client, "owner@example.com")
+    other_token = _register_and_login(client, "other@example.com")
+    conversation = _create_conversation(client, owner_token)
+
+    response = client.patch(
+        f"/conversations/{conversation['id']}/pin",
+        headers={"Authorization": f"Bearer {other_token}"},
+    )
+
+    assert response.status_code == 404
+
+
+def test_pinned_conversations_are_listed_first(client):
+    token = _register_and_login(client, "owner@example.com")
+    first = _create_conversation(client, token, title="First")
+    second = _create_conversation(client, token, title="Second")
+
+    client.patch(
+        f"/conversations/{first['id']}/pin",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    response = client.get(
+        "/conversations",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 200
+    conversations = response.json()
+    assert conversations[0]["id"] == first["id"]
+    assert conversations[0]["is_pinned"] is True
+    assert conversations[1]["id"] == second["id"]

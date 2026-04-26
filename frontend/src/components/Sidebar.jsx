@@ -8,6 +8,7 @@ export default function Sidebar({
   onSelectConversation,
   onRenameConversation,
   onDeleteConversation,
+  onTogglePin,
   onLogout,
   isLoading,
   isMessagesLoading,
@@ -144,12 +145,24 @@ export default function Sidebar({
               onClick={() => onSelectConversation(conversation)}
               disabled={isMessagesLoading || isStreaming}
             >
-              <span className="conversation-title">{conversation.title}</span>
+              <span className="conversation-title">
+                {conversation.is_pinned ? <span className="pin-marker">Pinned</span> : null}
+                <span>{conversation.title}</span>
+              </span>
               <time dateTime={conversation.created_at}>
                 {new Date(conversation.created_at).toLocaleDateString()}
               </time>
             </button>
             <div className="conversation-actions">
+              <button
+                type="button"
+                className="conversation-action"
+                onClick={() => onTogglePin(conversation)}
+                aria-label={`${conversation.is_pinned ? "Unpin" : "Pin"} ${conversation.title}`}
+                disabled={isStreaming}
+              >
+                {conversation.is_pinned ? "Unpin" : "Pin"}
+              </button>
               <button
                 type="button"
                 className="conversation-action"

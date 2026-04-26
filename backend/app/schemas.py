@@ -44,6 +44,7 @@ class ConversationRead(BaseModel):
     id: int
     title: str
     mode: str
+    is_pinned: bool
     user_id: int
     created_at: datetime
 

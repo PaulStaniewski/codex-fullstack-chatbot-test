@@ -104,7 +104,7 @@ def list_conversations(
     return (
         db.query(models.Conversation)
         .filter(models.Conversation.user_id == current_user.id)
-        .order_by(models.Conversation.created_at.desc())
+        .order_by(models.Conversation.is_pinned.desc(), models.Conversation.created_at.desc())
         .all()
     )
 
@@ -164,6 +164,19 @@ def update_conversation_mode(
 
     conversation = _get_owned_conversation(db, conversation_id, current_user.id)
     conversation.mode = mode_in.mode
+    db.commit()
+    db.refresh(conversation)
+    return conversation
+
+
+@router.patch("/{conversation_id}/pin", response_model=schemas.ConversationRead)
+def toggle_conversation_pin(
+    conversation_id: int,
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db),
+):
+    conversation = _get_owned_conversation(db, conversation_id, current_user.id)
+    conversation.is_pinned = not conversation.is_pinned
     db.commit()
     db.refresh(conversation)
     return conversation

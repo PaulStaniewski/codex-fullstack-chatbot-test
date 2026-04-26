@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.orm import Session
 
@@ -67,6 +67,7 @@ def update_progress_activity(
         update_time_spent(progress, current_time)
     else:
         progress.last_activity_at = current_time
+    update_learning_streak(progress, current_time)
     progress.sessions_count += sessions_delta
     progress.messages_count += messages_delta
     award_earned_achievements(db, progress)
@@ -88,6 +89,25 @@ def update_time_spent(progress: models.UserProgress, now: datetime | None = None
             progress.time_spent_seconds += elapsed_seconds
 
     progress.last_activity_at = current_time
+
+
+def update_learning_streak(progress: models.UserProgress, now: datetime | None = None) -> None:
+    current_time = now or datetime.now(timezone.utc)
+    if current_time.tzinfo is None:
+        current_time = current_time.replace(tzinfo=timezone.utc)
+
+    today = current_time.astimezone(timezone.utc).date()
+    last_streak_date = progress.last_streak_date
+
+    if last_streak_date == today:
+        return
+
+    if last_streak_date == today - timedelta(days=1):
+        progress.current_streak_days += 1
+    else:
+        progress.current_streak_days = 1
+
+    progress.last_streak_date = today
 
 
 def award_earned_achievements(db: Session, progress: models.UserProgress) -> None:

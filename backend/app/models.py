@@ -1,6 +1,6 @@
-from datetime import datetime
+from datetime import date, datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -77,6 +77,8 @@ class UserProgress(Base):
     correct_answers: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     incorrect_answers: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     time_spent_seconds: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    current_streak_days: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    last_streak_date: Mapped[date | None] = mapped_column(Date)
     last_activity_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     user: Mapped[User] = relationship(back_populates="progress")

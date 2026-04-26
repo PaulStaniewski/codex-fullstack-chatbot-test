@@ -26,6 +26,8 @@ def upgrade() -> None:
         sa.Column("correct_answers", sa.Integer(), nullable=False, server_default="0"),
         sa.Column("incorrect_answers", sa.Integer(), nullable=False, server_default="0"),
         sa.Column("time_spent_seconds", sa.Integer(), nullable=False, server_default="0"),
+        sa.Column("current_streak_days", sa.Integer(), nullable=False, server_default="0"),
+        sa.Column("last_streak_date", sa.Date(), nullable=True),
         sa.Column("last_activity_at", sa.DateTime(timezone=True), nullable=True),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("user_id"),

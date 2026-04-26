@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
@@ -84,5 +84,7 @@ class UserProgressRead(BaseModel):
     correct_answers: int
     incorrect_answers: int
     time_spent_seconds: int
+    current_streak_days: int
+    last_streak_date: date | None
     last_activity_at: datetime | None
     achievements: list[AchievementRead]

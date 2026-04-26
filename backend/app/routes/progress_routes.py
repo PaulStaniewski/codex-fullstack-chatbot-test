@@ -42,6 +42,8 @@ def get_progress(
         correct_answers=progress.correct_answers,
         incorrect_answers=progress.incorrect_answers,
         time_spent_seconds=progress.time_spent_seconds,
+        current_streak_days=progress.current_streak_days,
+        last_streak_date=progress.last_streak_date,
         last_activity_at=progress.last_activity_at,
         achievements=achievements,
     )

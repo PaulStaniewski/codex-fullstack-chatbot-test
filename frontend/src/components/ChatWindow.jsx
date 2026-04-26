@@ -16,14 +16,59 @@ export default function ChatWindow({
   const [draft, setDraft] = useState("");
   const [copiedMessageId, setCopiedMessageId] = useState(null);
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
+  const [isNearBottom, setIsNearBottom] = useState(true);
+  const [hasNewActivityAwayFromBottom, setHasNewActivityAwayFromBottom] = useState(false);
   const listRef = useRef(null);
+  const wasNearBottomRef = useRef(true);
 
   useEffect(() => {
     const element = listRef.current;
-    if (element) {
-      element.scrollTop = element.scrollHeight;
+    if (!element) {
+      return;
+    }
+
+    if (wasNearBottomRef.current) {
+      scrollToLatest("auto");
+    } else {
+      setHasNewActivityAwayFromBottom(true);
     }
   }, [messages]);
+
+  useEffect(() => {
+    if (isStreaming && !wasNearBottomRef.current) {
+      setHasNewActivityAwayFromBottom(true);
+    }
+  }, [isStreaming]);
+
+  function isElementNearBottom(element) {
+    return element.scrollHeight - element.scrollTop - element.clientHeight < 96;
+  }
+
+  function handleMessageListScroll() {
+    const element = listRef.current;
+    if (!element) {
+      return;
+    }
+
+    const nextIsNearBottom = isElementNearBottom(element);
+    wasNearBottomRef.current = nextIsNearBottom;
+    setIsNearBottom(nextIsNearBottom);
+    if (nextIsNearBottom) {
+      setHasNewActivityAwayFromBottom(false);
+    }
+  }
+
+  function scrollToLatest(behavior = "smooth") {
+    const element = listRef.current;
+    if (!element) {
+      return;
+    }
+
+    element.scrollTo({ top: element.scrollHeight, behavior });
+    wasNearBottomRef.current = true;
+    setIsNearBottom(true);
+    setHasNewActivityAwayFromBottom(false);
+  }
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -117,7 +162,12 @@ export default function ChatWindow({
         </div>
       </header>
 
-      <section className="message-list" ref={listRef} aria-live="polite">
+      <section
+        className="message-list"
+        ref={listRef}
+        aria-live="polite"
+        onScroll={handleMessageListScroll}
+      >
         {isLoading ? <p className="center-note">Loading messages...</p> : null}
         {!isLoading && !conversation ? (
           <div className="empty-state">
@@ -162,6 +212,12 @@ export default function ChatWindow({
           </article>
         ))}
       </section>
+
+      {!isNearBottom && hasNewActivityAwayFromBottom ? (
+        <button className="jump-latest-button" type="button" onClick={() => scrollToLatest()}>
+          Jump to latest
+        </button>
+      ) : null}
 
       <form className="composer" onSubmit={handleSubmit}>
         <div className="composer-input">

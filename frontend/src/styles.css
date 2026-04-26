@@ -574,6 +574,7 @@ input:focus,
 }
 
 .chat-shell {
+  position: relative;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
   min-width: 0;
@@ -758,6 +759,33 @@ input:focus,
   scroll-behavior: smooth;
   scrollbar-width: thin;
   scrollbar-color: var(--surface-3) transparent;
+}
+
+.jump-latest-button {
+  position: absolute;
+  right: 28px;
+  bottom: 92px;
+  z-index: 8;
+  min-height: 38px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  padding: 0 14px;
+  background: var(--panel-strong);
+  color: var(--text);
+  font-size: 0.82rem;
+  font-weight: 900;
+  box-shadow: var(--shadow-soft);
+  animation: toast-enter 160ms ease-out;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    transform 160ms ease;
+}
+
+.jump-latest-button:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-soft);
+  transform: translateY(-1px);
 }
 
 .center-note {
@@ -1228,6 +1256,11 @@ input:focus,
 
   .send-button {
     min-height: 44px;
+  }
+
+  .jump-latest-button {
+    right: 16px;
+    bottom: 116px;
   }
 
   .modal-actions {

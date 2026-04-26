@@ -30,6 +30,7 @@ export default function App() {
   const [isMessagesLoading, setIsMessagesLoading] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [failedMessage, setFailedMessage] = useState(null);
   const eventSourceRef = useRef(null);
 
   useEffect(() => {
@@ -334,6 +335,7 @@ export default function App() {
 
   async function sendMessage(content) {
     setError("");
+    setFailedMessage(null);
     let conversation = selectedConversation;
 
     try {
@@ -378,6 +380,14 @@ export default function App() {
           stream.close();
           eventSourceRef.current = null;
           setIsStreaming(false);
+          setFailedMessage(content);
+          setMessages((current) =>
+            current.map((message) =>
+              message.id === tempAssistantMessage.id
+                ? { ...message, failed: true, retryContent: content }
+                : message,
+            ),
+          );
           showToast("error", "Unable to generate response.");
         }
       };
@@ -394,21 +404,37 @@ export default function App() {
         setMessages((current) =>
           current.map((message) =>
             message.id === tempAssistantMessage.id
-              ? { ...message, content: assistantContent, isStreaming: false }
+              ? {
+                  ...message,
+                  content: assistantContent || "Streaming failed. Please try again.",
+                  failed: !assistantContent,
+                  retryContent: !assistantContent ? content : undefined,
+                  isStreaming: false,
+                }
               : message,
           ),
         );
         if (!assistantContent) {
+          setFailedMessage(content);
           showToast("error", "Streaming failed. Please try again.");
         } else {
+          setFailedMessage(null);
           loadConversations();
         }
       };
     } catch (err) {
       setIsStreaming(false);
+      setFailedMessage(content);
       handleRequestError(err);
       showToast("error", "Streaming failed. Please try again.");
     }
+  }
+
+  async function retryMessage(content = failedMessage) {
+    if (!content || isStreaming) {
+      return;
+    }
+    await sendMessage(content);
   }
 
   function handleRequestError(err) {
@@ -460,6 +486,7 @@ export default function App() {
         conversation={selectedConversation}
         messages={messages}
         onSendMessage={sendMessage}
+        onRetryMessage={retryMessage}
         onUpdateMode={updateConversationMode}
         onExportConversation={exportConversation}
         isStreaming={isStreaming}

@@ -923,6 +923,31 @@ input:focus,
   overflow-wrap: anywhere;
 }
 
+.message-retry {
+  margin-top: 10px;
+}
+
+.message-retry button {
+  min-height: 30px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0 10px;
+  background: var(--hover);
+  color: var(--text-soft);
+  font-size: 0.76rem;
+  font-weight: 900;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease;
+}
+
+.message-retry button:hover:not(:disabled) {
+  border-color: var(--border-strong);
+  background: var(--surface-soft);
+  color: var(--text);
+}
+
 .typing-dots {
   display: inline-flex;
   align-items: center;

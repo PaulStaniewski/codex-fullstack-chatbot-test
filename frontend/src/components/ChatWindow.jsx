@@ -5,6 +5,7 @@ export default function ChatWindow({
   conversation,
   messages,
   onSendMessage,
+  onRetryMessage,
   onUpdateMode,
   onExportConversation,
   isStreaming,
@@ -209,6 +210,17 @@ export default function ChatWindow({
                 <span></span>
               </div>
             )}
+            {message.failed ? (
+              <div className="message-retry">
+                <button
+                  type="button"
+                  onClick={() => onRetryMessage(message.retryContent)}
+                  disabled={isStreaming}
+                >
+                  Retry
+                </button>
+              </div>
+            ) : null}
           </article>
         ))}
       </section>

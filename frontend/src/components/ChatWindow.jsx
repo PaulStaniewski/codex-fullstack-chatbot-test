@@ -1,4 +1,7 @@
 import { useEffect, useRef, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { oneDark, oneLight } from "react-syntax-highlighter/dist/esm/styles/prism";
 import ThemeToggle from "./ThemeToggle.jsx";
 
 export default function ChatWindow({
@@ -101,6 +104,64 @@ export default function ChatWindow({
   async function handleExport(format) {
     setIsExportMenuOpen(false);
     await onExportConversation(format);
+  }
+
+  function renderMessageContent(message) {
+    if (message.role !== "assistant") {
+      return <p className="plain-message">{message.content}</p>;
+    }
+
+    return (
+      <div className="markdown-content">
+        <ReactMarkdown
+          components={{
+            a({ children, ...props }) {
+              return (
+                <a {...props} target="_blank" rel="noreferrer">
+                  {children}
+                </a>
+              );
+            },
+            code({ children, className, ...props }) {
+              const match = /language-(\w+)/.exec(className || "");
+              const code = String(children).replace(/\n$/, "");
+
+              if (!match) {
+                return (
+                  <code className="markdown-inline-code" {...props}>
+                    {children}
+                  </code>
+                );
+              }
+
+              return (
+                <SyntaxHighlighter
+                  PreTag="div"
+                  language={match[1]}
+                  style={theme === "light" ? oneLight : oneDark}
+                  customStyle={{
+                    margin: 0,
+                    borderRadius: "10px",
+                    background: "var(--input-bg)",
+                    fontSize: "0.86rem",
+                  }}
+                  codeTagProps={{
+                    style: {
+                      fontFamily:
+                        'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace',
+                    },
+                  }}
+                >
+                  {code}
+                </SyntaxHighlighter>
+              );
+            },
+          }}
+        >
+          {message.content}
+        </ReactMarkdown>
+      </div>
+    );
   }
 
   const modeBadgeLabel =
@@ -217,7 +278,7 @@ export default function ChatWindow({
               </div>
             </div>
             {message.content ? (
-              <p>{message.content}</p>
+              renderMessageContent(message)
             ) : (
               <div className="typing-dots" aria-label="Assistant is typing">
                 <span></span>

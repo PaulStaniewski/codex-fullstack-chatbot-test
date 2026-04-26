@@ -1,7 +1,7 @@
 import { useState } from "react";
 import ThemeToggle from "./ThemeToggle.jsx";
 
-export default function AuthView({ onLogin, onRegister, theme, onToggleTheme }) {
+export default function AuthView({ onLogin, onRegister, onAuthError, theme, onToggleTheme }) {
   const [mode, setMode] = useState("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -23,6 +23,7 @@ export default function AuthView({ onLogin, onRegister, theme, onToggleTheme }) 
       }
     } catch (err) {
       setError(err.message);
+      onAuthError(err.message);
     } finally {
       setIsSubmitting(false);
     }

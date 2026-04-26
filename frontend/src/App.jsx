@@ -3,6 +3,7 @@ import { apiFetch, getStreamUrl } from "./api.js";
 import AuthView from "./components/AuthView.jsx";
 import ChatWindow from "./components/ChatWindow.jsx";
 import Sidebar from "./components/Sidebar.jsx";
+import ToastStack from "./components/ToastStack.jsx";
 
 const TOKEN_KEY = "chatbot_access_token";
 const ACTIVE_CONVERSATION_KEY = "chatbot_active_conversation_id";
@@ -15,6 +16,7 @@ export default function App() {
   const [selectedConversation, setSelectedConversation] = useState(null);
   const [messages, setMessages] = useState([]);
   const [error, setError] = useState("");
+  const [toasts, setToasts] = useState([]);
   const [isConversationsLoading, setIsConversationsLoading] = useState(false);
   const [isMessagesLoading, setIsMessagesLoading] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
@@ -67,6 +69,18 @@ export default function App() {
 
   function toggleTheme() {
     setTheme((currentTheme) => (currentTheme === "dark" ? "light" : "dark"));
+  }
+
+  function showToast(type, message) {
+    const id = `${Date.now()}-${Math.random()}`;
+    setToasts((current) => [...current, { id, type, message }]);
+    window.setTimeout(() => {
+      dismissToast(id);
+    }, 3600);
+  }
+
+  function dismissToast(id) {
+    setToasts((current) => current.filter((toast) => toast.id !== id));
   }
 
   async function loadConversations() {
@@ -144,8 +158,10 @@ export default function App() {
       if (selectedConversation?.id === updatedConversation.id) {
         setSelectedConversation(updatedConversation);
       }
+      showToast("success", "Conversation renamed.");
     } catch (err) {
       handleRequestError(err);
+      showToast("error", "Unable to rename conversation.");
       throw err;
     }
   }
@@ -168,8 +184,10 @@ export default function App() {
         setMessages([]);
         setIsStreaming(false);
       }
+      showToast("success", "Conversation deleted.");
     } catch (err) {
       handleRequestError(err);
+      showToast("error", "Unable to delete conversation.");
       throw err;
     }
   }
@@ -260,6 +278,7 @@ export default function App() {
           stream.close();
           eventSourceRef.current = null;
           setIsStreaming(false);
+          showToast("error", "Unable to generate response.");
         }
       };
 
@@ -279,10 +298,14 @@ export default function App() {
               : message,
           ),
         );
+        if (!assistantContent) {
+          showToast("error", "Streaming failed. Please try again.");
+        }
       };
     } catch (err) {
       setIsStreaming(false);
       handleRequestError(err);
+      showToast("error", "Streaming failed. Please try again.");
     }
   }
 
@@ -292,6 +315,10 @@ export default function App() {
       return;
     }
     setError(err.message);
+  }
+
+  function handleAuthError(message) {
+    showToast("error", message || "Authentication failed.");
   }
 
   function makeTitle(content) {
@@ -304,6 +331,7 @@ export default function App() {
       <AuthView
         onLogin={login}
         onRegister={register}
+        onAuthError={handleAuthError}
         theme={theme}
         onToggleTheme={toggleTheme}
       />
@@ -321,6 +349,8 @@ export default function App() {
         onDeleteConversation={deleteConversation}
         onLogout={logout}
         isLoading={isConversationsLoading}
+        isMessagesLoading={isMessagesLoading}
+        isStreaming={isStreaming}
       />
 
       <ChatWindow
@@ -334,7 +364,7 @@ export default function App() {
         onToggleTheme={toggleTheme}
       />
 
-      {error ? <div className="toast" role="alert">{error}</div> : null}
+      <ToastStack toasts={toasts} onDismiss={dismissToast} />
     </div>
   );
 }

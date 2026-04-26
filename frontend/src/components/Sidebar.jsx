@@ -10,6 +10,8 @@ export default function Sidebar({
   onDeleteConversation,
   onLogout,
   isLoading,
+  isMessagesLoading,
+  isStreaming,
 }) {
   const [modalState, setModalState] = useState(null);
   const [draftTitle, setDraftTitle] = useState("");
@@ -31,6 +33,10 @@ export default function Sidebar({
     if (isSubmitting) {
       return;
     }
+    resetModal();
+  }
+
+  function resetModal() {
     setModalState(null);
     setDraftTitle("");
     setModalError("");
@@ -47,7 +53,7 @@ export default function Sidebar({
     setModalError("");
     try {
       await onRenameConversation(modalState.conversation, cleanTitle);
-      closeModal();
+      resetModal();
     } catch (err) {
       setModalError(err.message || "Unable to rename conversation.");
     } finally {
@@ -60,7 +66,7 @@ export default function Sidebar({
     setModalError("");
     try {
       await onDeleteConversation(modalState.conversation);
-      closeModal();
+      resetModal();
     } catch (err) {
       setModalError(err.message || "Unable to delete conversation.");
     } finally {
@@ -75,7 +81,13 @@ export default function Sidebar({
           <p className="eyebrow">Conversations</p>
           <h2>Chats</h2>
         </div>
-        <button className="icon-button" type="button" onClick={onCreateConversation} aria-label="New chat">
+        <button
+          className="icon-button"
+          type="button"
+          onClick={onCreateConversation}
+          aria-label="New chat"
+          disabled={isLoading || isStreaming}
+        >
           +
         </button>
       </div>
@@ -83,7 +95,12 @@ export default function Sidebar({
       <nav className="conversation-list" aria-label="Conversations">
         {isLoading ? <p className="sidebar-note">Loading conversations...</p> : null}
         {!isLoading && conversations.length === 0 ? (
-          <p className="sidebar-note">No conversations yet.</p>
+          <div className="sidebar-empty">
+            <p>No conversations yet.</p>
+            <button type="button" onClick={onCreateConversation} disabled={isLoading || isStreaming}>
+              Start one
+            </button>
+          </div>
         ) : null}
 
         {conversations.map((conversation) => (
@@ -99,6 +116,7 @@ export default function Sidebar({
               type="button"
               className="conversation-item"
               onClick={() => onSelectConversation(conversation)}
+              disabled={isMessagesLoading || isStreaming}
             >
               <span className="conversation-title">{conversation.title}</span>
               <time dateTime={conversation.created_at}>
@@ -111,16 +129,18 @@ export default function Sidebar({
                 className="conversation-action"
                 onClick={() => openRename(conversation)}
                 aria-label={`Rename ${conversation.title}`}
+                disabled={isStreaming}
               >
-                Edit
+                Rename
               </button>
               <button
                 type="button"
                 className="conversation-action danger"
                 onClick={() => openDelete(conversation)}
                 aria-label={`Delete ${conversation.title}`}
+                disabled={isStreaming}
               >
-                Del
+                Delete
               </button>
             </div>
           </div>

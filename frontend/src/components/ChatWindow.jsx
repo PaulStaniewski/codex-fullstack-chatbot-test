@@ -12,6 +12,7 @@ export default function ChatWindow({
   onToggleTheme,
 }) {
   const [draft, setDraft] = useState("");
+  const [copiedMessageId, setCopiedMessageId] = useState(null);
   const listRef = useRef(null);
 
   useEffect(() => {
@@ -30,6 +31,22 @@ export default function ChatWindow({
 
     setDraft("");
     await onSendMessage(cleanDraft);
+  }
+
+  async function copyMessage(message) {
+    if (!message.content) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(message.content);
+      setCopiedMessageId(message.id);
+      window.setTimeout(() => {
+        setCopiedMessageId((current) => (current === message.id ? null : current));
+      }, 1400);
+    } catch {
+      setCopiedMessageId(null);
+    }
   }
 
   return (
@@ -72,7 +89,7 @@ export default function ChatWindow({
           <div className="empty-state">
             <div className="empty-mark">AI</div>
             <h2>Start a conversation</h2>
-            <p>Create a chat from the sidebar or send a message to begin.</p>
+            <p>Create a chat from the sidebar, then send a message here.</p>
           </div>
         ) : null}
         {!isLoading && conversation && messages.length === 0 ? (
@@ -90,7 +107,14 @@ export default function ChatWindow({
           >
             <div className="message-meta">
               <span>{message.role === "assistant" ? "Assistant" : "You"}</span>
-              {isStreaming && message.role === "assistant" ? <span>typing</span> : null}
+              <div className="message-actions">
+                {isStreaming && message.role === "assistant" ? <span>typing</span> : null}
+                {message.content ? (
+                  <button type="button" onClick={() => copyMessage(message)}>
+                    {copiedMessageId === message.id ? "Copied" : "Copy"}
+                  </button>
+                ) : null}
+              </div>
             </div>
             {message.content ? (
               <p>{message.content}</p>

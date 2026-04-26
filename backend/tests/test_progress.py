@@ -1,3 +1,9 @@
+from datetime import datetime, timezone
+
+from app import models
+from app.progress import update_time_spent
+
+
 def _register_and_login(client, email="progress@example.com"):
     client.post(
         "/register",
@@ -60,3 +66,42 @@ def test_progress_requires_auth(client):
     response = client.get("/progress")
 
     assert response.status_code == 401
+
+
+def test_update_time_spent_increments_under_threshold():
+    progress = models.UserProgress(
+        user_id=1,
+        time_spent_seconds=30,
+        last_activity_at=datetime(2026, 4, 26, 12, 0, tzinfo=timezone.utc),
+    )
+
+    update_time_spent(progress, datetime(2026, 4, 26, 12, 5, tzinfo=timezone.utc))
+
+    assert progress.time_spent_seconds == 330
+    assert progress.last_activity_at == datetime(2026, 4, 26, 12, 5, tzinfo=timezone.utc)
+
+
+def test_update_time_spent_skips_after_inactivity():
+    progress = models.UserProgress(
+        user_id=1,
+        time_spent_seconds=30,
+        last_activity_at=datetime(2026, 4, 26, 12, 0, tzinfo=timezone.utc),
+    )
+
+    update_time_spent(progress, datetime(2026, 4, 26, 12, 11, tzinfo=timezone.utc))
+
+    assert progress.time_spent_seconds == 30
+    assert progress.last_activity_at == datetime(2026, 4, 26, 12, 11, tzinfo=timezone.utc)
+
+
+def test_update_time_spent_skips_negative_elapsed_time():
+    progress = models.UserProgress(
+        user_id=1,
+        time_spent_seconds=30,
+        last_activity_at=datetime(2026, 4, 26, 12, 5, tzinfo=timezone.utc),
+    )
+
+    update_time_spent(progress, datetime(2026, 4, 26, 12, 0, tzinfo=timezone.utc))
+
+    assert progress.time_spent_seconds == 30
+    assert progress.last_activity_at == datetime(2026, 4, 26, 12, 0, tzinfo=timezone.utc)

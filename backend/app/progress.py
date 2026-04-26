@@ -5,6 +5,8 @@ from sqlalchemy.orm import Session
 from app import models
 
 
+ACTIVE_TIME_THRESHOLD_SECONDS = 10 * 60
+
 DEFAULT_ACHIEVEMENTS = [
     {
         "id": 1,
@@ -57,13 +59,35 @@ def update_progress_activity(
     *,
     sessions_delta: int = 0,
     messages_delta: int = 0,
+    now: datetime | None = None,
 ) -> models.UserProgress:
     progress = get_or_create_progress(db, user_id)
+    current_time = now or datetime.now(timezone.utc)
+    if messages_delta:
+        update_time_spent(progress, current_time)
+    else:
+        progress.last_activity_at = current_time
     progress.sessions_count += sessions_delta
     progress.messages_count += messages_delta
-    progress.last_activity_at = datetime.now(timezone.utc)
     award_earned_achievements(db, progress)
     return progress
+
+
+def update_time_spent(progress: models.UserProgress, now: datetime | None = None) -> None:
+    current_time = now or datetime.now(timezone.utc)
+    if current_time.tzinfo is None:
+        current_time = current_time.replace(tzinfo=timezone.utc)
+
+    last_activity_at = progress.last_activity_at
+    if last_activity_at and last_activity_at.tzinfo is None:
+        last_activity_at = last_activity_at.replace(tzinfo=timezone.utc)
+
+    if last_activity_at:
+        elapsed_seconds = int((current_time - last_activity_at).total_seconds())
+        if 0 <= elapsed_seconds < ACTIVE_TIME_THRESHOLD_SECONDS:
+            progress.time_spent_seconds += elapsed_seconds
+
+    progress.last_activity_at = current_time
 
 
 def award_earned_achievements(db: Session, progress: models.UserProgress) -> None:

@@ -404,6 +404,17 @@ input:focus,
   scrollbar-color: var(--surface-3) transparent;
 }
 
+.conversation-search input {
+  height: 40px;
+  border-radius: var(--radius-md);
+  background: var(--input-bg);
+  font-size: 0.88rem;
+}
+
+.conversation-search input::placeholder {
+  color: var(--muted);
+}
+
 .conversation-row {
   position: relative;
   display: grid;

@@ -17,6 +17,13 @@ export default function Sidebar({
   const [draftTitle, setDraftTitle] = useState("");
   const [modalError, setModalError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const cleanSearchQuery = searchQuery.trim().toLowerCase();
+  const filteredConversations = cleanSearchQuery
+    ? conversations.filter((conversation) =>
+        conversation.title.toLowerCase().includes(cleanSearchQuery),
+      )
+    : conversations;
 
   function openRename(conversation) {
     setDraftTitle(conversation.title);
@@ -92,6 +99,17 @@ export default function Sidebar({
         </button>
       </div>
 
+      <div className="conversation-search">
+        <input
+          type="search"
+          value={searchQuery}
+          onChange={(event) => setSearchQuery(event.target.value)}
+          placeholder="Search conversations"
+          aria-label="Search conversations"
+          disabled={isLoading}
+        />
+      </div>
+
       <nav className="conversation-list" aria-label="Conversations">
         {isLoading ? <p className="sidebar-note">Loading conversations...</p> : null}
         {!isLoading && conversations.length === 0 ? (
@@ -102,8 +120,16 @@ export default function Sidebar({
             </button>
           </div>
         ) : null}
+        {!isLoading && conversations.length > 0 && filteredConversations.length === 0 ? (
+          <div className="sidebar-empty">
+            <p>No matching conversations.</p>
+            <button type="button" onClick={() => setSearchQuery("")}>
+              Clear search
+            </button>
+          </div>
+        ) : null}
 
-        {conversations.map((conversation) => (
+        {filteredConversations.map((conversation) => (
           <div
             key={conversation.id}
             className={

@@ -1,8 +1,17 @@
+import logging
 import os
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import StreamingResponse
-from openai import APIError, AsyncOpenAI, OpenAIError
+from openai import (
+    APIConnectionError,
+    APIError,
+    APIStatusError,
+    APITimeoutError,
+    AuthenticationError,
+    AsyncOpenAI,
+    OpenAIError,
+)
 from sqlalchemy.orm import Session
 
 from app import auth, models
@@ -10,8 +19,10 @@ from app.database import get_db
 
 
 router = APIRouter(tags=["chat"])
+logger = logging.getLogger(__name__)
 
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-5.4-mini")
+SAFE_STREAM_ERROR = "Error: Unable to generate response."
 
 
 def _get_owned_conversation(db: Session, conversation_id: int, user_id: int) -> models.Conversation:
@@ -52,6 +63,9 @@ def _build_openai_input(
 
 
 async def _stream_openai_text(openai_input: list[dict[str, str]]):
+    if not os.getenv("OPENAI_API_KEY"):
+        raise RuntimeError("OPENAI_API_KEY is not configured")
+
     client = AsyncOpenAI()
     stream = await client.responses.create(
         model=os.getenv("OPENAI_MODEL", OPENAI_MODEL),
@@ -99,17 +113,43 @@ async def chat_stream(
             try:
                 async for chunk in _stream_openai_text(openai_input):
                     if await request.is_disconnected():
+                        logger.info(
+                            "Client disconnected from chat stream",
+                            extra={"conversation_id": conversation_id, "user_id": user_id},
+                        )
                         return
                     if not chunk:
                         continue
 
                     chunks.append(chunk)
                     yield _format_sse_data(chunk)
-            except APIError as exc:
-                yield _format_sse_data(f"OpenAI API error: {exc.message}")
+            except AuthenticationError:
+                logger.exception("OpenAI authentication failed")
+                yield _format_sse_data(SAFE_STREAM_ERROR)
                 return
-            except OpenAIError as exc:
-                yield _format_sse_data(f"OpenAI error: {exc}")
+            except APITimeoutError:
+                logger.exception("OpenAI request timed out")
+                yield _format_sse_data(SAFE_STREAM_ERROR)
+                return
+            except APIConnectionError:
+                logger.exception("OpenAI network connection failed")
+                yield _format_sse_data(SAFE_STREAM_ERROR)
+                return
+            except APIStatusError:
+                logger.exception("OpenAI API returned an error status")
+                yield _format_sse_data(SAFE_STREAM_ERROR)
+                return
+            except APIError:
+                logger.exception("OpenAI API error while streaming")
+                yield _format_sse_data(SAFE_STREAM_ERROR)
+                return
+            except OpenAIError:
+                logger.exception("OpenAI error while streaming")
+                yield _format_sse_data(SAFE_STREAM_ERROR)
+                return
+            except Exception:
+                logger.exception("Unexpected error while streaming chat response")
+                yield _format_sse_data(SAFE_STREAM_ERROR)
                 return
 
             assistant_content = "".join(chunks).strip()

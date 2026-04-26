@@ -6,6 +6,9 @@ from app import models
 
 
 ACTIVE_TIME_THRESHOLD_SECONDS = 10 * 60
+XP_PER_MESSAGE = 10
+XP_PER_SESSION = 25
+XP_PER_ACHIEVEMENT = 50
 
 DEFAULT_ACHIEVEMENTS = [
     {
@@ -84,10 +87,14 @@ DEFAULT_ACHIEVEMENTS = [
 
 
 def ensure_default_achievements(db: Session) -> None:
+    did_create = False
     for achievement_data in DEFAULT_ACHIEVEMENTS:
         achievement = db.get(models.Achievement, achievement_data["id"])
         if not achievement:
             db.add(models.Achievement(**achievement_data))
+            did_create = True
+    if did_create:
+        db.flush()
 
 
 def get_or_create_progress(db: Session, user_id: int) -> models.UserProgress:
@@ -118,8 +125,18 @@ def update_progress_activity(
     update_learning_streak(progress, current_time)
     progress.sessions_count += sessions_delta
     progress.messages_count += messages_delta
+    progress.xp_points += (sessions_delta * XP_PER_SESSION) + (messages_delta * XP_PER_MESSAGE)
+    recalculate_level(progress)
     evaluate_achievements(progress, db)
     return progress
+
+
+def calculate_level(xp_points: int) -> int:
+    return max(1, (max(0, xp_points) // 100) + 1)
+
+
+def recalculate_level(progress: models.UserProgress) -> None:
+    progress.level = calculate_level(progress.xp_points)
 
 
 def update_time_spent(progress: models.UserProgress, now: datetime | None = None) -> None:
@@ -208,6 +225,10 @@ def evaluate_achievements(
             earned_ids.add(achievement.id)
             newly_earned.append(achievement)
 
+    if newly_earned:
+        user_progress.xp_points += len(newly_earned) * XP_PER_ACHIEVEMENT
+
+    recalculate_level(user_progress)
     return newly_earned
 
 

@@ -26,6 +26,19 @@ function normalizeProgressResponse(data) {
   return data;
 }
 
+function getLevelTitle(level) {
+  if (level >= 10) {
+    return "Master";
+  }
+  if (level >= 5) {
+    return "Builder";
+  }
+  if (level >= 2) {
+    return "Learner";
+  }
+  return "Starter";
+}
+
 export default function ProgressPage({ token, theme, onToggleTheme, onAchievementUnlocked }) {
   const [progress, setProgress] = useState(null);
   const [error, setError] = useState("");
@@ -65,6 +78,11 @@ export default function ProgressPage({ token, theme, onToggleTheme, onAchievemen
   const accuracy = answeredCount
     ? Math.round(((progress?.correct_answers || 0) / answeredCount) * 100)
     : 0;
+  const xpPoints = progress?.xp_points || 0;
+  const level = progress?.level || 1;
+  const currentLevelXp = xpPoints % 100;
+  const nextLevelTotalXp = level * 100;
+  const xpPercent = Math.min(100, Math.max(0, currentLevelXp));
 
   return (
     <main className="progress-shell">
@@ -83,6 +101,27 @@ export default function ProgressPage({ token, theme, onToggleTheme, onAchievemen
         {!isLoading && error ? <p className="form-error">{error}</p> : null}
         {!isLoading && progress ? (
           <>
+            <section className="progress-section level-section">
+              <div>
+                <p className="eyebrow">Level</p>
+                <h2>
+                  Level {level} - {getLevelTitle(level)}
+                </h2>
+              </div>
+              <div className="level-progress">
+                <div className="level-progress__meta">
+                  <span>{currentLevelXp} / 100 XP</span>
+                  <span>{nextLevelTotalXp} total XP for next level</span>
+                </div>
+                <div className="level-progress__track" aria-label={`${currentLevelXp} of 100 XP`}>
+                  <div
+                    className="level-progress__bar"
+                    style={{ width: `${xpPercent}%` }}
+                  />
+                </div>
+              </div>
+            </section>
+
             <section className="progress-section">
               <div>
                 <p className="eyebrow">Learning Summary</p>

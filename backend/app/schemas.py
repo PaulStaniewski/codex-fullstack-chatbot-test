@@ -84,6 +84,8 @@ class UserProgressStats(BaseModel):
     correct_answers: int
     incorrect_answers: int
     time_spent_seconds: int
+    xp_points: int
+    level: int
     current_streak_days: int
     last_streak_date: date | None
     last_activity_at: datetime | None

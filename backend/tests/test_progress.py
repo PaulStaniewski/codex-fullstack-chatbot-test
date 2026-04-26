@@ -2,8 +2,13 @@ from datetime import datetime, timezone
 
 from app import models
 from app.progress import (
+    XP_PER_ACHIEVEMENT,
+    XP_PER_MESSAGE,
+    XP_PER_SESSION,
+    calculate_level,
     evaluate_achievements,
     get_progress_condition_value,
+    update_progress_activity,
     update_learning_streak,
     update_time_spent,
 )
@@ -37,6 +42,8 @@ def test_progress_defaults(client):
     assert data["progress"]["correct_answers"] == 0
     assert data["progress"]["incorrect_answers"] == 0
     assert data["progress"]["time_spent_seconds"] == 0
+    assert data["progress"]["xp_points"] == 0
+    assert data["progress"]["level"] == 1
     assert data["progress"]["current_streak_days"] == 0
     assert data["progress"]["last_streak_date"] is None
     assert data["achievements"] == []
@@ -53,10 +60,12 @@ def test_progress_tracks_sessions_messages_and_achievements(client, monkeypatch)
         headers={"Authorization": f"Bearer {token}"},
     )
     conversation_id = conversation_response.json()["id"]
-    client.get(
+    stream_response = client.get(
         "/chat-stream",
         params={"conversation_id": conversation_id, "message": "hello", "token": token},
     )
+    assert stream_response.status_code == 200
+    assert "Assistant reply" in stream_response.text
 
     response = client.get("/progress", headers={"Authorization": f"Bearer {token}"})
 
@@ -66,6 +75,10 @@ def test_progress_tracks_sessions_messages_and_achievements(client, monkeypatch)
     new_achievement_names = {achievement["name"] for achievement in data["new_achievements"]}
     assert data["progress"]["sessions_count"] == 1
     assert data["progress"]["messages_count"] == 1
+    assert data["progress"]["xp_points"] == (
+        XP_PER_SESSION + XP_PER_MESSAGE + (2 * XP_PER_ACHIEVEMENT)
+    )
+    assert data["progress"]["level"] == 2
     assert data["progress"]["current_streak_days"] == 1
     assert data["progress"]["last_streak_date"] is not None
     assert data["progress"]["last_activity_at"] is not None
@@ -83,6 +96,93 @@ def test_progress_requires_auth(client):
     response = client.get("/progress")
 
     assert response.status_code == 401
+
+
+def test_xp_increases_on_session_activity(client):
+    token = _register_and_login(client)
+
+    response = client.post(
+        "/conversations",
+        json={"title": "Practice"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 201
+
+    progress_response = client.get("/progress", headers={"Authorization": f"Bearer {token}"})
+    progress = progress_response.json()["progress"]
+
+    assert progress["sessions_count"] == 1
+    assert progress["xp_points"] == XP_PER_SESSION + XP_PER_ACHIEVEMENT
+    assert progress["level"] == 1
+
+
+def test_xp_increases_on_message_activity(client):
+    _register_and_login(client)
+
+    from app.database import get_db
+
+    db = next(client.app.dependency_overrides[get_db]())
+    try:
+        user = db.query(models.User).first()
+        progress = update_progress_activity(db, user.id, messages_delta=1)
+        db.commit()
+        db.refresh(progress)
+    finally:
+        db.close()
+
+    assert progress.messages_count == 1
+    assert progress.xp_points == XP_PER_MESSAGE + XP_PER_ACHIEVEMENT
+
+
+def test_level_increases_after_xp_threshold(client):
+    token = _register_and_login(client)
+
+    from app.database import get_db
+
+    db = next(client.app.dependency_overrides[get_db]())
+    try:
+        user = db.query(models.User).first()
+        progress = update_progress_activity(db, user.id, messages_delta=1)
+        progress.xp_points = 90
+        db.flush()
+
+        update_progress_activity(db, user.id, messages_delta=1)
+        db.commit()
+        db.refresh(progress)
+    finally:
+        db.close()
+
+    assert progress.xp_points >= 100
+    assert progress.level == 2
+
+
+def test_xp_accumulation_awards_achievement_bonus_once(client):
+    token = _register_and_login(client)
+
+    response = client.post(
+        "/conversations",
+        json={"title": "Practice"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 201
+
+    first_progress = client.get("/progress", headers={"Authorization": f"Bearer {token}"}).json()[
+        "progress"
+    ]
+    second_progress = client.get("/progress", headers={"Authorization": f"Bearer {token}"}).json()[
+        "progress"
+    ]
+
+    assert first_progress["xp_points"] == XP_PER_SESSION + XP_PER_ACHIEVEMENT
+    assert second_progress["xp_points"] == first_progress["xp_points"]
+
+
+def test_level_calculation_correct():
+    assert calculate_level(0) == 1
+    assert calculate_level(99) == 1
+    assert calculate_level(100) == 2
+    assert calculate_level(250) == 3
+    assert calculate_level(-10) == 1
 
 
 def test_update_time_spent_increments_under_threshold():

@@ -1024,6 +1024,44 @@ input:focus,
   line-height: 1;
 }
 
+.level-section {
+  gap: 16px;
+}
+
+.level-progress {
+  display: grid;
+  gap: 10px;
+}
+
+.level-progress__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  color: var(--text-muted);
+  font-size: 0.84rem;
+  font-weight: 850;
+}
+
+.level-progress__meta span:first-child {
+  color: var(--text);
+}
+
+.level-progress__track {
+  height: 12px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-soft);
+}
+
+.level-progress__bar {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  transition: width 180ms ease;
+}
+
 .achievement-list {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -1843,6 +1881,12 @@ input:focus,
   .progress-stats,
   .achievement-list {
     grid-template-columns: 1fr;
+  }
+
+  .level-progress__meta {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 6px;
   }
 
   .send-button {

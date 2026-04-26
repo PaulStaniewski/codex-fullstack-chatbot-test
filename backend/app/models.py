@@ -77,6 +77,8 @@ class UserProgress(Base):
     correct_answers: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     incorrect_answers: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     time_spent_seconds: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    xp_points: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    level: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     current_streak_days: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     last_streak_date: Mapped[date | None] = mapped_column(Date)
     last_activity_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

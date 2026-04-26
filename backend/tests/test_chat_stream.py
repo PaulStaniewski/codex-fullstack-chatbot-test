@@ -63,6 +63,20 @@ def test_chat_stream_returns_sse_data(client, monkeypatch):
     assert "data: a streamed assistant response." in response.text
 
 
+def test_chat_stream_normal_streaming_still_works(client, monkeypatch):
+    monkeypatch.setattr("app.routes.chat_routes._stream_openai_text", _fake_openai_stream)
+    token, conversation_id = _create_authenticated_conversation(client)
+
+    response = client.get(
+        "/chat-stream",
+        params={"conversation_id": conversation_id, "message": "hello", "token": token},
+    )
+
+    assert response.status_code == 200
+    assert "data: This " in response.text
+    assert "Error:" not in response.text
+
+
 def test_chat_stream_persists_user_and_assistant_messages(client, monkeypatch):
     monkeypatch.setattr("app.routes.chat_routes._stream_openai_text", _fake_openai_stream)
     token, conversation_id = _create_authenticated_conversation(client)
@@ -129,3 +143,57 @@ def test_chat_stream_returns_safe_error_and_skips_assistant_on_stream_failure(
     )
     messages = messages_response.json()
     assert [message["role"] for message in messages] == ["user"]
+
+
+def test_chat_stream_rejects_message_that_is_too_long(client, monkeypatch):
+    monkeypatch.setattr("app.routes.chat_routes._stream_openai_text", _fake_openai_stream)
+    token, conversation_id = _create_authenticated_conversation(client)
+
+    response = client.get(
+        "/chat-stream",
+        params={"conversation_id": conversation_id, "message": "x" * 2001, "token": token},
+    )
+
+    assert response.status_code == 200
+    assert "data: Error: Message is too long." in response.text
+
+    messages_response = client.get(
+        "/messages",
+        params={"conversation_id": conversation_id},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert messages_response.json() == []
+
+
+def test_chat_stream_rate_limit_exceeded(client, monkeypatch):
+    calls = 0
+
+    async def counted_stream(_openai_input):
+        nonlocal calls
+        calls += 1
+        yield "ok"
+
+    monkeypatch.setattr("app.routes.chat_routes._stream_openai_text", counted_stream)
+    monkeypatch.setattr("app.routes.chat_routes.CHAT_STREAM_RATE_LIMIT", 2)
+    monkeypatch.setattr("app.routes.chat_routes.CHAT_STREAM_RATE_WINDOW_SECONDS", 60)
+    monkeypatch.setattr("app.routes.chat_routes._rate_limit_buckets", {})
+    token, conversation_id = _create_authenticated_conversation(client)
+
+    first_response = client.get(
+        "/chat-stream",
+        params={"conversation_id": conversation_id, "message": "one", "token": token},
+    )
+    second_response = client.get(
+        "/chat-stream",
+        params={"conversation_id": conversation_id, "message": "two", "token": token},
+    )
+    limited_response = client.get(
+        "/chat-stream",
+        params={"conversation_id": conversation_id, "message": "three", "token": token},
+    )
+
+    assert first_response.status_code == 200
+    assert second_response.status_code == 200
+    assert limited_response.status_code == 200
+    assert "data: Error: Too many requests. Please wait a moment." in limited_response.text
+    assert calls == 2

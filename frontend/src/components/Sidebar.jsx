@@ -225,6 +225,8 @@ export default function Sidebar({
     const isCollapsed = Boolean(collapsedSections[sectionId]);
     const headingId = `learning-${course.id}`;
     const listId = `${headingId}-list`;
+    const modules = course.modules || [{ id: `${course.id}-lessons`, title: "Lessons", lessons: course.lessons || [] }];
+    const lessonCount = modules.reduce((count, module) => count + module.lessons.length, 0);
 
     return (
       <section
@@ -246,7 +248,7 @@ export default function Sidebar({
             </span>
             <span>{course.title}</span>
           </span>
-          <span className="section-count">{course.lessons.length}</span>
+          <span className="section-count">{lessonCount}</span>
         </button>
         <div
           className={
@@ -257,8 +259,15 @@ export default function Sidebar({
           id={listId}
           aria-hidden={isCollapsed}
         >
-          <div className="lesson-list">
-            {course.lessons.map((lesson) => renderLesson(course, lesson))}
+          <div className="module-list">
+            {modules.map((module) => (
+              <div className="module-group" key={module.id}>
+                <div className="module-label">{module.title}</div>
+                <div className="lesson-list">
+                  {module.lessons.map((lesson) => renderLesson(course, lesson))}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </section>

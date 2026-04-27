@@ -589,6 +589,27 @@ input:focus,
   gap: 6px;
 }
 
+.module-list {
+  display: grid;
+  gap: 10px;
+  overflow: hidden;
+  padding-top: 2px;
+}
+
+.module-group {
+  display: grid;
+  gap: 5px;
+}
+
+.module-label {
+  padding-left: 18px;
+  color: var(--text-muted);
+  font-size: 0.66rem;
+  font-weight: 950;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
 .lesson-list {
   display: grid;
   gap: 5px;

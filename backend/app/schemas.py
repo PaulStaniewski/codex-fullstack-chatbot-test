@@ -130,4 +130,7 @@ class PracticeSubmissionRead(BaseModel):
     step_index: int
     answer: str
     feedback: str
+    score: int | None = None
+    strengths: list[str] | None = None
+    improvements: list[str] | None = None
     created_at: datetime

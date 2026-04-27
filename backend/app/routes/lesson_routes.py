@@ -1,6 +1,6 @@
-from datetime import datetime, timezone
-
 import logging
+import re
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import StreamingResponse
@@ -131,7 +131,13 @@ def build_practice_feedback_prompt(
                 "Mention what is missing or unclear.\n"
                 "Suggest one improved answer.\n"
                 "Be supportive and not harsh.\n"
-                "Do not invent requirements outside the lesson."
+                "Do not invent requirements outside the lesson.\n"
+                "End with this compact structured section exactly:\n"
+                "Score: <0-100>\n"
+                "Strengths:\n"
+                "- ...\n"
+                "Improvements:\n"
+                "- ..."
             ),
         },
         {
@@ -145,6 +151,43 @@ def build_practice_feedback_prompt(
             ),
         },
     ]
+
+
+def _parse_bullets(section_text: str) -> list[str] | None:
+    items = [
+        line.strip().lstrip("-*").strip()
+        for line in section_text.splitlines()
+        if line.strip().startswith(("-", "*"))
+    ]
+    clean_items = [item for item in items if item]
+    return clean_items or None
+
+
+def parse_practice_feedback_metadata(feedback: str) -> dict[str, int | list[str] | None]:
+    metadata: dict[str, int | list[str] | None] = {
+        "score": None,
+        "strengths": None,
+        "improvements": None,
+    }
+
+    score_match = re.search(r"(?im)^\s*Score:\s*(\d{1,3})\s*$", feedback)
+    if score_match:
+        score = int(score_match.group(1))
+        if 0 <= score <= 100:
+            metadata["score"] = score
+
+    strengths_match = re.search(
+        r"(?ims)^\s*Strengths:\s*(.*?)(?=^\s*Improvements:|\Z)",
+        feedback,
+    )
+    if strengths_match:
+        metadata["strengths"] = _parse_bullets(strengths_match.group(1))
+
+    improvements_match = re.search(r"(?ims)^\s*Improvements:\s*(.*)\Z", feedback)
+    if improvements_match:
+        metadata["improvements"] = _parse_bullets(improvements_match.group(1))
+
+    return metadata
 
 
 @router.get("/progress", response_model=list[schemas.LessonProgressRead])
@@ -337,6 +380,7 @@ async def lesson_practice_feedback_stream(
             feedback = "".join(chunks).strip()
             if not feedback:
                 return
+            metadata = parse_practice_feedback_metadata(feedback)
 
             db.add(
                 models.PracticeSubmission(
@@ -345,6 +389,9 @@ async def lesson_practice_feedback_stream(
                     step_index=step_index,
                     answer=clean_answer,
                     feedback=feedback,
+                    score=metadata["score"],
+                    strengths=metadata["strengths"],
+                    improvements=metadata["improvements"],
                 )
             )
             db.commit()

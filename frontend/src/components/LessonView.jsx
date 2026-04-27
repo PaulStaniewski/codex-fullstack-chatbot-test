@@ -269,7 +269,12 @@ export default function LessonView({ lesson, isLoading, token, onNextStep }) {
                       )
                     }
                   >
-                    <span>Attempt {practiceHistory.length - index}</span>
+                    <span>
+                      Attempt {practiceHistory.length - index}
+                      {attempt.score !== null && attempt.score !== undefined ? (
+                        <em>{attempt.score}/100</em>
+                      ) : null}
+                    </span>
                     <time dateTime={attempt.created_at}>{formatAttemptTime(attempt.created_at)}</time>
                     <strong>{previewAnswer(attempt.answer)}</strong>
                   </button>
@@ -287,6 +292,29 @@ export default function LessonView({ lesson, isLoading, token, onNextStep }) {
                 </div>
                 <div>
                   <h3>AI feedback</h3>
+                  {selectedAttempt.score !== null && selectedAttempt.score !== undefined ? (
+                    <div className="practice-score-badge">Score {selectedAttempt.score}/100</div>
+                  ) : null}
+                  {selectedAttempt.strengths?.length > 0 ? (
+                    <div className="practice-metadata-list">
+                      <h4>Strengths</h4>
+                      <ul>
+                        {selectedAttempt.strengths.map((item) => (
+                          <li key={item}>{item}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                  {selectedAttempt.improvements?.length > 0 ? (
+                    <div className="practice-metadata-list">
+                      <h4>Improvements</h4>
+                      <ul>
+                        {selectedAttempt.improvements.map((item) => (
+                          <li key={item}>{item}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
                   <ReactMarkdown>{selectedAttempt.feedback}</ReactMarkdown>
                 </div>
               </div>

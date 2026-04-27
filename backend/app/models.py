@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, JSON, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -158,6 +158,9 @@ class PracticeSubmission(Base):
     step_index: Mapped[int] = mapped_column(Integer, nullable=False)
     answer: Mapped[str] = mapped_column(Text, nullable=False)
     feedback: Mapped[str] = mapped_column(Text, nullable=False)
+    score: Mapped[int | None] = mapped_column(Integer)
+    strengths: Mapped[list[str] | None] = mapped_column(JSON)
+    improvements: Mapped[list[str] | None] = mapped_column(JSON)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

@@ -1,7 +1,11 @@
 from app import models
 from app.lessons import get_lesson
 from app.progress import XP_PER_LESSON_COMPLETION
-from app.routes.lesson_routes import build_lesson_tutor_prompt, build_practice_feedback_prompt
+from app.routes.lesson_routes import (
+    build_lesson_tutor_prompt,
+    build_practice_feedback_prompt,
+    parse_practice_feedback_metadata,
+)
 
 
 def _register_and_login(client, email="lesson@example.com"):
@@ -13,6 +17,13 @@ def _register_and_login(client, email="lesson@example.com"):
 async def _fake_feedback_stream(_openai_input):
     yield "Good start. "
     yield "Mention the route decorator too."
+
+
+async def _fake_scored_feedback_stream(_openai_input):
+    yield "Good answer. Add the exact route path.\n\n"
+    yield "Score: 82\n"
+    yield "Strengths:\n- Mentions a health endpoint\n- Understands GET usage\n"
+    yield "Improvements:\n- Include the /health path\n- Mention the decorator"
 
 
 def test_get_lesson_creates_progress(client):
@@ -260,6 +271,9 @@ def test_practice_feedback_prompt_includes_instruction_and_user_answer():
     assert step["title"] in combined_content
     assert step["content"] in combined_content
     assert "I would use @app.get('/health')." in combined_content
+    assert "Score: <0-100>" in combined_content
+    assert "Strengths:" in combined_content
+    assert "Improvements:" in combined_content
 
 
 def test_practice_submission_saved_after_feedback(client, monkeypatch):
@@ -350,3 +364,82 @@ def test_practice_history_unknown_lesson_returns_404(client):
     )
 
     assert response.status_code == 404
+
+
+def test_practice_feedback_metadata_parser_extracts_score_strengths_and_improvements():
+    feedback = (
+        "Nice work.\n\n"
+        "Score: 91\n"
+        "Strengths:\n"
+        "- Clear route choice\n"
+        "- Good HTTP method\n"
+        "Improvements:\n"
+        "- Include response shape\n"
+    )
+
+    metadata = parse_practice_feedback_metadata(feedback)
+
+    assert metadata["score"] == 91
+    assert metadata["strengths"] == ["Clear route choice", "Good HTTP method"]
+    assert metadata["improvements"] == ["Include response shape"]
+
+
+def test_practice_feedback_metadata_parser_tolerates_unstructured_feedback():
+    metadata = parse_practice_feedback_metadata("This is just normal feedback.")
+
+    assert metadata["score"] is None
+    assert metadata["strengths"] is None
+    assert metadata["improvements"] is None
+
+
+def test_practice_submission_saves_score_metadata(client, monkeypatch):
+    monkeypatch.setattr("app.routes.lesson_routes._stream_openai_text", _fake_scored_feedback_stream)
+    token = _register_and_login(client)
+
+    client.get(
+        "/lessons/fastapi_routing/practice-feedback-stream",
+        params={
+            "step_index": 2,
+            "answer": "I would use a GET endpoint.",
+            "token": token,
+        },
+    )
+    history_response = client.get(
+        "/lessons/fastapi_routing/practice-history",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    submission = history_response.json()[0]
+
+    assert submission["score"] == 82
+    assert submission["strengths"] == [
+        "Mentions a health endpoint",
+        "Understands GET usage",
+    ]
+    assert submission["improvements"] == [
+        "Include the /health path",
+        "Mention the decorator",
+    ]
+
+
+def test_practice_submission_parsing_failure_still_saves_feedback(client, monkeypatch):
+    monkeypatch.setattr("app.routes.lesson_routes._stream_openai_text", _fake_feedback_stream)
+    token = _register_and_login(client)
+
+    client.get(
+        "/lessons/fastapi_routing/practice-feedback-stream",
+        params={
+            "step_index": 2,
+            "answer": "I would create a health route.",
+            "token": token,
+        },
+    )
+    history_response = client.get(
+        "/lessons/fastapi_routing/practice-history",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    submission = history_response.json()[0]
+
+    assert submission["feedback"] == "Good start. Mention the route decorator too."
+    assert submission["score"] is None
+    assert submission["strengths"] is None
+    assert submission["improvements"] is None

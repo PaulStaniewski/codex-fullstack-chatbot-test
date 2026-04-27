@@ -443,3 +443,92 @@ def test_practice_submission_parsing_failure_still_saves_feedback(client, monkey
     assert submission["score"] is None
     assert submission["strengths"] is None
     assert submission["improvements"] is None
+
+
+def test_practice_submission_first_attempt_number_is_one(client, monkeypatch):
+    monkeypatch.setattr("app.routes.lesson_routes._stream_openai_text", _fake_feedback_stream)
+    token = _register_and_login(client)
+
+    client.get(
+        "/lessons/fastapi_routing/practice-feedback-stream",
+        params={"step_index": 2, "answer": "First answer", "token": token},
+    )
+    history_response = client.get(
+        "/lessons/fastapi_routing/practice-history",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert history_response.json()[0]["attempt_number"] == 1
+
+
+def test_practice_submission_second_attempt_increments(client, monkeypatch):
+    monkeypatch.setattr("app.routes.lesson_routes._stream_openai_text", _fake_feedback_stream)
+    token = _register_and_login(client)
+
+    client.get(
+        "/lessons/fastapi_routing/practice-feedback-stream",
+        params={"step_index": 2, "answer": "First answer", "token": token},
+    )
+    client.get(
+        "/lessons/fastapi_routing/practice-feedback-stream",
+        params={"step_index": 2, "answer": "Second answer", "token": token},
+    )
+    history_response = client.get(
+        "/lessons/fastapi_routing/practice-history",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert [item["attempt_number"] for item in history_response.json()] == [2, 1]
+
+
+def test_practice_submission_numbering_scoped_to_step(client, monkeypatch):
+    monkeypatch.setattr("app.routes.lesson_routes._stream_openai_text", _fake_feedback_stream)
+    token = _register_and_login(client)
+
+    client.get(
+        "/lessons/fastapi_routing/practice-feedback-stream",
+        params={"step_index": 2, "answer": "Routing practice", "token": token},
+    )
+    client.get(
+        "/lessons/fastapi_dependency/practice-feedback-stream",
+        params={"step_index": 2, "answer": "Dependency practice", "token": token},
+    )
+
+    routing_history = client.get(
+        "/lessons/fastapi_routing/practice-history",
+        headers={"Authorization": f"Bearer {token}"},
+    ).json()
+    dependency_history = client.get(
+        "/lessons/fastapi_dependency/practice-history",
+        headers={"Authorization": f"Bearer {token}"},
+    ).json()
+
+    assert routing_history[0]["attempt_number"] == 1
+    assert dependency_history[0]["attempt_number"] == 1
+
+
+def test_practice_submission_numbering_scoped_to_user(client, monkeypatch):
+    monkeypatch.setattr("app.routes.lesson_routes._stream_openai_text", _fake_feedback_stream)
+    first_token = _register_and_login(client, "attempt-one@example.com")
+    second_token = _register_and_login(client, "attempt-two@example.com")
+
+    client.get(
+        "/lessons/fastapi_routing/practice-feedback-stream",
+        params={"step_index": 2, "answer": "First user answer", "token": first_token},
+    )
+    client.get(
+        "/lessons/fastapi_routing/practice-feedback-stream",
+        params={"step_index": 2, "answer": "Second user answer", "token": second_token},
+    )
+
+    first_history = client.get(
+        "/lessons/fastapi_routing/practice-history",
+        headers={"Authorization": f"Bearer {first_token}"},
+    ).json()
+    second_history = client.get(
+        "/lessons/fastapi_routing/practice-history",
+        headers={"Authorization": f"Bearer {second_token}"},
+    ).json()
+
+    assert first_history[0]["attempt_number"] == 1
+    assert second_history[0]["attempt_number"] == 1

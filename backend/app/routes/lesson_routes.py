@@ -13,6 +13,7 @@ from openai import (
     OpenAIError,
 )
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 
 from app import auth, lessons, models, progress as progress_service, schemas
 from app.database import get_db
@@ -188,6 +189,24 @@ def parse_practice_feedback_metadata(feedback: str) -> dict[str, int | list[str]
         metadata["improvements"] = _parse_bullets(improvements_match.group(1))
 
     return metadata
+
+
+def get_next_practice_attempt_number(
+    db: Session,
+    user_id: int,
+    lesson_id: str,
+    step_index: int,
+) -> int:
+    max_attempt_number = (
+        db.query(func.max(models.PracticeSubmission.attempt_number))
+        .filter(
+            models.PracticeSubmission.user_id == user_id,
+            models.PracticeSubmission.lesson_id == lesson_id,
+            models.PracticeSubmission.step_index == step_index,
+        )
+        .scalar()
+    )
+    return (max_attempt_number or 0) + 1
 
 
 @router.get("/progress", response_model=list[schemas.LessonProgressRead])
@@ -387,6 +406,12 @@ async def lesson_practice_feedback_stream(
                     user_id=current_user.id,
                     lesson_id=lesson["lesson_id"],
                     step_index=step_index,
+                    attempt_number=get_next_practice_attempt_number(
+                        db,
+                        current_user.id,
+                        lesson["lesson_id"],
+                        step_index,
+                    ),
                     answer=clean_answer,
                     feedback=feedback,
                     score=metadata["score"],

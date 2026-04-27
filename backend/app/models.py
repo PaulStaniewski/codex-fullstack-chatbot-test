@@ -156,6 +156,7 @@ class PracticeSubmission(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     lesson_id: Mapped[str] = mapped_column(String(120), nullable=False, index=True)
     step_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    attempt_number: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     answer: Mapped[str] = mapped_column(Text, nullable=False)
     feedback: Mapped[str] = mapped_column(Text, nullable=False)
     score: Mapped[int | None] = mapped_column(Integer)

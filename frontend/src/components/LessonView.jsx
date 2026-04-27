@@ -270,7 +270,7 @@ export default function LessonView({ lesson, isLoading, token, onNextStep }) {
                     }
                   >
                     <span>
-                      Attempt {practiceHistory.length - index}
+                      Attempt {attempt.attempt_number}
                       {attempt.score !== null && attempt.score !== undefined ? (
                         <em>{attempt.score}/100</em>
                       ) : null}

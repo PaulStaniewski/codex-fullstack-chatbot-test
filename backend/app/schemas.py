@@ -128,6 +128,7 @@ class PracticeSubmissionRead(BaseModel):
     id: int
     lesson_id: str
     step_index: int
+    attempt_number: int
     answer: str
     feedback: str
     score: int | None = None

@@ -17,6 +17,9 @@ export const learningStructure = [
         title: "Database & Migrations",
         lessons: [
           { id: "alembic_missing_column", title: "Debugging Alembic Missing Column Errors" },
+          { id: "alembic_revision_too_long", title: "Alembic Revision ID Too Long" },
+          { id: "duplicate_migration_head", title: "Duplicate Alembic Migration Head" },
+          { id: "missing_foreign_key_constraint", title: "Missing Foreign Key Constraint" },
         ],
       },
       {
@@ -45,6 +48,9 @@ export const learningStructure = [
             id: "docker_startup_race_condition",
             title: "Docker Compose Startup Race Condition",
           },
+          { id: "postgres_container_not_ready", title: "Postgres Container Not Ready" },
+          { id: "docker_healthcheck_missing", title: "Docker Healthcheck Missing" },
+          { id: "env_variable_not_loaded", title: "Environment Variable Not Loaded" },
         ],
       },
     ],
@@ -56,7 +62,11 @@ export const learningStructure = [
       {
         id: "eventsource-auth",
         title: "EventSource Auth",
-        lessons: [{ id: "sse_eventsource_auth", title: "SSE Authentication with EventSource" }],
+        lessons: [
+          { id: "sse_eventsource_auth", title: "SSE Authentication with EventSource" },
+          { id: "eventsource_token_expired", title: "EventSource Token Expired" },
+          { id: "duplicate_stream_messages", title: "Duplicate Stream Messages" },
+        ],
       },
     ],
   },
@@ -67,7 +77,11 @@ export const learningStructure = [
       {
         id: "streaming-ai",
         title: "Streaming AI",
-        lessons: [{ id: "openai_streaming_errors", title: "Handling OpenAI Streaming Errors" }],
+        lessons: [
+          { id: "openai_streaming_errors", title: "Handling OpenAI Streaming Errors" },
+          { id: "openai_rate_limit_handling", title: "OpenAI Rate Limit Handling" },
+          { id: "partial_stream_failure", title: "Partial Stream Failure" },
+        ],
       },
     ],
   },

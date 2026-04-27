@@ -74,6 +74,63 @@ export function streamLessonTutor({
   };
 }
 
+export function getPracticeFeedbackStreamUrl({ lessonId, stepIndex, answer, token }) {
+  const params = new URLSearchParams({
+    step_index: String(stepIndex),
+    answer,
+    token,
+  });
+
+  return `${getApiBaseUrl()}/lessons/${encodeURIComponent(lessonId)}/practice-feedback-stream?${params.toString()}`;
+}
+
+export function streamPracticeFeedback({
+  lessonId,
+  stepIndex,
+  answer,
+  token,
+  onToken,
+  onError,
+  onDone,
+}) {
+  const stream = new EventSource(
+    getPracticeFeedbackStreamUrl({ lessonId, stepIndex, answer, token }),
+  );
+  let receivedContent = "";
+  let didFinalize = false;
+
+  stream.onmessage = (event) => {
+    receivedContent += event.data;
+    onToken?.(event.data, receivedContent);
+
+    if (receivedContent.startsWith("Error:")) {
+      didFinalize = true;
+      stream.close();
+      onError?.(receivedContent);
+      onDone?.(receivedContent);
+    }
+  };
+
+  stream.onerror = () => {
+    if (didFinalize) {
+      return;
+    }
+
+    didFinalize = true;
+    stream.close();
+    if (receivedContent) {
+      onDone?.(receivedContent);
+    } else {
+      onError?.("Unable to get practice feedback.");
+    }
+  };
+
+  return () => {
+    didFinalize = true;
+    stream.close();
+  };
+}
+
 export async function apiFetch(path, { token, ...options } = {}) {
   const headers = new Headers(options.headers || {});
 

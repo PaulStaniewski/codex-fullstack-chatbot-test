@@ -778,6 +778,50 @@ input:focus,
   gap: 16px;
 }
 
+.lesson-practice-card {
+  gap: 16px;
+}
+
+.lesson-practice-form {
+  display: grid;
+  gap: 10px;
+}
+
+.lesson-practice-form textarea {
+  min-height: 112px;
+  resize: vertical;
+}
+
+.lesson-practice-form button {
+  justify-self: start;
+  min-height: 42px;
+  padding: 0 16px;
+}
+
+.lesson-feedback {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 15px;
+  background: var(--surface-soft);
+  color: var(--text-soft);
+  line-height: 1.6;
+}
+
+.lesson-feedback p + p,
+.lesson-feedback ul,
+.lesson-feedback ol {
+  margin-top: 10px;
+}
+
+.lesson-feedback code {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 1px 5px;
+  background: var(--input-bg);
+  color: var(--text);
+  font-size: 0.88em;
+}
+
 .quick-actions {
   display: flex;
   flex-wrap: wrap;

@@ -115,6 +115,38 @@ def build_lesson_tutor_prompt(
     ]
 
 
+def build_practice_feedback_prompt(
+    lesson: dict,
+    step: dict,
+    answer: str,
+) -> list[dict[str, str]]:
+    return [
+        {
+            "role": "system",
+            "content": (
+                "You are an AI programming tutor reviewing a learner's practice answer.\n"
+                "Use the provided lesson and practice instruction as the source of truth.\n"
+                "Give concise feedback.\n"
+                "Mention what is correct.\n"
+                "Mention what is missing or unclear.\n"
+                "Suggest one improved answer.\n"
+                "Be supportive and not harsh.\n"
+                "Do not invent requirements outside the lesson."
+            ),
+        },
+        {
+            "role": "user",
+            "content": (
+                f"Lesson title: {lesson['title']}\n"
+                f"Course ID: {lesson['course_id']}\n"
+                f"Practice step title: {step['title']}\n"
+                f"Practice instruction:\n{step['content']}\n\n"
+                f"User answer:\n{answer}"
+            ),
+        },
+    ]
+
+
 @router.get("/progress", response_model=list[schemas.LessonProgressRead])
 def list_lesson_progress(
     current_user: models.User = Depends(auth.get_current_user),
@@ -225,6 +257,72 @@ async def lesson_tutor_stream(
                 yield _format_sse_data(SAFE_STREAM_ERROR)
             except Exception:
                 logger.exception("Unexpected error during lesson tutor stream")
+                yield _format_sse_data(SAFE_STREAM_ERROR)
+        finally:
+            db.close()
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+
+@router.get("/{lesson_id}/practice-feedback-stream")
+async def lesson_practice_feedback_stream(
+    request: Request,
+    lesson_id: str,
+    step_index: int,
+    answer: str,
+    token: str | None = Query(default=None),
+    db: Session = Depends(get_db),
+):
+    if not token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing token")
+
+    clean_answer = answer.strip()
+    if not clean_answer:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Answer cannot be empty")
+
+    current_user = auth.get_user_from_token(db, token)
+    lesson = get_lesson_or_404(lesson_id)
+    step = resolve_lesson_step(lesson, None, step_index)
+    if step["type"] != "practice":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Practice feedback is only available for practice steps",
+        )
+
+    openai_input = build_practice_feedback_prompt(lesson, step, clean_answer)
+
+    async def event_generator():
+        try:
+            try:
+                async for chunk in _stream_openai_text(openai_input):
+                    if await request.is_disconnected():
+                        logger.info(
+                            "Client disconnected from lesson practice feedback stream",
+                            extra={"lesson_id": lesson_id, "user_id": current_user.id},
+                        )
+                        return
+                    if chunk:
+                        yield _format_sse_data(chunk)
+            except AuthenticationError:
+                logger.exception("OpenAI authentication failed during practice feedback stream")
+                yield _format_sse_data(SAFE_STREAM_ERROR)
+            except APITimeoutError:
+                logger.exception("OpenAI request timed out during practice feedback stream")
+                yield _format_sse_data(SAFE_STREAM_ERROR)
+            except APIConnectionError:
+                logger.exception("OpenAI network connection failed during practice feedback stream")
+                yield _format_sse_data(SAFE_STREAM_ERROR)
+            except APIStatusError:
+                logger.exception("OpenAI API returned an error status during practice feedback stream")
+                yield _format_sse_data(SAFE_STREAM_ERROR)
+            except APIError:
+                logger.exception("OpenAI API error during practice feedback stream")
+                yield _format_sse_data(SAFE_STREAM_ERROR)
+            except OpenAIError:
+                logger.exception("OpenAI error during practice feedback stream")
+                yield _format_sse_data(SAFE_STREAM_ERROR)
+            except Exception:
+                logger.exception("Unexpected error during practice feedback stream")
                 yield _format_sse_data(SAFE_STREAM_ERROR)
         finally:
             db.close()

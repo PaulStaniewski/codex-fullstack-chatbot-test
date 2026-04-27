@@ -1,7 +1,7 @@
 from app import models
 from app.lessons import get_lesson
 from app.progress import XP_PER_LESSON_COMPLETION
-from app.routes.lesson_routes import build_lesson_tutor_prompt
+from app.routes.lesson_routes import build_lesson_tutor_prompt, build_practice_feedback_prompt
 
 
 def _register_and_login(client, email="lesson@example.com"):
@@ -189,3 +189,69 @@ def test_lesson_tutor_prompt_includes_lesson_step_and_question():
     assert step["title"] in combined_content
     assert step["content"] in combined_content
     assert "Why is this useful?" in combined_content
+
+
+def test_practice_feedback_stream_requires_auth(client):
+    response = client.get(
+        "/lessons/fastapi_routing/practice-feedback-stream",
+        params={"step_index": 2, "answer": "I would add app.get."},
+    )
+
+    assert response.status_code == 401
+
+
+def test_practice_feedback_stream_unknown_lesson_returns_404(client):
+    token = _register_and_login(client)
+
+    response = client.get(
+        "/lessons/unknown/practice-feedback-stream",
+        params={"step_index": 0, "answer": "My answer", "token": token},
+    )
+
+    assert response.status_code == 404
+
+
+def test_practice_feedback_stream_invalid_step_index_returns_400(client):
+    token = _register_and_login(client)
+
+    response = client.get(
+        "/lessons/fastapi_routing/practice-feedback-stream",
+        params={"step_index": 99, "answer": "My answer", "token": token},
+    )
+
+    assert response.status_code == 400
+
+
+def test_practice_feedback_stream_non_practice_step_rejected(client):
+    token = _register_and_login(client)
+
+    response = client.get(
+        "/lessons/fastapi_routing/practice-feedback-stream",
+        params={"step_index": 0, "answer": "My answer", "token": token},
+    )
+
+    assert response.status_code == 400
+
+
+def test_practice_feedback_stream_empty_answer_rejected(client):
+    token = _register_and_login(client)
+
+    response = client.get(
+        "/lessons/fastapi_routing/practice-feedback-stream",
+        params={"step_index": 2, "answer": "   ", "token": token},
+    )
+
+    assert response.status_code == 400
+
+
+def test_practice_feedback_prompt_includes_instruction_and_user_answer():
+    lesson = get_lesson("fastapi_routing")
+    step = lesson["steps"][2]
+
+    prompt = build_practice_feedback_prompt(lesson, step, "I would use @app.get('/health').")
+    combined_content = "\n".join(item["content"] for item in prompt)
+
+    assert lesson["title"] in combined_content
+    assert step["title"] in combined_content
+    assert step["content"] in combined_content
+    assert "I would use @app.get('/health')." in combined_content

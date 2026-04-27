@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
-import { streamLessonTutor } from "../api.js";
+import { streamLessonTutor, streamPracticeFeedback } from "../api.js";
 
 const QUICK_ACTIONS = ["Explain simply", "Give an example", "Why does this matter?"];
 
@@ -23,20 +23,32 @@ export default function LessonView({ lesson, isLoading, token, onNextStep }) {
   const [tutorAnswer, setTutorAnswer] = useState("");
   const [tutorError, setTutorError] = useState("");
   const [isTutorStreaming, setIsTutorStreaming] = useState(false);
+  const [practiceAnswer, setPracticeAnswer] = useState("");
+  const [practiceFeedback, setPracticeFeedback] = useState("");
+  const [practiceError, setPracticeError] = useState("");
+  const [isPracticeStreaming, setIsPracticeStreaming] = useState(false);
   const closeTutorStreamRef = useRef(null);
+  const closePracticeStreamRef = useRef(null);
 
   useEffect(() => {
     setTutorQuestion("");
     setTutorAnswer("");
     setTutorError("");
     setIsTutorStreaming(false);
+    setPracticeAnswer("");
+    setPracticeFeedback("");
+    setPracticeError("");
+    setIsPracticeStreaming(false);
     closeTutorStreamRef.current?.();
     closeTutorStreamRef.current = null;
+    closePracticeStreamRef.current?.();
+    closePracticeStreamRef.current = null;
   }, [lesson?.lesson_id, lesson?.current_step_index]);
 
   useEffect(() => {
     return () => {
       closeTutorStreamRef.current?.();
+      closePracticeStreamRef.current?.();
     };
   }, []);
 
@@ -86,6 +98,40 @@ export default function LessonView({ lesson, isLoading, token, onNextStep }) {
     askTutor();
   }
 
+  function requestPracticeFeedback() {
+    const cleanAnswer = practiceAnswer.trim();
+    if (!cleanAnswer || isPracticeStreaming) {
+      return;
+    }
+
+    closePracticeStreamRef.current?.();
+    setPracticeFeedback("");
+    setPracticeError("");
+    setIsPracticeStreaming(true);
+
+    closePracticeStreamRef.current = streamPracticeFeedback({
+      lessonId: lesson.lesson_id,
+      stepIndex: lesson.current_step_index,
+      answer: cleanAnswer,
+      token,
+      onToken: (_chunk, fullAnswer) => {
+        setPracticeFeedback(fullAnswer);
+      },
+      onError: (message) => {
+        setPracticeError(message || "Unable to get practice feedback.");
+      },
+      onDone: () => {
+        setIsPracticeStreaming(false);
+        closePracticeStreamRef.current = null;
+      },
+    });
+  }
+
+  function handlePracticeSubmit(event) {
+    event.preventDefault();
+    requestPracticeFeedback();
+  }
+
   return (
     <section className="lesson-view">
       <div className="lesson-card">
@@ -123,6 +169,42 @@ export default function LessonView({ lesson, isLoading, token, onNextStep }) {
           </>
         )}
       </div>
+
+      {!lesson.completed && currentStep.type === "practice" ? (
+        <div className="lesson-card lesson-practice-card">
+          <div className="lesson-card-header">
+            <div>
+              <p className="eyebrow">Practice Answer</p>
+              <h2>Try it yourself</h2>
+            </div>
+            {isPracticeStreaming ? <span className="status-pill">Streaming</span> : null}
+          </div>
+
+          <form className="lesson-practice-form" onSubmit={handlePracticeSubmit}>
+            <textarea
+              value={practiceAnswer}
+              onChange={(event) => setPracticeAnswer(event.target.value)}
+              placeholder="Write your answer for this practice step..."
+              rows={4}
+              disabled={isPracticeStreaming}
+            />
+            <button
+              className="primary-button"
+              type="submit"
+              disabled={!practiceAnswer.trim() || isPracticeStreaming}
+            >
+              {isPracticeStreaming ? "Getting feedback..." : "Get AI feedback"}
+            </button>
+          </form>
+
+          {practiceError ? <p className="form-error">{practiceError}</p> : null}
+          {practiceFeedback ? (
+            <div className="lesson-feedback">
+              <ReactMarkdown>{practiceFeedback}</ReactMarkdown>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="lesson-card lesson-tutor-card">
         <div className="lesson-card-header">

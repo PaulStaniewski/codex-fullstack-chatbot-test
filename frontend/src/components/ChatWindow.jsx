@@ -6,6 +6,7 @@ import ThemeToggle from "./ThemeToggle.jsx";
 
 export default function ChatWindow({
   conversation,
+  lessonContext,
   messages,
   onSendMessage,
   onRetryMessage,
@@ -175,8 +176,10 @@ export default function ChatWindow({
     <main className="chat-shell">
       <header className="chat-header">
         <div className="chat-title">
-          <p className="eyebrow">Assistant</p>
-          <h1>{conversation?.title || "Select or start a chat"}</h1>
+          <p className="eyebrow">
+            {lessonContext ? lessonContext.course_title : "Assistant"}
+          </p>
+          <h1>{lessonContext?.lesson_title || conversation?.title || "Select or start a chat"}</h1>
         </div>
         <div className="chat-actions">
           {modeBadgeLabel ? <span className="mode-badge">{modeBadgeLabel}</span> : null}
@@ -248,9 +251,13 @@ export default function ChatWindow({
         {isLoading ? <p className="center-note">Loading messages...</p> : null}
         {!isLoading && !conversation ? (
           <div className="empty-state">
-            <div className="empty-mark">AI</div>
-            <h2>Start a conversation</h2>
-            <p>Create a chat from the sidebar, then send a message here.</p>
+            <div className="empty-mark">{lessonContext ? "L" : "AI"}</div>
+            <h2>{lessonContext ? lessonContext.lesson_title : "Start a conversation"}</h2>
+            <p>
+              {lessonContext
+                ? `Ask a question or start practicing ${lessonContext.lesson_title}.`
+                : "Create a chat from the sidebar, then send a message here."}
+            </p>
           </div>
         ) : null}
         {!isLoading && conversation && messages.length === 0 ? (

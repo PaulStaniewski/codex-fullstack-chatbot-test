@@ -35,6 +35,7 @@ export default function App() {
   const [failedMessage, setFailedMessage] = useState(null);
   const [activeView, setActiveView] = useState("chat");
   const [achievementToast, setAchievementToast] = useState(null);
+  const [lessonContext, setLessonContext] = useState(null);
   const eventSourceRef = useRef(null);
 
   useEffect(() => {
@@ -82,6 +83,7 @@ export default function App() {
     setIsStreaming(false);
     setActiveView("chat");
     setAchievementToast(null);
+    setLessonContext(null);
   }
 
   function toggleTheme() {
@@ -171,14 +173,32 @@ export default function App() {
     return conversation;
   }
 
+  async function startNewConversation() {
+    setLessonContext(null);
+    await createConversation();
+  }
+
   async function selectConversation(conversation) {
     eventSourceRef.current?.close();
     eventSourceRef.current = null;
     setIsStreaming(false);
+    setLessonContext(null);
     localStorage.setItem(ACTIVE_CONVERSATION_KEY, String(conversation.id));
     setSelectedConversation(conversation);
     setActiveView("chat");
     await loadMessages(conversation.id);
+  }
+
+  function selectLesson(lesson) {
+    eventSourceRef.current?.close();
+    eventSourceRef.current = null;
+    setIsStreaming(false);
+    setFailedMessage(null);
+    localStorage.removeItem(ACTIVE_CONVERSATION_KEY);
+    setSelectedConversation(null);
+    setMessages([]);
+    setLessonContext(lesson);
+    setActiveView("chat");
   }
 
   function showProgress() {
@@ -372,7 +392,7 @@ export default function App() {
 
     try {
       if (!conversation) {
-        conversation = await createConversation(makeTitle(content));
+        conversation = await createConversation(lessonContext?.lesson_title || makeTitle(content));
       }
 
       const tempUserMessage = {
@@ -504,13 +524,15 @@ export default function App() {
       <Sidebar
         conversations={conversations}
         selectedConversationId={selectedConversation?.id}
-        onCreateConversation={() => createConversation().catch(handleRequestError)}
+        onCreateConversation={() => startNewConversation().catch(handleRequestError)}
         onSelectConversation={selectConversation}
         onRenameConversation={renameConversation}
         onDeleteConversation={deleteConversation}
         onTogglePin={toggleConversationPin}
+        onSelectLesson={selectLesson}
         onShowProgress={showProgress}
         onLogout={logout}
+        selectedLessonId={lessonContext?.lesson_id}
         isProgressActive={activeView === "progress"}
         isLoading={isConversationsLoading}
         isMessagesLoading={isMessagesLoading}
@@ -527,6 +549,7 @@ export default function App() {
       ) : (
         <ChatWindow
           conversation={selectedConversation}
+          lessonContext={lessonContext}
           messages={messages}
           onSendMessage={sendMessage}
           onRetryMessage={retryMessage}

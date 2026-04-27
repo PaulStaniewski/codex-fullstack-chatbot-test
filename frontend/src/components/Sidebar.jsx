@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { learningStructure } from "../learningStructure.js";
 import Modal from "./Modal.jsx";
 
 const COLLAPSED_SECTIONS_STORAGE_KEY = "sidebar.collapsedSections";
@@ -20,8 +21,10 @@ export default function Sidebar({
   onRenameConversation,
   onDeleteConversation,
   onTogglePin,
+  onSelectLesson,
   onShowProgress,
   onLogout,
+  selectedLessonId,
   isProgressActive,
   isLoading,
   isMessagesLoading,
@@ -171,6 +174,78 @@ export default function Sidebar({
     });
   }
 
+  function renderLesson(course, lesson) {
+    const lessonKey = `${course.id}:${lesson.id}`;
+    const isActive = lessonKey === selectedLessonId;
+
+    return (
+      <button
+        type="button"
+        key={lessonKey}
+        className={isActive ? "lesson-item active" : "lesson-item"}
+        onClick={() =>
+          onSelectLesson({
+            lesson_id: lessonKey,
+            lesson_title: lesson.title,
+            course_id: course.id,
+            course_title: course.title,
+          })
+        }
+        disabled={isMessagesLoading || isStreaming}
+      >
+        <span className="lesson-status" aria-hidden="true">
+          {isActive ? "●" : "○"}
+        </span>
+        <span className="lesson-title">{lesson.title}</span>
+      </button>
+    );
+  }
+
+  function renderLearningSection(course) {
+    const sectionId = `course-${course.id}`;
+    const isCollapsed = Boolean(collapsedSections[sectionId]);
+    const headingId = `learning-${course.id}`;
+    const listId = `${headingId}-list`;
+
+    return (
+      <section
+        className="conversation-section learning-section"
+        aria-labelledby={headingId}
+        key={course.id}
+      >
+        <button
+          type="button"
+          className="conversation-section-label"
+          id={headingId}
+          aria-expanded={!isCollapsed}
+          aria-controls={listId}
+          onClick={() => toggleSection(sectionId)}
+        >
+          <span className="section-label-text">
+            <span className="section-chevron" aria-hidden="true">
+              {">"}
+            </span>
+            <span>{course.title}</span>
+          </span>
+          <span className="section-count">{course.lessons.length}</span>
+        </button>
+        <div
+          className={
+            isCollapsed
+              ? "conversation-section-body collapsed"
+              : "conversation-section-body"
+          }
+          id={listId}
+          aria-hidden={isCollapsed}
+        >
+          <div className="lesson-list">
+            {course.lessons.map((lesson) => renderLesson(course, lesson))}
+          </div>
+        </div>
+      </section>
+    );
+  }
+
   function renderConversation(conversation) {
     const isActive = conversation.id === selectedConversationId;
 
@@ -276,8 +351,8 @@ export default function Sidebar({
     <aside className="sidebar">
       <div className="sidebar-header">
         <div>
-          <p className="eyebrow">Conversations</p>
-          <h2>Chats</h2>
+          <p className="eyebrow">Learning</p>
+          <h2>Courses</h2>
         </div>
         <button
           className="icon-button"
@@ -321,7 +396,15 @@ export default function Sidebar({
         />
       </div>
 
-      <nav className="conversation-list" aria-label="Conversations">
+      <nav className="conversation-list" aria-label="Learning">
+        <div className="learning-nav">
+          {learningStructure.map(renderLearningSection)}
+        </div>
+
+        <div className="conversation-history-heading">
+          <span>Conversation history</span>
+        </div>
+
         {isLoading ? <p className="sidebar-note">Loading conversations...</p> : null}
         {!isLoading && conversations.length === 0 ? (
           <div className="sidebar-empty">

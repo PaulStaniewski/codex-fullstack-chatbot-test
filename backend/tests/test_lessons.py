@@ -136,6 +136,34 @@ def test_lesson_progress_endpoint_returns_user_only_progress(client):
     assert data[0]["lesson_id"] == "fastapi_intro"
 
 
+def test_lesson_progress_endpoint_excludes_other_user_completed_rows(client):
+    first_token = _register_and_login(client, "complete-one@example.com")
+    second_token = _register_and_login(client, "complete-two@example.com")
+
+    lesson = client.get(
+        "/lessons/fastapi_intro",
+        headers={"Authorization": f"Bearer {first_token}"},
+    ).json()
+    client.get("/lessons/docker_basics", headers={"Authorization": f"Bearer {second_token}"})
+
+    for _ in lesson["steps"]:
+        client.post(
+            "/lessons/fastapi_intro/next",
+            headers={"Authorization": f"Bearer {first_token}"},
+        )
+
+    response = client.get(
+        "/lessons/progress",
+        headers={"Authorization": f"Bearer {second_token}"},
+    )
+    data = response.json()
+
+    assert response.status_code == 200
+    assert len(data) == 1
+    assert data[0]["lesson_id"] == "docker_basics"
+    assert data[0]["completed"] is False
+
+
 def test_lesson_progress_unique_per_user_and_lesson(client):
     token = _register_and_login(client)
     client.get("/lessons/fastapi_intro", headers={"Authorization": f"Bearer {token}"})
@@ -150,6 +178,54 @@ def test_lesson_progress_unique_per_user_and_lesson(client):
         db.close()
 
     assert len(rows) == 1
+
+
+def test_lesson_completion_is_scoped_to_current_user(client):
+    first_token = _register_and_login(client, "scoped-complete-one@example.com")
+    second_token = _register_and_login(client, "scoped-complete-two@example.com")
+
+    lesson = client.get(
+        "/lessons/fastapi_intro",
+        headers={"Authorization": f"Bearer {first_token}"},
+    ).json()
+
+    for _ in lesson["steps"]:
+        client.post(
+            "/lessons/fastapi_intro/next",
+            headers={"Authorization": f"Bearer {first_token}"},
+        )
+
+    second_user_lesson = client.get(
+        "/lessons/fastapi_intro",
+        headers={"Authorization": f"Bearer {second_token}"},
+    )
+    data = second_user_lesson.json()
+
+    assert second_user_lesson.status_code == 200
+    assert data["current_step_index"] == 0
+    assert data["completed"] is False
+    assert data["completed_at"] is None
+
+
+def test_get_lesson_does_not_expose_other_user_progress(client):
+    first_token = _register_and_login(client, "lesson-read-one@example.com")
+    second_token = _register_and_login(client, "lesson-read-two@example.com")
+
+    client.get("/lessons/fastapi_routing", headers={"Authorization": f"Bearer {first_token}"})
+    client.post(
+        "/lessons/fastapi_routing/next",
+        headers={"Authorization": f"Bearer {first_token}"},
+    )
+
+    response = client.get(
+        "/lessons/fastapi_routing",
+        headers={"Authorization": f"Bearer {second_token}"},
+    )
+    data = response.json()
+
+    assert response.status_code == 200
+    assert data["current_step_index"] == 0
+    assert data["completed"] is False
 
 
 def test_lesson_tutor_stream_requires_auth(client):

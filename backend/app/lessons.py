@@ -21,9 +21,15 @@ LESSONS = {
                 "content": "from fastapi import FastAPI\n\napp = FastAPI()\n\n@app.get('/health')\ndef health():\n    return {'status': 'ok'}",
             },
             {
+                "type": "practice",
+                "title": "Practice",
+                "difficulty": "easy",
+                "content": "In your own words, explain what the /health endpoint does and why a backend team might add one before deploying an API.",
+            },
+            {
                 "type": "summary",
                 "title": "Summary",
-                "content": "You learned what FastAPI is and why it is useful for API development.",
+                "content": "You learned what FastAPI is, why generated API docs help developers, and how a minimal endpoint turns a Python function into an HTTP response.",
             },
         ],
     },
@@ -107,9 +113,15 @@ LESSONS = {
                 "content": "docker compose up --build",
             },
             {
+                "type": "practice",
+                "title": "Practice",
+                "difficulty": "easy",
+                "content": "Describe the difference between a Docker image and a running container, then explain why docker compose up --build can be useful during local development.",
+            },
+            {
                 "type": "summary",
                 "title": "Summary",
-                "content": "You learned how Docker helps run applications consistently across environments.",
+                "content": "You learned how Docker images, containers, and Compose help run fullstack applications more consistently across environments.",
             },
         ],
     },
@@ -125,14 +137,24 @@ LESSONS = {
                 "content": "Docker Compose depends_on can start services in order, but it does not guarantee that PostgreSQL is ready to accept connections.",
             },
             {
-                "type": "explanation",
-                "title": "Healthchecks and retries",
-                "content": "Healthchecks describe service readiness, while application-level retry handles real connection timing and transient startup failures.",
+                "type": "concept",
+                "title": "Startup order is not a contract",
+                "content": "depends_on controls container start order, not application readiness. PostgreSQL may still be initializing files, accepting only local connections, or replaying logs when the backend tries to connect.",
+            },
+            {
+                "type": "deep_dive",
+                "title": "Readiness needs two layers",
+                "content": "Healthchecks help Compose understand service readiness, but the backend still needs application-level retry because networks, migrations, and database recovery can fail after a container is marked healthy.",
             },
             {
                 "type": "example",
                 "title": "Retry migrations before serving",
                 "content": "until alembic upgrade head; do\n  echo 'Database not ready, retrying...'\n  sleep 2\ndone\nuvicorn app.main:app --host 0.0.0.0 --port 8000",
+            },
+            {
+                "type": "checklist",
+                "title": "Startup reliability checklist",
+                "content": "Check database health, retry migrations with a limit, log each retry, fail loudly after timeout, and expose a backend health endpoint only after dependencies are ready.",
             },
             {
                 "type": "practice",
@@ -171,14 +193,24 @@ LESSONS = {
                 "content": "A 'column does not exist' error often means your SQLAlchemy model expects a column that the actual database schema does not have yet.",
             },
             {
-                "type": "explanation",
+                "type": "concept",
                 "title": "Model state vs migration state",
-                "content": "Changing a model class does not change the database by itself. Alembic migrations are the bridge between code state and database state.",
+                "content": "Changing a SQLAlchemy model updates Python expectations, but the database changes only after an Alembic migration is created and applied.",
+            },
+            {
+                "type": "deep_dive",
+                "title": "Why the app fails at runtime",
+                "content": "The ORM may generate SELECT, INSERT, or UPDATE statements that reference the new column. If production is still on an older migration revision, PostgreSQL rejects the query even though the code looks correct.",
             },
             {
                 "type": "example",
                 "title": "Useful Alembic checks",
                 "content": "alembic current\nalembic heads\nalembic upgrade head",
+            },
+            {
+                "type": "checklist",
+                "title": "Missing-column checklist",
+                "content": "Check the failing SQL, confirm the model contains the column, inspect alembic current, compare with alembic heads, then apply or repair the missing migration path.",
             },
             {
                 "type": "practice",
@@ -217,14 +249,24 @@ LESSONS = {
                 "content": "Alembic revision identifiers are stored in the database and referenced by migration files, so overly long IDs can break tooling or exceed column limits.",
             },
             {
-                "type": "explanation",
+                "type": "concept",
+                "title": "Revision IDs are stored data",
+                "content": "Alembic revision IDs are not just filenames. They are persisted in alembic_version and used to link migrations together.",
+            },
+            {
+                "type": "deep_dive",
                 "title": "Why generated names can fail",
-                "content": "Custom migration templates or manual revision IDs can accidentally create identifiers longer than the alembic_version table expects.",
+                "content": "Custom migration templates, branch names, or manual revisions can create identifiers longer than the database column allows. This turns migration metadata into a deploy blocker.",
             },
             {
                 "type": "example",
                 "title": "Typical symptom",
                 "content": "sqlalchemy.exc.DataError: value too long for type character varying(32)\n\nCheck the revision id in the migration file and the version_num column length.",
+            },
+            {
+                "type": "checklist",
+                "title": "Revision safety checklist",
+                "content": "Keep revision IDs short, avoid branch names as revision IDs, run migrations in CI, and review the revision and down_revision fields before merge.",
             },
             {
                 "type": "practice",
@@ -263,14 +305,24 @@ LESSONS = {
                 "content": "Alembic can report multiple heads when two migration files were created from the same previous revision.",
             },
             {
-                "type": "explanation",
+                "type": "concept",
+                "title": "Migration graphs can branch",
+                "content": "Each migration points to a down_revision. If two migrations point to the same parent, Alembic sees two valid latest revisions instead of one linear path.",
+            },
+            {
+                "type": "deep_dive",
                 "title": "Why teams hit this",
-                "content": "Parallel feature branches often add migrations independently. When merged together, the migration graph has more than one latest revision.",
+                "content": "Parallel feature branches often add migrations independently. The conflict may not appear until the branches are merged and CI tries to upgrade to head.",
             },
             {
                 "type": "example",
                 "title": "Useful commands",
                 "content": "alembic heads\nalembic history --verbose\nalembic merge -m \"merge heads\" <head_a> <head_b>",
+            },
+            {
+                "type": "checklist",
+                "title": "Multiple-head checklist",
+                "content": "Run alembic heads, inspect both migration branches, confirm both schema changes are valid, create a merge migration, and rerun upgrade from a clean database.",
             },
             {
                 "type": "practice",
@@ -309,14 +361,24 @@ LESSONS = {
                 "content": "A SQLAlchemy relationship in code does not guarantee the database enforces referential integrity unless the schema includes a foreign key constraint.",
             },
             {
-                "type": "explanation",
+                "type": "concept",
+                "title": "Application relationships are not constraints",
+                "content": "SQLAlchemy relationships help Python navigate objects, but the database needs an actual foreign key to enforce valid references.",
+            },
+            {
+                "type": "deep_dive",
                 "title": "What goes wrong",
-                "content": "Without a real foreign key, orphan rows can survive deletes, joins can behave unexpectedly, and data cleanup becomes harder.",
+                "content": "Without a real foreign key, orphan rows can survive deletes, joins can hide data quality issues, and later migrations may fail when they try to enforce integrity.",
             },
             {
                 "type": "example",
                 "title": "Constraint shape",
                 "content": "user_id = Column(Integer, ForeignKey('users.id'), nullable=False)\n\nCheck the generated Alembic migration includes op.create_foreign_key or a ForeignKey column.",
+            },
+            {
+                "type": "checklist",
+                "title": "Constraint review checklist",
+                "content": "Verify the model has ForeignKey, the migration creates the constraint, existing rows are valid, delete behavior is intentional, and indexes support common joins.",
             },
             {
                 "type": "practice",
@@ -347,7 +409,7 @@ LESSONS = {
         "lesson_id": "sse_eventsource_auth",
         "course_id": "frontend",
         "title": "SSE Authentication with EventSource",
-        "difficulty": "medium",
+        "difficulty": "easy",
         "steps": [
             {
                 "type": "intro",
@@ -355,14 +417,24 @@ LESSONS = {
                 "content": "The browser EventSource API does not let you attach custom Authorization headers like fetch does.",
             },
             {
-                "type": "explanation",
-                "title": "Token query param tradeoffs",
-                "content": "Passing a token in the query string can make SSE work, but URLs may appear in logs, browser history, or monitoring tools.",
+                "type": "concept",
+                "title": "EventSource authentication tradeoff",
+                "content": "EventSource is simple for browser streaming, but it cannot attach custom Authorization headers. Many apps use a short-lived token in the URL instead.",
+            },
+            {
+                "type": "deep_dive",
+                "title": "Why query tokens are sensitive",
+                "content": "URLs can appear in access logs, browser history, analytics tools, and error reports. Query-token SSE should use HTTPS, short lifetimes, and log redaction.",
             },
             {
                 "type": "example",
                 "title": "Authenticated stream URL",
                 "content": "/chat-stream?message=Explain%20SSE&token=<jwt>",
+            },
+            {
+                "type": "checklist",
+                "title": "SSE auth checklist",
+                "content": "Use HTTPS, keep stream tokens short-lived, redact query strings in logs, handle 401 clearly, and close EventSource when the stream finishes or fails.",
             },
             {
                 "type": "practice",
@@ -393,7 +465,7 @@ LESSONS = {
         "lesson_id": "eventsource_token_expired",
         "course_id": "frontend",
         "title": "EventSource Token Expired",
-        "difficulty": "hard",
+        "difficulty": "production",
         "steps": [
             {
                 "type": "intro",
@@ -401,14 +473,24 @@ LESSONS = {
                 "content": "SSE connections may stay open long enough for a JWT or short-lived stream token to expire while the user is still interacting.",
             },
             {
-                "type": "explanation",
+                "type": "concept",
+                "title": "Expiration is a normal stream state",
+                "content": "A token can expire before a user starts a new stream or while the UI still appears signed in. The client needs a clear recovery path.",
+            },
+            {
+                "type": "deep_dive",
                 "title": "How expiration appears",
-                "content": "The server may reject a new stream with 401, close an active stream, or send a safe auth error depending on where validation happens.",
+                "content": "The server may reject a new stream with 401, close an active stream, or send a safe SSE error depending on whether auth is checked before or during streaming.",
             },
             {
                 "type": "example",
                 "title": "Client recovery path",
                 "content": "eventSource.onerror = () => {\n  showFriendlyError('Your session expired. Please sign in again.');\n  eventSource.close();\n}",
+            },
+            {
+                "type": "checklist",
+                "title": "Expired-token checklist",
+                "content": "Detect auth failures separately from network errors, close the stream, avoid retry loops, preserve the user's draft, and route the user to sign in again.",
             },
             {
                 "type": "practice",
@@ -447,14 +529,24 @@ LESSONS = {
                 "content": "A live assistant bubble can appear twice if the UI both appends streamed content and reloads persisted messages without reconciliation.",
             },
             {
-                "type": "explanation",
+                "type": "concept",
+                "title": "One response needs one identity",
+                "content": "A streamed response should have a stable temporary identity so chunks update the same bubble instead of creating new messages.",
+            },
+            {
+                "type": "deep_dive",
                 "title": "Where duplication comes from",
-                "content": "Duplicate messages often happen when optimistic UI state, final persisted state, and retry logic all write separate assistant entries.",
+                "content": "Duplicate messages often happen when optimistic UI state, final persisted state, reload-after-stream logic, and retry handling all append separate assistant entries.",
             },
             {
                 "type": "example",
                 "title": "Stable live message pattern",
                 "content": "Use one temporary assistant message during streaming, update its content as chunks arrive, then finalize that same message instead of appending another one.",
+            },
+            {
+                "type": "checklist",
+                "title": "Streaming state checklist",
+                "content": "Create one live assistant bubble, append chunks into it, finalize it in place, skip immediate full reloads, and guard retry paths from duplicating user messages.",
             },
             {
                 "type": "practice",
@@ -493,14 +585,24 @@ LESSONS = {
                 "content": "AI streaming depends on network, provider, and client connections, so failures can happen after a response has already started.",
             },
             {
-                "type": "explanation",
+                "type": "concept",
+                "title": "Streaming errors need safe boundaries",
+                "content": "A streamed response may fail after the HTTP connection starts, so the backend needs a safe way to tell the client that generation did not complete.",
+            },
+            {
+                "type": "deep_dive",
                 "title": "Graceful SSE error events",
-                "content": "A safe streamed error lets the client show a friendly message without crashing the server or saving incomplete assistant output.",
+                "content": "A safe streamed error lets the client show a friendly message without crashing the server, leaking provider details, or saving incomplete assistant output.",
             },
             {
                 "type": "example",
                 "title": "Safe fallback message",
                 "content": "SAFE_STREAM_ERROR = 'Error: Unable to generate response.'\nyield format_sse_data(SAFE_STREAM_ERROR)",
+            },
+            {
+                "type": "checklist",
+                "title": "AI stream error checklist",
+                "content": "Catch provider errors, timeouts, network failures, auth failures, and client disconnects. Show a safe message, log the real cause, and avoid persisting failed output.",
             },
             {
                 "type": "practice",
@@ -539,14 +641,24 @@ LESSONS = {
                 "content": "AI applications must expect rate limits from upstream providers and respond without crashing or overwhelming the provider.",
             },
             {
-                "type": "explanation",
+                "type": "concept",
+                "title": "Rate limits are backpressure",
+                "content": "Provider rate limits protect shared capacity. Your app should slow down gracefully instead of retrying aggressively or exposing raw provider errors.",
+            },
+            {
+                "type": "deep_dive",
                 "title": "User-safe backpressure",
-                "content": "Good rate-limit handling combines clear user messaging, retry-after behavior, local throttling, and logs that help operators tune usage.",
+                "content": "Good rate-limit handling combines clear user messaging, retry-after behavior, local per-user throttling, and logs that help operators tune usage.",
             },
             {
                 "type": "example",
                 "title": "Safe response",
                 "content": "If the provider returns a rate limit error, stream or return a friendly message such as: 'The AI service is busy. Please try again shortly.'",
+            },
+            {
+                "type": "checklist",
+                "title": "Rate-limit checklist",
+                "content": "Limit per user, respect retry timing, avoid duplicate retries, log provider status, expose friendly UI recovery, and monitor saturation trends.",
             },
             {
                 "type": "practice",
@@ -577,7 +689,7 @@ LESSONS = {
         "lesson_id": "partial_stream_failure",
         "course_id": "ai",
         "title": "Partial Stream Failure",
-        "difficulty": "production",
+        "difficulty": "hard",
         "steps": [
             {
                 "type": "intro",
@@ -585,14 +697,24 @@ LESSONS = {
                 "content": "A stream can fail after sending useful-looking text, but the response may be incomplete, misleading, or unsafe to persist as final.",
             },
             {
-                "type": "explanation",
+                "type": "concept",
+                "title": "Draft text is not final content",
+                "content": "While a stream is active, the UI is showing draft output. It should not be treated as a complete assistant answer until the stream finishes successfully.",
+            },
+            {
+                "type": "deep_dive",
                 "title": "Finalization matters",
-                "content": "Applications should distinguish between streamed draft content and successfully completed assistant messages.",
+                "content": "Applications should distinguish between streamed draft content, failed partial content, and successfully completed assistant messages before writing to history.",
             },
             {
                 "type": "example",
                 "title": "State transition",
                 "content": "streaming -> completed: save assistant message\nstreaming -> failed: show retry and avoid persisting incomplete assistant output",
+            },
+            {
+                "type": "checklist",
+                "title": "Partial-stream checklist",
+                "content": "Track stream state, keep a retry action, avoid saving failed drafts, log where the stream failed, and make reload behavior reconcile with the last known final message.",
             },
             {
                 "type": "practice",
@@ -623,7 +745,7 @@ LESSONS = {
         "lesson_id": "sqlAlchemy_user_scoped_queries",
         "course_id": "backend",
         "title": "User-Scoped Database Queries",
-        "difficulty": "hard",
+        "difficulty": "production",
         "steps": [
             {
                 "type": "intro",
@@ -631,14 +753,24 @@ LESSONS = {
                 "content": "When data belongs to a user, queries should filter by both the resource identifier and current user_id.",
             },
             {
-                "type": "explanation",
+                "type": "concept",
+                "title": "Ownership belongs in every query",
+                "content": "For user-owned resources, the authenticated user_id should be part of the query condition, not just checked in UI state.",
+            },
+            {
+                "type": "deep_dive",
                 "title": "Preventing cross-user leaks",
-                "content": "Filtering only by a public or guessable identifier can expose another user's conversations, lessons, or submissions.",
+                "content": "Filtering only by a public or guessable identifier can expose another user's conversations, lessons, or submissions. This becomes a security incident, not just a bug.",
             },
             {
                 "type": "example",
                 "title": "Scoped query pattern",
                 "content": "db.query(PracticeSubmission).filter(\n    PracticeSubmission.user_id == current_user.id,\n    PracticeSubmission.lesson_id == lesson_id,\n)",
+            },
+            {
+                "type": "checklist",
+                "title": "User-scope checklist",
+                "content": "Filter by current_user.id, test with two users, avoid trusting client IDs, review export/history endpoints, and add database constraints where ownership is required.",
             },
             {
                 "type": "practice",
@@ -677,7 +809,12 @@ LESSONS = {
                 "content": "A PostgreSQL container can be running while the database is still initializing and not yet accepting application connections.",
             },
             {
-                "type": "explanation",
+                "type": "concept",
+                "title": "Database readiness is observable",
+                "content": "A database service should be considered ready only when it can accept the same kind of connection the application will use.",
+            },
+            {
+                "type": "deep_dive",
                 "title": "Initialization takes time",
                 "content": "Startup scripts, volume initialization, WAL recovery, and container networking can all delay database readiness after the process starts.",
             },
@@ -685,6 +822,11 @@ LESSONS = {
                 "type": "example",
                 "title": "Readiness check",
                 "content": "pg_isready -U postgres -d app_db\n\nUse readiness checks with retries instead of assuming the port is ready immediately.",
+            },
+            {
+                "type": "checklist",
+                "title": "Postgres readiness checklist",
+                "content": "Use pg_isready with the real database/user, retry with limits, log connection failures, keep migrations idempotent, and alert if readiness never succeeds.",
             },
             {
                 "type": "practice",
@@ -715,7 +857,7 @@ LESSONS = {
         "lesson_id": "docker_healthcheck_missing",
         "course_id": "docker",
         "title": "Docker Healthcheck Missing",
-        "difficulty": "hard",
+        "difficulty": "production",
         "steps": [
             {
                 "type": "intro",
@@ -723,14 +865,24 @@ LESSONS = {
                 "content": "Without healthchecks, orchestration tools may treat a process as healthy even when the application cannot serve real requests.",
             },
             {
-                "type": "explanation",
+                "type": "concept",
+                "title": "Health is a product signal",
+                "content": "A useful healthcheck answers whether the service should receive traffic, not merely whether a process exists.",
+            },
+            {
+                "type": "deep_dive",
                 "title": "Healthchecks describe behavior",
-                "content": "A good healthcheck verifies the service is actually ready, such as an API returning /health or a database accepting connections.",
+                "content": "A good healthcheck verifies the service is actually ready, such as an API returning /health only after dependencies are reachable or a database accepting connections.",
             },
             {
                 "type": "example",
                 "title": "Compose healthcheck",
                 "content": "healthcheck:\n  test: [\"CMD\", \"curl\", \"-f\", \"http://localhost:8000/health\"]\n  interval: 10s\n  timeout: 3s\n  retries: 5",
+            },
+            {
+                "type": "checklist",
+                "title": "Healthcheck checklist",
+                "content": "Verify the right endpoint, keep checks cheap, tune retries and startup grace, avoid leaking secrets, and ensure orchestration reacts to unhealthy services.",
             },
             {
                 "type": "practice",
@@ -761,7 +913,7 @@ LESSONS = {
         "lesson_id": "env_variable_not_loaded",
         "course_id": "docker",
         "title": "Environment Variable Not Loaded",
-        "difficulty": "hard",
+        "difficulty": "medium",
         "steps": [
             {
                 "type": "intro",
@@ -769,14 +921,24 @@ LESSONS = {
                 "content": "Environment variables may exist locally but be missing inside a container if Compose, env_file, or deployment configuration is incorrect.",
             },
             {
-                "type": "explanation",
-                "title": "Local shell is not the container",
-                "content": "The variables available to your terminal are not automatically available inside Docker containers unless explicitly passed.",
+                "type": "concept",
+                "title": "Container config is explicit",
+                "content": "The variables available to your terminal are not automatically available inside Docker containers unless Compose or the runtime passes them in.",
+            },
+            {
+                "type": "deep_dive",
+                "title": "Why config bugs hide",
+                "content": "A service may work locally because your shell has variables, then fail in Docker, CI, or production when env_file paths, secret mounts, or deployment settings differ.",
             },
             {
                 "type": "example",
                 "title": "Compose env wiring",
                 "content": "services:\n  backend:\n    env_file:\n      - .env\n    environment:\n      DATABASE_URL: ${DATABASE_URL}",
+            },
+            {
+                "type": "checklist",
+                "title": "Config loading checklist",
+                "content": "Document required variables, validate at startup, avoid logging secret values, verify Compose env_file paths, and separate local defaults from production secrets.",
             },
             {
                 "type": "practice",

@@ -45,7 +45,7 @@ export const learningStructure = [
           {
             id: "sqlAlchemy_user_scoped_queries",
             title: "User-Scoped Database Queries",
-            difficulty: "hard",
+            difficulty: "production",
           },
         ],
       },
@@ -70,6 +70,11 @@ export const learningStructure = [
             difficulty: "medium",
           },
           {
+            id: "env_variable_not_loaded",
+            title: "Environment Variable Not Loaded",
+            difficulty: "medium",
+          },
+          {
             id: "postgres_container_not_ready",
             title: "Postgres Container Not Ready",
             difficulty: "hard",
@@ -77,12 +82,7 @@ export const learningStructure = [
           {
             id: "docker_healthcheck_missing",
             title: "Docker Healthcheck Missing",
-            difficulty: "hard",
-          },
-          {
-            id: "env_variable_not_loaded",
-            title: "Environment Variable Not Loaded",
-            difficulty: "hard",
+            difficulty: "production",
           },
         ],
       },
@@ -99,12 +99,12 @@ export const learningStructure = [
           {
             id: "sse_eventsource_auth",
             title: "SSE Authentication with EventSource",
-            difficulty: "medium",
+            difficulty: "easy",
           },
           {
             id: "eventsource_token_expired",
             title: "EventSource Token Expired",
-            difficulty: "hard",
+            difficulty: "production",
           },
           {
             id: "duplicate_stream_messages",
@@ -136,7 +136,7 @@ export const learningStructure = [
           {
             id: "partial_stream_failure",
             title: "Partial Stream Failure",
-            difficulty: "production",
+            difficulty: "hard",
           },
         ],
       },

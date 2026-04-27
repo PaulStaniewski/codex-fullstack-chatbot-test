@@ -3,6 +3,7 @@ LESSONS = {
         "lesson_id": "fastapi_intro",
         "course_id": "fastapi",
         "title": "FastAPI Introduction",
+        "difficulty": "easy",
         "steps": [
             {
                 "type": "intro",
@@ -30,6 +31,7 @@ LESSONS = {
         "lesson_id": "fastapi_routing",
         "course_id": "fastapi",
         "title": "FastAPI Routing",
+        "difficulty": "easy",
         "steps": [
             {
                 "type": "intro",
@@ -44,6 +46,7 @@ LESSONS = {
             {
                 "type": "practice",
                 "title": "Practice",
+                "difficulty": "easy",
                 "content": "Describe how you would create a GET /health endpoint.",
             },
             {
@@ -57,6 +60,7 @@ LESSONS = {
         "lesson_id": "fastapi_dependency",
         "course_id": "fastapi",
         "title": "Dependency Injection",
+        "difficulty": "easy",
         "steps": [
             {
                 "type": "intro",
@@ -71,6 +75,7 @@ LESSONS = {
             {
                 "type": "practice",
                 "title": "Practice",
+                "difficulty": "easy",
                 "content": "Name one piece of request logic that would make sense as a dependency.",
             },
             {
@@ -84,6 +89,7 @@ LESSONS = {
         "lesson_id": "docker_basics",
         "course_id": "docker",
         "title": "Docker Basics",
+        "difficulty": "easy",
         "steps": [
             {
                 "type": "intro",
@@ -111,6 +117,7 @@ LESSONS = {
         "lesson_id": "docker_startup_race_condition",
         "course_id": "docker",
         "title": "Docker Compose Startup Race Condition",
+        "difficulty": "medium",
         "steps": [
             {
                 "type": "intro",
@@ -130,16 +137,19 @@ LESSONS = {
             {
                 "type": "practice",
                 "title": "Practice 1 - Diagnose",
+                "difficulty": "medium",
                 "content": "A FastAPI container starts before PostgreSQL is ready and crashes with a connection refused error. Explain why depends_on did not prevent this failure.",
             },
             {
                 "type": "practice",
                 "title": "Practice 2 - Fix",
+                "difficulty": "hard",
                 "content": "Propose a Docker Compose and backend startup strategy that waits safely for PostgreSQL before running Alembic migrations and starting Uvicorn.",
             },
             {
                 "type": "practice",
                 "title": "Practice 3 - Production hardening",
+                "difficulty": "production",
                 "content": "Describe how you would make the startup flow resilient in production, including retry limits, logging, healthchecks, and what should happen if the database never becomes ready.",
             },
             {
@@ -153,6 +163,7 @@ LESSONS = {
         "lesson_id": "alembic_missing_column",
         "course_id": "backend",
         "title": "Debugging Alembic Missing Column Errors",
+        "difficulty": "medium",
         "steps": [
             {
                 "type": "intro",
@@ -172,16 +183,19 @@ LESSONS = {
             {
                 "type": "practice",
                 "title": "Practice 1 - Diagnose",
+                "difficulty": "medium",
                 "content": "A user sees: column user_progress.current_streak_days does not exist. Explain the most likely mismatch between SQLAlchemy models and the actual database schema.",
             },
             {
                 "type": "practice",
                 "title": "Practice 2 - Fix",
+                "difficulty": "hard",
                 "content": "Write the sequence of Alembic checks and commands you would run to confirm the current revision, compare it with heads, and apply the missing migration safely.",
             },
             {
                 "type": "practice",
                 "title": "Practice 3 - Production hardening",
+                "difficulty": "production",
                 "content": "Explain how you would prevent missing-column errors during deploys, including migration ordering, release checks, rollback thinking, and avoiding manual database edits.",
             },
             {
@@ -195,6 +209,7 @@ LESSONS = {
         "lesson_id": "alembic_revision_too_long",
         "course_id": "backend",
         "title": "Alembic Revision ID Too Long",
+        "difficulty": "hard",
         "steps": [
             {
                 "type": "intro",
@@ -214,16 +229,19 @@ LESSONS = {
             {
                 "type": "practice",
                 "title": "Practice 1 - Diagnose",
+                "difficulty": "medium",
                 "content": "A deploy fails while inserting a migration revision into alembic_version because the value is too long. Explain what you would inspect first and why.",
             },
             {
                 "type": "practice",
                 "title": "Practice 2 - Fix",
+                "difficulty": "hard",
                 "content": "Describe a safe fix for an overly long Alembic revision ID before it has been deployed to shared environments.",
             },
             {
                 "type": "practice",
                 "title": "Practice 3 - Production hardening",
+                "difficulty": "production",
                 "content": "Design a migration review rule that prevents invalid revision IDs from reaching CI or production.",
             },
             {
@@ -237,6 +255,7 @@ LESSONS = {
         "lesson_id": "duplicate_migration_head",
         "course_id": "backend",
         "title": "Duplicate Alembic Migration Head",
+        "difficulty": "hard",
         "steps": [
             {
                 "type": "intro",
@@ -256,16 +275,19 @@ LESSONS = {
             {
                 "type": "practice",
                 "title": "Practice 1 - Diagnose",
+                "difficulty": "medium",
                 "content": "CI fails with 'Multiple head revisions are present'. Explain what this says about the migration graph and how you would identify the divergent heads.",
             },
             {
                 "type": "practice",
                 "title": "Practice 2 - Fix",
+                "difficulty": "hard",
                 "content": "Describe how to create and review an Alembic merge migration without losing either branch's schema changes.",
             },
             {
                 "type": "practice",
                 "title": "Practice 3 - Production hardening",
+                "difficulty": "production",
                 "content": "Propose a CI check and team workflow that prevents duplicate migration heads from surprising production deploys.",
             },
             {
@@ -279,6 +301,7 @@ LESSONS = {
         "lesson_id": "missing_foreign_key_constraint",
         "course_id": "backend",
         "title": "Missing Foreign Key Constraint",
+        "difficulty": "hard",
         "steps": [
             {
                 "type": "intro",
@@ -298,16 +321,19 @@ LESSONS = {
             {
                 "type": "practice",
                 "title": "Practice 1 - Diagnose",
+                "difficulty": "medium",
                 "content": "Practice submissions have a user_id column but deleting a user leaves orphan submissions. Explain what schema issue you suspect and how you would confirm it.",
             },
             {
                 "type": "practice",
                 "title": "Practice 2 - Fix",
+                "difficulty": "hard",
                 "content": "Describe how to add the missing foreign key safely, including how you would handle existing orphan rows before applying the constraint.",
             },
             {
                 "type": "practice",
                 "title": "Practice 3 - Production hardening",
+                "difficulty": "production",
                 "content": "Create a checklist for reviewing migrations that add user-owned tables so missing constraints and cascade behavior are caught early.",
             },
             {
@@ -321,6 +347,7 @@ LESSONS = {
         "lesson_id": "sse_eventsource_auth",
         "course_id": "frontend",
         "title": "SSE Authentication with EventSource",
+        "difficulty": "medium",
         "steps": [
             {
                 "type": "intro",
@@ -340,16 +367,19 @@ LESSONS = {
             {
                 "type": "practice",
                 "title": "Practice 1 - Diagnose",
+                "difficulty": "medium",
                 "content": "A team uses /chat-stream?token=<jwt> for EventSource. Identify one concrete place that token might leak and why EventSource pushed the team toward this design.",
             },
             {
                 "type": "practice",
                 "title": "Practice 2 - Fix",
+                "difficulty": "hard",
                 "content": "Propose a safer SSE authentication approach or mitigation plan for query-token streams while keeping browser EventSource compatibility.",
             },
             {
                 "type": "practice",
                 "title": "Practice 3 - Production hardening",
+                "difficulty": "production",
                 "content": "Design a production policy for SSE tokens that considers short lifetimes, logging redaction, HTTPS, refresh behavior, and what the client should do on auth failure.",
             },
             {
@@ -363,6 +393,7 @@ LESSONS = {
         "lesson_id": "eventsource_token_expired",
         "course_id": "frontend",
         "title": "EventSource Token Expired",
+        "difficulty": "hard",
         "steps": [
             {
                 "type": "intro",
@@ -382,16 +413,19 @@ LESSONS = {
             {
                 "type": "practice",
                 "title": "Practice 1 - Diagnose",
+                "difficulty": "medium",
                 "content": "A user can load conversations but every new EventSource stream immediately fails after their token expires. Explain how you would distinguish auth expiration from a network failure.",
             },
             {
                 "type": "practice",
                 "title": "Practice 2 - Fix",
+                "difficulty": "hard",
                 "content": "Design a frontend and backend response flow for expired SSE tokens that avoids duplicate messages and gives the user a clear next action.",
             },
             {
                 "type": "practice",
                 "title": "Practice 3 - Production hardening",
+                "difficulty": "production",
                 "content": "Propose a secure token lifetime and refresh strategy for SSE that balances usability, logging risk, and forced logout behavior.",
             },
             {
@@ -405,6 +439,7 @@ LESSONS = {
         "lesson_id": "duplicate_stream_messages",
         "course_id": "frontend",
         "title": "Duplicate Stream Messages",
+        "difficulty": "hard",
         "steps": [
             {
                 "type": "intro",
@@ -424,16 +459,19 @@ LESSONS = {
             {
                 "type": "practice",
                 "title": "Practice 1 - Diagnose",
+                "difficulty": "medium",
                 "content": "A chat UI shows two identical assistant answers after streaming completes. Explain which state transitions you would inspect first.",
             },
             {
                 "type": "practice",
                 "title": "Practice 2 - Fix",
+                "difficulty": "hard",
                 "content": "Describe a simple message-state approach that keeps one live assistant bubble during streaming and prevents duplicate final messages.",
             },
             {
                 "type": "practice",
                 "title": "Practice 3 - Production hardening",
+                "difficulty": "production",
                 "content": "Design a retry and reconnect strategy that prevents duplicate user or assistant messages when a stream fails midway.",
             },
             {
@@ -447,6 +485,7 @@ LESSONS = {
         "lesson_id": "openai_streaming_errors",
         "course_id": "ai",
         "title": "Handling OpenAI Streaming Errors",
+        "difficulty": "medium",
         "steps": [
             {
                 "type": "intro",
@@ -466,16 +505,19 @@ LESSONS = {
             {
                 "type": "practice",
                 "title": "Practice 1 - Diagnose",
+                "difficulty": "medium",
                 "content": "A streamed AI response stops halfway through. Explain which parts of the system could have failed and why the backend should avoid saving a partial assistant message.",
             },
             {
                 "type": "practice",
                 "title": "Practice 2 - Fix",
+                "difficulty": "hard",
                 "content": "Describe the backend and frontend behavior you would implement to send a safe SSE error and show a retry option without duplicating messages.",
             },
             {
                 "type": "practice",
                 "title": "Practice 3 - Production hardening",
+                "difficulty": "production",
                 "content": "Explain how you would monitor and harden AI streaming failures in production, including timeout handling, provider errors, client disconnects, and user-facing recovery.",
             },
             {
@@ -489,6 +531,7 @@ LESSONS = {
         "lesson_id": "openai_rate_limit_handling",
         "course_id": "ai",
         "title": "OpenAI Rate Limit Handling",
+        "difficulty": "production",
         "steps": [
             {
                 "type": "intro",
@@ -508,16 +551,19 @@ LESSONS = {
             {
                 "type": "practice",
                 "title": "Practice 1 - Diagnose",
+                "difficulty": "medium",
                 "content": "Users report intermittent AI failures during busy periods. Explain how you would determine whether provider rate limits are the root cause.",
             },
             {
                 "type": "practice",
                 "title": "Practice 2 - Fix",
+                "difficulty": "hard",
                 "content": "Design a minimal backend strategy for catching OpenAI rate limit errors and returning a safe SSE error without saving a failed assistant response.",
             },
             {
                 "type": "practice",
                 "title": "Practice 3 - Production hardening",
+                "difficulty": "production",
                 "content": "Propose a production plan for per-user limits, retry timing, monitoring, and communicating provider saturation to users.",
             },
             {
@@ -531,6 +577,7 @@ LESSONS = {
         "lesson_id": "partial_stream_failure",
         "course_id": "ai",
         "title": "Partial Stream Failure",
+        "difficulty": "production",
         "steps": [
             {
                 "type": "intro",
@@ -550,16 +597,19 @@ LESSONS = {
             {
                 "type": "practice",
                 "title": "Practice 1 - Diagnose",
+                "difficulty": "medium",
                 "content": "A user sees half an answer and then an error. Explain why persisting that partial text as a normal assistant message could cause product and data problems.",
             },
             {
                 "type": "practice",
                 "title": "Practice 2 - Fix",
+                "difficulty": "hard",
                 "content": "Describe backend and frontend changes that separate live streamed text from final persisted assistant content.",
             },
             {
                 "type": "practice",
                 "title": "Practice 3 - Production hardening",
+                "difficulty": "production",
                 "content": "Design observability and recovery behavior for partial stream failures, including logs, metrics, retry UI, and client disconnect handling.",
             },
             {
@@ -573,6 +623,7 @@ LESSONS = {
         "lesson_id": "sqlAlchemy_user_scoped_queries",
         "course_id": "backend",
         "title": "User-Scoped Database Queries",
+        "difficulty": "hard",
         "steps": [
             {
                 "type": "intro",
@@ -592,16 +643,19 @@ LESSONS = {
             {
                 "type": "practice",
                 "title": "Practice 1 - Diagnose",
+                "difficulty": "medium",
                 "content": "A practice history query filters only by lesson_id. Explain how this can leak another user's submissions in a multi-user application.",
             },
             {
                 "type": "practice",
                 "title": "Practice 2 - Fix",
+                "difficulty": "hard",
                 "content": "Rewrite the query conceptually so practice history is scoped to both lesson_id and the authenticated current_user.id.",
             },
             {
                 "type": "practice",
                 "title": "Practice 3 - Production hardening",
+                "difficulty": "production",
                 "content": "Describe a review checklist or test strategy that would catch missing user_id filters across conversations, lesson progress, and practice submissions.",
             },
             {
@@ -615,6 +669,7 @@ LESSONS = {
         "lesson_id": "postgres_container_not_ready",
         "course_id": "docker",
         "title": "Postgres Container Not Ready",
+        "difficulty": "hard",
         "steps": [
             {
                 "type": "intro",
@@ -634,16 +689,19 @@ LESSONS = {
             {
                 "type": "practice",
                 "title": "Practice 1 - Diagnose",
+                "difficulty": "medium",
                 "content": "A backend fails on the first deploy attempt but works after docker compose restart. Explain why this points to a database readiness race.",
             },
             {
                 "type": "practice",
                 "title": "Practice 2 - Fix",
+                "difficulty": "hard",
                 "content": "Describe a startup sequence that waits for PostgreSQL readiness before running migrations or accepting traffic.",
             },
             {
                 "type": "practice",
                 "title": "Practice 3 - Production hardening",
+                "difficulty": "production",
                 "content": "Explain how to handle repeated readiness failures with retry limits, clear logs, container health, and alerting.",
             },
             {
@@ -657,6 +715,7 @@ LESSONS = {
         "lesson_id": "docker_healthcheck_missing",
         "course_id": "docker",
         "title": "Docker Healthcheck Missing",
+        "difficulty": "hard",
         "steps": [
             {
                 "type": "intro",
@@ -676,16 +735,19 @@ LESSONS = {
             {
                 "type": "practice",
                 "title": "Practice 1 - Diagnose",
+                "difficulty": "medium",
                 "content": "A container is marked running but the reverse proxy sends users to a failing backend. Explain why a missing healthcheck makes this harder to detect.",
             },
             {
                 "type": "practice",
                 "title": "Practice 2 - Fix",
+                "difficulty": "hard",
                 "content": "Design a healthcheck for a FastAPI backend and a PostgreSQL service, including what each should verify.",
             },
             {
                 "type": "practice",
                 "title": "Practice 3 - Production hardening",
+                "difficulty": "production",
                 "content": "Explain how you would tune healthcheck interval, timeout, retries, and startup grace periods to avoid noisy restarts.",
             },
             {
@@ -699,6 +761,7 @@ LESSONS = {
         "lesson_id": "env_variable_not_loaded",
         "course_id": "docker",
         "title": "Environment Variable Not Loaded",
+        "difficulty": "hard",
         "steps": [
             {
                 "type": "intro",
@@ -718,16 +781,19 @@ LESSONS = {
             {
                 "type": "practice",
                 "title": "Practice 1 - Diagnose",
+                "difficulty": "medium",
                 "content": "A backend container logs 'OPENAI_API_KEY is missing' even though .env exists on the host. Explain the likely configuration gap.",
             },
             {
                 "type": "practice",
                 "title": "Practice 2 - Fix",
+                "difficulty": "hard",
                 "content": "Describe how to pass required environment variables to a Docker Compose service without committing secrets.",
             },
             {
                 "type": "practice",
                 "title": "Practice 3 - Production hardening",
+                "difficulty": "production",
                 "content": "Design a startup validation approach for required config that fails fast, logs safely, and avoids exposing secret values.",
             },
             {

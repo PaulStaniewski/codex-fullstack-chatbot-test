@@ -23,6 +23,8 @@
   --accent-soft: rgba(139, 156, 255, 0.13);
   --user: #242b45;
   --assistant: #1b1e25;
+  --success: #7dd3a8;
+  --warning: #f6c76f;
   --danger: #ffb4ab;
   --danger-bg: rgba(86, 36, 36, 0.74);
   --shadow: 0 24px 70px rgba(0, 0, 0, 0.42);
@@ -64,6 +66,8 @@
   --accent-soft: rgba(68, 85, 216, 0.1);
   --user: #eef0ff;
   --assistant: #ffffff;
+  --success: #16803a;
+  --warning: #b45309;
   --danger: #b42318;
   --danger-bg: rgba(255, 236, 232, 0.96);
   --shadow: 0 24px 60px rgba(20, 24, 31, 0.14);
@@ -675,6 +679,56 @@ input:focus,
   font-weight: 800;
 }
 
+.lesson-title-wrap {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.difficulty-badge {
+  display: inline-flex;
+  flex: 0 0 auto;
+  width: fit-content;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 3px 7px;
+  background: var(--surface-soft);
+  color: var(--text-muted);
+  font-size: 0.62rem;
+  font-weight: 950;
+  line-height: 1.1;
+  text-transform: uppercase;
+}
+
+.difficulty-easy {
+  border-color: rgba(72, 187, 120, 0.28);
+  background: rgba(72, 187, 120, 0.11);
+  color: var(--success);
+}
+
+.difficulty-medium {
+  border-color: rgba(139, 156, 255, 0.32);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.difficulty-hard {
+  border-color: rgba(245, 158, 11, 0.28);
+  background: rgba(245, 158, 11, 0.11);
+  color: var(--warning);
+}
+
+.difficulty-production {
+  border-color: rgba(239, 68, 68, 0.3);
+  background: rgba(239, 68, 68, 0.11);
+  color: var(--danger);
+}
+
 .lesson-view {
   display: grid;
   min-height: 0;
@@ -708,6 +762,14 @@ input:focus,
   line-height: 1.2;
 }
 
+.lesson-header-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .lesson-step-badge,
 .lesson-complete-badge {
   flex: 0 0 auto;
@@ -731,7 +793,14 @@ input:focus,
   gap: 12px;
 }
 
-.lesson-step > span {
+.lesson-step-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.lesson-step-meta > span:first-child {
   width: fit-content;
   border: 1px solid var(--border);
   border-radius: 999px;
@@ -2347,6 +2416,11 @@ input:focus,
 
   .lesson-card-header {
     flex-direction: column;
+  }
+
+  .lesson-header-actions {
+    width: 100%;
+    justify-content: flex-start;
   }
 
   .lesson-tutor-form {

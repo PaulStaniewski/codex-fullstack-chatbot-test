@@ -178,9 +178,14 @@ export default function Sidebar({
     });
   }
 
+  function formatDifficulty(value) {
+    return value ? value.charAt(0).toUpperCase() + value.slice(1) : "";
+  }
+
   function renderLesson(course, lesson) {
     const lessonState = lessonProgressById.get(lesson.id);
     const isActive = lesson.id === selectedLessonId;
+    const difficultyLabel = formatDifficulty(lesson.difficulty);
     const statusLabel = lessonState?.completed
       ? "Completed"
       : lessonState
@@ -201,7 +206,9 @@ export default function Sidebar({
           })
         }
         disabled={isMessagesLoading || isStreaming}
-        aria-label={`${lesson.title}: ${statusLabel}`}
+        aria-label={`${lesson.title}: ${statusLabel}${
+          difficultyLabel ? `, ${difficultyLabel} difficulty` : ""
+        }`}
       >
         <span
           className={[
@@ -215,7 +222,14 @@ export default function Sidebar({
         >
           {isActive ? "●" : "○"}
         </span>
-        <span className="lesson-title">{lesson.title}</span>
+        <span className="lesson-title-wrap">
+          <span className="lesson-title">{lesson.title}</span>
+          {lesson.difficulty ? (
+            <span className={`difficulty-badge difficulty-${lesson.difficulty}`}>
+              {difficultyLabel}
+            </span>
+          ) : null}
+        </span>
       </button>
     );
   }

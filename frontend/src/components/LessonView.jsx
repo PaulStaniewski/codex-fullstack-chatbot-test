@@ -4,6 +4,10 @@ import { getPracticeHistory, streamLessonTutor, streamPracticeFeedback } from ".
 
 const QUICK_ACTIONS = ["Explain simply", "Give an example", "Why does this matter?"];
 
+function formatDifficulty(value) {
+  return value ? value.charAt(0).toUpperCase() + value.slice(1) : "";
+}
+
 function formatLessonContent(content) {
   const looksLikeCode =
     content.includes("\n") ||
@@ -82,6 +86,8 @@ export default function LessonView({ lesson, isLoading, token, onNextStep }) {
   const currentStep = lesson.steps[lesson.current_step_index] || lesson.steps[0];
   const stepNumber = Math.min(lesson.current_step_index + 1, lesson.steps.length);
   const selectedAttempt = practiceHistory.find((attempt) => attempt.id === selectedAttemptId);
+  const lessonDifficultyLabel = formatDifficulty(lesson.difficulty);
+  const stepDifficultyLabel = formatDifficulty(currentStep.difficulty);
 
   async function loadPracticeHistory() {
     try {
@@ -183,9 +189,16 @@ export default function LessonView({ lesson, isLoading, token, onNextStep }) {
             <p className="eyebrow">Structured lesson</p>
             <h2>{lesson.title}</h2>
           </div>
-          <span className={lesson.completed ? "lesson-complete-badge" : "lesson-step-badge"}>
-            {lesson.completed ? "Completed" : `Step ${stepNumber} / ${lesson.steps.length}`}
-          </span>
+          <div className="lesson-header-actions">
+            {lesson.difficulty ? (
+              <span className={`difficulty-badge difficulty-${lesson.difficulty}`}>
+                {lessonDifficultyLabel}
+              </span>
+            ) : null}
+            <span className={lesson.completed ? "lesson-complete-badge" : "lesson-step-badge"}>
+              {lesson.completed ? "Completed" : `Step ${stepNumber} / ${lesson.steps.length}`}
+            </span>
+          </div>
         </div>
 
         {lesson.completed ? (
@@ -197,7 +210,14 @@ export default function LessonView({ lesson, isLoading, token, onNextStep }) {
         ) : (
           <>
             <div className="lesson-step">
-              <span>{currentStep.type}</span>
+              <div className="lesson-step-meta">
+                <span>{currentStep.type}</span>
+                {currentStep.type === "practice" && currentStep.difficulty ? (
+                  <span className={`difficulty-badge difficulty-${currentStep.difficulty}`}>
+                    {stepDifficultyLabel}
+                  </span>
+                ) : null}
+              </div>
               <h3>{currentStep.title}</h3>
               <div className="lesson-step-content">
                 {formatLessonContent(currentStep.content)}

@@ -228,6 +228,109 @@ def test_get_lesson_does_not_expose_other_user_progress(client):
     assert data["completed"] is False
 
 
+def test_completing_theory_step_awards_xp_once(client):
+    token = _register_and_login(client, "theory-xp@example.com")
+
+    first_response = client.post(
+        "/lessons/fastapi_intro/steps/0/complete",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    first_progress = client.get("/progress", headers={"Authorization": f"Bearer {token}"}).json()[
+        "progress"
+    ]
+
+    second_response = client.post(
+        "/lessons/fastapi_intro/steps/0/complete",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    second_progress = client.get("/progress", headers={"Authorization": f"Bearer {token}"}).json()[
+        "progress"
+    ]
+
+    assert first_response.status_code == 200
+    assert second_response.status_code == 200
+    assert first_response.json()["steps"][0]["completed"] is True
+    assert first_response.json()["steps"][0]["xp_awarded"] == 5
+    assert first_progress["xp_points"] == 5
+    assert second_progress["xp_points"] == first_progress["xp_points"]
+
+
+def test_completing_practice_step_does_not_award_reading_xp(client):
+    token = _register_and_login(client, "practice-no-xp@example.com")
+
+    response = client.post(
+        "/lessons/fastapi_routing/steps/2/complete",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    progress = client.get("/progress", headers={"Authorization": f"Bearer {token}"}).json()[
+        "progress"
+    ]
+
+    assert response.status_code == 200
+    assert response.json()["steps"][2]["completed"] is True
+    assert response.json()["steps"][2]["xp_awarded"] == 0
+    assert progress["xp_points"] == 0
+
+
+def test_complete_step_unknown_lesson_returns_404(client):
+    token = _register_and_login(client, "unknown-step@example.com")
+
+    response = client.post(
+        "/lessons/unknown/steps/0/complete",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 404
+
+
+def test_complete_step_invalid_index_returns_400(client):
+    token = _register_and_login(client, "invalid-step@example.com")
+
+    response = client.post(
+        "/lessons/fastapi_intro/steps/99/complete",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 400
+
+
+def test_step_completion_is_scoped_to_current_user(client):
+    first_token = _register_and_login(client, "step-scope-one@example.com")
+    second_token = _register_and_login(client, "step-scope-two@example.com")
+
+    client.post(
+        "/lessons/fastapi_intro/steps/0/complete",
+        headers={"Authorization": f"Bearer {first_token}"},
+    )
+
+    response = client.get(
+        "/lessons/fastapi_intro",
+        headers={"Authorization": f"Bearer {second_token}"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["steps"][0]["completed"] is False
+    assert response.json()["steps"][0]["xp_awarded"] == 0
+
+
+def test_get_lesson_returns_step_completed_state(client):
+    token = _register_and_login(client, "step-state@example.com")
+
+    client.post(
+        "/lessons/fastapi_intro/steps/1/complete",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    response = client.get(
+        "/lessons/fastapi_intro",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["steps"][1]["completed"] is True
+    assert response.json()["steps"][1]["completed_at"] is not None
+    assert response.json()["steps"][1]["xp_awarded"] == 10
+
+
 def test_lesson_tutor_stream_requires_auth(client):
     response = client.get(
         "/lessons/fastapi_intro/tutor-stream",

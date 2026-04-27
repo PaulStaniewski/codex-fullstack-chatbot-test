@@ -31,6 +31,9 @@ class User(Base):
     lesson_progress: Mapped[list["LessonProgress"]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
+    lesson_step_progress: Mapped[list["LessonStepProgress"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
     practice_submissions: Mapped[list["PracticeSubmission"]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
@@ -147,6 +150,38 @@ class LessonProgress(Base):
     )
 
     user: Mapped[User] = relationship(back_populates="lesson_progress")
+
+
+class LessonStepProgress(Base):
+    __tablename__ = "lesson_step_progress"
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id",
+            "lesson_id",
+            "step_index",
+            name="uq_lesson_step_progress_user_lesson_step",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    lesson_id: Mapped[str] = mapped_column(String(120), nullable=False, index=True)
+    step_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    step_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    completed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    xp_awarded: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    user: Mapped[User] = relationship(back_populates="lesson_step_progress")
 
 
 class PracticeSubmission(Base):

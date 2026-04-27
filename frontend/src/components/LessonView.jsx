@@ -3,6 +3,15 @@ import ReactMarkdown from "react-markdown";
 import { getPracticeHistory, streamLessonTutor, streamPracticeFeedback } from "../api.js";
 
 const QUICK_ACTIONS = ["Explain simply", "Give an example", "Why does this matter?"];
+const THEORY_STEP_TYPES = new Set([
+  "intro",
+  "concept",
+  "deep_dive",
+  "explanation",
+  "example",
+  "checklist",
+  "summary",
+]);
 
 function formatDifficulty(value) {
   return value ? value.charAt(0).toUpperCase() + value.slice(1) : "";
@@ -22,7 +31,14 @@ function formatLessonContent(content) {
   return <p>{content}</p>;
 }
 
-export default function LessonView({ lesson, isLoading, token, onNextStep }) {
+export default function LessonView({
+  lesson,
+  isLoading,
+  isCompletingStep = false,
+  token,
+  onNextStep,
+  onMarkStepRead,
+}) {
   const [tutorQuestion, setTutorQuestion] = useState("");
   const [tutorAnswer, setTutorAnswer] = useState("");
   const [tutorError, setTutorError] = useState("");
@@ -88,6 +104,12 @@ export default function LessonView({ lesson, isLoading, token, onNextStep }) {
   const selectedAttempt = practiceHistory.find((attempt) => attempt.id === selectedAttemptId);
   const lessonDifficultyLabel = formatDifficulty(lesson.difficulty);
   const stepDifficultyLabel = formatDifficulty(currentStep.difficulty);
+  const isTheoryStep = THEORY_STEP_TYPES.has(currentStep.type);
+  const unreadTheoryStepsBeforePractice =
+    currentStep.type === "practice" &&
+    lesson.steps
+      .slice(0, lesson.current_step_index)
+      .some((step) => THEORY_STEP_TYPES.has(step.type) && !step.completed);
 
   async function loadPracticeHistory() {
     try {
@@ -222,6 +244,27 @@ export default function LessonView({ lesson, isLoading, token, onNextStep }) {
               <div className="lesson-step-content">
                 {formatLessonContent(currentStep.content)}
               </div>
+              {isTheoryStep ? (
+                <div className="lesson-read-actions">
+                  <button
+                    className="secondary-button"
+                    type="button"
+                    onClick={() => onMarkStepRead?.(lesson.current_step_index)}
+                    disabled={currentStep.completed || isCompletingStep}
+                  >
+                    {currentStep.completed
+                      ? "Read ✓"
+                      : isCompletingStep
+                        ? "Marking..."
+                        : "Mark as read"}
+                  </button>
+                  {currentStep.completed ? (
+                    <span className="lesson-xp-badge">
+                      +{currentStep.xp_awarded || 0} XP earned
+                    </span>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
 
             <button className="primary-button lesson-next-button" type="button" onClick={onNextStep}>
@@ -242,6 +285,12 @@ export default function LessonView({ lesson, isLoading, token, onNextStep }) {
             </div>
             {isPracticeStreaming ? <span className="status-pill">Streaming</span> : null}
           </div>
+
+          {unreadTheoryStepsBeforePractice ? (
+            <div className="lesson-practice-tip">
+              Tip: read the lesson content first to get better feedback.
+            </div>
+          ) : null}
 
           <form className="lesson-practice-form" onSubmit={handlePracticeSubmit}>
             <textarea

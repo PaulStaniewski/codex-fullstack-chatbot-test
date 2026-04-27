@@ -148,6 +148,15 @@ def award_lesson_completion_xp(db: Session, user_id: int) -> models.UserProgress
     return progress
 
 
+def award_xp(db: Session, user_id: int, xp_points: int) -> models.UserProgress:
+    progress = get_or_create_progress(db, user_id)
+    if xp_points > 0:
+        progress.xp_points += xp_points
+    recalculate_level(progress)
+    evaluate_achievements(progress, db)
+    return progress
+
+
 def update_time_spent(progress: models.UserProgress, now: datetime | None = None) -> None:
     current_time = now or datetime.now(timezone.utc)
     if current_time.tzinfo is None:

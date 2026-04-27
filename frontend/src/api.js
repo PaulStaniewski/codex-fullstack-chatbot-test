@@ -176,6 +176,16 @@ export function nextLessonStep(lessonId, token) {
   });
 }
 
+export function completeLessonStep(lessonId, stepIndex, token) {
+  return apiFetch(
+    `/lessons/${encodeURIComponent(lessonId)}/steps/${encodeURIComponent(stepIndex)}/complete`,
+    {
+      method: "POST",
+      token,
+    },
+  );
+}
+
 export function getLessonProgress(token) {
   return apiFetch("/lessons/progress", { token });
 }

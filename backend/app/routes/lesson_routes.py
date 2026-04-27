@@ -23,6 +23,16 @@ from app.routes.chat_routes import SAFE_STREAM_ERROR, _format_sse_data, _stream_
 router = APIRouter(prefix="/lessons", tags=["lessons"])
 logger = logging.getLogger(__name__)
 
+THEORY_STEP_XP = {
+    "intro": 5,
+    "concept": 10,
+    "deep_dive": 15,
+    "explanation": 10,
+    "example": 10,
+    "checklist": 10,
+    "summary": 5,
+}
+
 
 def get_lesson_or_404(lesson_id: str) -> dict:
     lesson = lessons.get_lesson(lesson_id)
@@ -57,12 +67,46 @@ def get_or_create_lesson_progress(
     return progress
 
 
-def serialize_lesson(lesson: dict, progress: models.LessonProgress) -> schemas.LessonRead:
+def get_lesson_step_progress_map(
+    db: Session,
+    user_id: int,
+    lesson_id: str,
+) -> dict[int, models.LessonStepProgress]:
+    rows = (
+        db.query(models.LessonStepProgress)
+        .filter(
+            models.LessonStepProgress.user_id == user_id,
+            models.LessonStepProgress.lesson_id == lesson_id,
+        )
+        .all()
+    )
+    return {row.step_index: row for row in rows}
+
+
+def serialize_lesson(
+    lesson: dict,
+    progress: models.LessonProgress,
+    step_progress_by_index: dict[int, models.LessonStepProgress] | None = None,
+) -> schemas.LessonRead:
+    step_progress_by_index = step_progress_by_index or {}
+    steps = []
+    for index, step in enumerate(lesson["steps"]):
+        step_progress = step_progress_by_index.get(index)
+        steps.append(
+            {
+                **step,
+                "completed": bool(step_progress.completed) if step_progress else False,
+                "completed_at": step_progress.completed_at if step_progress else None,
+                "xp_awarded": step_progress.xp_awarded if step_progress else 0,
+            }
+        )
+
     return schemas.LessonRead(
         lesson_id=lesson["lesson_id"],
         course_id=lesson["course_id"],
         title=lesson["title"],
-        steps=lesson["steps"],
+        difficulty=lesson.get("difficulty"),
+        steps=steps,
         current_step_index=progress.current_step_index,
         completed=progress.completed,
         completed_at=progress.completed_at,
@@ -82,6 +126,36 @@ def resolve_lesson_step(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid step index")
 
     return lesson["steps"][resolved_step_index]
+
+
+def get_or_create_lesson_step_progress(
+    db: Session,
+    user_id: int,
+    lesson_id: str,
+    step_index: int,
+    step_type: str,
+) -> models.LessonStepProgress:
+    step_progress = (
+        db.query(models.LessonStepProgress)
+        .filter(
+            models.LessonStepProgress.user_id == user_id,
+            models.LessonStepProgress.lesson_id == lesson_id,
+            models.LessonStepProgress.step_index == step_index,
+        )
+        .first()
+    )
+    if step_progress:
+        return step_progress
+
+    step_progress = models.LessonStepProgress(
+        user_id=user_id,
+        lesson_id=lesson_id,
+        step_index=step_index,
+        step_type=step_type,
+    )
+    db.add(step_progress)
+    db.flush()
+    return step_progress
 
 
 def build_lesson_tutor_prompt(
@@ -232,7 +306,12 @@ def get_lesson(
     lesson_progress = get_or_create_lesson_progress(db, current_user.id, lesson)
     db.commit()
     db.refresh(lesson_progress)
-    return serialize_lesson(lesson, lesson_progress)
+    step_progress_by_index = get_lesson_step_progress_map(
+        db,
+        current_user.id,
+        lesson["lesson_id"],
+    )
+    return serialize_lesson(lesson, lesson_progress, step_progress_by_index)
 
 
 @router.post("/{lesson_id}/next", response_model=schemas.LessonRead)
@@ -255,7 +334,49 @@ def next_lesson_step(
 
     db.commit()
     db.refresh(lesson_progress)
-    return serialize_lesson(lesson, lesson_progress)
+    step_progress_by_index = get_lesson_step_progress_map(
+        db,
+        current_user.id,
+        lesson["lesson_id"],
+    )
+    return serialize_lesson(lesson, lesson_progress, step_progress_by_index)
+
+
+@router.post("/{lesson_id}/steps/{step_index}/complete", response_model=schemas.LessonRead)
+def complete_lesson_step(
+    lesson_id: str,
+    step_index: int,
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db),
+):
+    lesson = get_lesson_or_404(lesson_id)
+    step = resolve_lesson_step(lesson, None, step_index)
+    lesson_progress = get_or_create_lesson_progress(db, current_user.id, lesson)
+    step_progress = get_or_create_lesson_step_progress(
+        db,
+        current_user.id,
+        lesson["lesson_id"],
+        step_index,
+        step["type"],
+    )
+
+    if not step_progress.completed:
+        step_progress.completed = True
+        step_progress.completed_at = datetime.now(timezone.utc)
+        step_progress.step_type = step["type"]
+        xp_award = THEORY_STEP_XP.get(step["type"], 0)
+        step_progress.xp_awarded = xp_award
+        if xp_award:
+            progress_service.award_xp(db, current_user.id, xp_award)
+
+    db.commit()
+    db.refresh(lesson_progress)
+    step_progress_by_index = get_lesson_step_progress_map(
+        db,
+        current_user.id,
+        lesson["lesson_id"],
+    )
+    return serialize_lesson(lesson, lesson_progress, step_progress_by_index)
 
 
 @router.get("/{lesson_id}/tutor-stream")

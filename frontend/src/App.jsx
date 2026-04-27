@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
   apiFetch,
+  completeLessonStep,
   getApiBaseUrl,
   getLesson,
   getLessonProgress,
@@ -48,6 +49,7 @@ export default function App() {
   const [activeLesson, setActiveLesson] = useState(null);
   const [lessonProgress, setLessonProgress] = useState([]);
   const [isLessonLoading, setIsLessonLoading] = useState(false);
+  const [isCompletingLessonStep, setIsCompletingLessonStep] = useState(false);
   const eventSourceRef = useRef(null);
 
   useEffect(() => {
@@ -258,6 +260,29 @@ export default function App() {
       showToast("error", "Unable to update lesson.");
     } finally {
       setIsLessonLoading(false);
+    }
+  }
+
+  async function markLessonStepRead(stepIndex) {
+    if (!activeLesson || isCompletingLessonStep) {
+      return;
+    }
+
+    setIsCompletingLessonStep(true);
+    try {
+      const nextLesson = await completeLessonStep(activeLesson.lesson_id, stepIndex, token);
+      const completedStep = nextLesson.steps[stepIndex];
+      setActiveLesson(nextLesson);
+      await loadLessonProgress();
+      await checkProgressAchievements();
+      if (completedStep?.xp_awarded > 0) {
+        showToast("success", `Reading complete: +${completedStep.xp_awarded} XP`);
+      }
+    } catch (err) {
+      handleRequestError(err);
+      showToast("error", "Unable to mark step as read.");
+    } finally {
+      setIsCompletingLessonStep(false);
     }
   }
 
@@ -621,8 +646,10 @@ export default function App() {
           <LessonView
             lesson={activeLesson}
             isLoading={isLessonLoading}
+            isCompletingStep={isCompletingLessonStep}
             token={token}
             onNextStep={advanceLesson}
+            onMarkStepRead={markLessonStepRead}
           />
         </main>
       ) : (

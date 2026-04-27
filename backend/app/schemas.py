@@ -105,6 +105,10 @@ class LessonStepRead(BaseModel):
     type: str
     title: str
     content: str
+    difficulty: str | None = None
+    completed: bool = False
+    completed_at: datetime | None = None
+    xp_awarded: int = 0
 
 
 class LessonProgressRead(BaseModel):
@@ -119,6 +123,7 @@ class LessonProgressRead(BaseModel):
 
 class LessonRead(LessonProgressRead):
     title: str
+    difficulty: str | None = None
     steps: list[LessonStepRead]
 
 

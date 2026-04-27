@@ -1,5 +1,7 @@
 from app import models
+from app.lessons import get_lesson
 from app.progress import XP_PER_LESSON_COMPLETION
+from app.routes.lesson_routes import build_lesson_tutor_prompt
 
 
 def _register_and_login(client, email="lesson@example.com"):
@@ -132,3 +134,58 @@ def test_lesson_progress_unique_per_user_and_lesson(client):
         db.close()
 
     assert len(rows) == 1
+
+
+def test_lesson_tutor_stream_requires_auth(client):
+    response = client.get(
+        "/lessons/fastapi_intro/tutor-stream",
+        params={"question": "Explain this"},
+    )
+
+    assert response.status_code == 401
+
+
+def test_lesson_tutor_stream_unknown_lesson_returns_404(client):
+    token = _register_and_login(client)
+
+    response = client.get(
+        "/lessons/unknown/tutor-stream",
+        params={"question": "Explain this", "token": token},
+    )
+
+    assert response.status_code == 404
+
+
+def test_lesson_tutor_stream_invalid_step_index_returns_400(client):
+    token = _register_and_login(client)
+
+    response = client.get(
+        "/lessons/fastapi_intro/tutor-stream",
+        params={"question": "Explain this", "step_index": 99, "token": token},
+    )
+
+    assert response.status_code == 400
+
+
+def test_lesson_tutor_stream_empty_question_rejected(client):
+    token = _register_and_login(client)
+
+    response = client.get(
+        "/lessons/fastapi_intro/tutor-stream",
+        params={"question": "   ", "token": token},
+    )
+
+    assert response.status_code == 400
+
+
+def test_lesson_tutor_prompt_includes_lesson_step_and_question():
+    lesson = get_lesson("fastapi_intro")
+    step = lesson["steps"][0]
+
+    prompt = build_lesson_tutor_prompt(lesson, step, "Why is this useful?")
+    combined_content = "\n".join(item["content"] for item in prompt)
+
+    assert lesson["title"] in combined_content
+    assert step["title"] in combined_content
+    assert step["content"] in combined_content
+    assert "Why is this useful?" in combined_content

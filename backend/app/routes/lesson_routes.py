@@ -1,13 +1,26 @@
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, status
+import logging
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi.responses import StreamingResponse
+from openai import (
+    APIConnectionError,
+    APIError,
+    APIStatusError,
+    APITimeoutError,
+    AuthenticationError,
+    OpenAIError,
+)
 from sqlalchemy.orm import Session
 
 from app import auth, lessons, models, progress as progress_service, schemas
 from app.database import get_db
+from app.routes.chat_routes import SAFE_STREAM_ERROR, _format_sse_data, _stream_openai_text
 
 
 router = APIRouter(prefix="/lessons", tags=["lessons"])
+logger = logging.getLogger(__name__)
 
 
 def get_lesson_or_404(lesson_id: str) -> dict:
@@ -53,6 +66,53 @@ def serialize_lesson(lesson: dict, progress: models.LessonProgress) -> schemas.L
         completed=progress.completed,
         completed_at=progress.completed_at,
     )
+
+
+def resolve_lesson_step(
+    lesson: dict,
+    progress: models.LessonProgress | None,
+    step_index: int | None,
+) -> dict:
+    resolved_step_index = progress.current_step_index if step_index is None and progress else step_index
+    if resolved_step_index is None:
+        resolved_step_index = 0
+
+    if resolved_step_index < 0 or resolved_step_index >= len(lesson["steps"]):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid step index")
+
+    return lesson["steps"][resolved_step_index]
+
+
+def build_lesson_tutor_prompt(
+    lesson: dict,
+    step: dict,
+    question: str,
+) -> list[dict[str, str]]:
+    return [
+        {
+            "role": "system",
+            "content": (
+                "You are an AI programming tutor inside a learning platform.\n"
+                "You help the user understand the current lesson step.\n"
+                "Use the provided lesson context as the source of truth.\n"
+                "If the user asks about something outside this lesson, answer briefly and connect "
+                "it back to the lesson when possible.\n"
+                "Do not give unrelated long explanations.\n"
+                "Be friendly, clear, concise, and use simple examples."
+            ),
+        },
+        {
+            "role": "user",
+            "content": (
+                f"Lesson title: {lesson['title']}\n"
+                f"Course ID: {lesson['course_id']}\n"
+                f"Current step title: {step['title']}\n"
+                f"Current step type: {step['type']}\n"
+                f"Current step content:\n{step['content']}\n\n"
+                f"User question: {question}"
+            ),
+        },
+    ]
 
 
 @router.get("/progress", response_model=list[schemas.LessonProgressRead])
@@ -102,3 +162,71 @@ def next_lesson_step(
     db.commit()
     db.refresh(lesson_progress)
     return serialize_lesson(lesson, lesson_progress)
+
+
+@router.get("/{lesson_id}/tutor-stream")
+async def lesson_tutor_stream(
+    request: Request,
+    lesson_id: str,
+    question: str,
+    step_index: int | None = Query(default=None),
+    token: str | None = Query(default=None),
+    db: Session = Depends(get_db),
+):
+    if not token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing token")
+
+    clean_question = question.strip()
+    if not clean_question:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Question cannot be empty")
+
+    current_user = auth.get_user_from_token(db, token)
+    lesson = get_lesson_or_404(lesson_id)
+    lesson_progress = (
+        db.query(models.LessonProgress)
+        .filter(
+            models.LessonProgress.user_id == current_user.id,
+            models.LessonProgress.lesson_id == lesson["lesson_id"],
+        )
+        .first()
+    )
+    step = resolve_lesson_step(lesson, lesson_progress, step_index)
+    openai_input = build_lesson_tutor_prompt(lesson, step, clean_question)
+
+    async def event_generator():
+        try:
+            try:
+                async for chunk in _stream_openai_text(openai_input):
+                    if await request.is_disconnected():
+                        logger.info(
+                            "Client disconnected from lesson tutor stream",
+                            extra={"lesson_id": lesson_id, "user_id": current_user.id},
+                        )
+                        return
+                    if chunk:
+                        yield _format_sse_data(chunk)
+            except AuthenticationError:
+                logger.exception("OpenAI authentication failed during lesson tutor stream")
+                yield _format_sse_data(SAFE_STREAM_ERROR)
+            except APITimeoutError:
+                logger.exception("OpenAI request timed out during lesson tutor stream")
+                yield _format_sse_data(SAFE_STREAM_ERROR)
+            except APIConnectionError:
+                logger.exception("OpenAI network connection failed during lesson tutor stream")
+                yield _format_sse_data(SAFE_STREAM_ERROR)
+            except APIStatusError:
+                logger.exception("OpenAI API returned an error status during lesson tutor stream")
+                yield _format_sse_data(SAFE_STREAM_ERROR)
+            except APIError:
+                logger.exception("OpenAI API error during lesson tutor stream")
+                yield _format_sse_data(SAFE_STREAM_ERROR)
+            except OpenAIError:
+                logger.exception("OpenAI error during lesson tutor stream")
+                yield _format_sse_data(SAFE_STREAM_ERROR)
+            except Exception:
+                logger.exception("Unexpected error during lesson tutor stream")
+                yield _format_sse_data(SAFE_STREAM_ERROR)
+        finally:
+            db.close()
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")

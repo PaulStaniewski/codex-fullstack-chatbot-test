@@ -618,7 +618,12 @@ export default function App() {
               <ThemeToggle theme={theme} onToggleTheme={toggleTheme} />
             </div>
           </header>
-          <LessonView lesson={activeLesson} isLoading={isLessonLoading} onNextStep={advanceLesson} />
+          <LessonView
+            lesson={activeLesson}
+            isLoading={isLessonLoading}
+            token={token}
+            onNextStep={advanceLesson}
+          />
         </main>
       ) : (
         <ChatWindow

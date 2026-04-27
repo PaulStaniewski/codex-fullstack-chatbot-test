@@ -14,6 +14,66 @@ export function getStreamUrl(conversationId, message, token) {
   return `${getApiBaseUrl()}/chat-stream?${params.toString()}`;
 }
 
+export function getLessonTutorStreamUrl({ lessonId, question, stepIndex, token }) {
+  const params = new URLSearchParams({
+    question,
+    token,
+  });
+
+  if (stepIndex !== undefined && stepIndex !== null) {
+    params.set("step_index", String(stepIndex));
+  }
+
+  return `${getApiBaseUrl()}/lessons/${encodeURIComponent(lessonId)}/tutor-stream?${params.toString()}`;
+}
+
+export function streamLessonTutor({
+  lessonId,
+  question,
+  stepIndex,
+  token,
+  onToken,
+  onError,
+  onDone,
+}) {
+  const stream = new EventSource(
+    getLessonTutorStreamUrl({ lessonId, question, stepIndex, token }),
+  );
+  let receivedContent = "";
+  let didFinalize = false;
+
+  stream.onmessage = (event) => {
+    receivedContent += event.data;
+    onToken?.(event.data, receivedContent);
+
+    if (receivedContent.startsWith("Error:")) {
+      didFinalize = true;
+      stream.close();
+      onError?.(receivedContent);
+      onDone?.(receivedContent);
+    }
+  };
+
+  stream.onerror = () => {
+    if (didFinalize) {
+      return;
+    }
+
+    didFinalize = true;
+    stream.close();
+    if (receivedContent) {
+      onDone?.(receivedContent);
+    } else {
+      onError?.("Unable to get tutor response.");
+    }
+  };
+
+  return () => {
+    didFinalize = true;
+    stream.close();
+  };
+}
+
 export async function apiFetch(path, { token, ...options } = {}) {
   const headers = new Headers(options.headers || {});
 

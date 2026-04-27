@@ -129,8 +129,18 @@ LESSONS = {
             },
             {
                 "type": "practice",
-                "title": "Practice",
-                "content": "Explain how you would make a FastAPI backend wait safely for PostgreSQL in Docker Compose without assuming depends_on is enough.",
+                "title": "Practice 1 - Diagnose",
+                "content": "A FastAPI container starts before PostgreSQL is ready and crashes with a connection refused error. Explain why depends_on did not prevent this failure.",
+            },
+            {
+                "type": "practice",
+                "title": "Practice 2 - Fix",
+                "content": "Propose a Docker Compose and backend startup strategy that waits safely for PostgreSQL before running Alembic migrations and starting Uvicorn.",
+            },
+            {
+                "type": "practice",
+                "title": "Practice 3 - Production hardening",
+                "content": "Describe how you would make the startup flow resilient in production, including retry limits, logging, healthchecks, and what should happen if the database never becomes ready.",
             },
             {
                 "type": "summary",
@@ -161,8 +171,18 @@ LESSONS = {
             },
             {
                 "type": "practice",
-                "title": "Practice",
-                "content": "A user sees: column user_progress.current_streak_days does not exist. Explain how you would diagnose the migration state and fix it safely.",
+                "title": "Practice 1 - Diagnose",
+                "content": "A user sees: column user_progress.current_streak_days does not exist. Explain the most likely mismatch between SQLAlchemy models and the actual database schema.",
+            },
+            {
+                "type": "practice",
+                "title": "Practice 2 - Fix",
+                "content": "Write the sequence of Alembic checks and commands you would run to confirm the current revision, compare it with heads, and apply the missing migration safely.",
+            },
+            {
+                "type": "practice",
+                "title": "Practice 3 - Production hardening",
+                "content": "Explain how you would prevent missing-column errors during deploys, including migration ordering, release checks, rollback thinking, and avoiding manual database edits.",
             },
             {
                 "type": "summary",
@@ -193,8 +213,18 @@ LESSONS = {
             },
             {
                 "type": "practice",
-                "title": "Practice",
-                "content": "Explain one security risk of query-token SSE and one mitigation you would use in a production app.",
+                "title": "Practice 1 - Diagnose",
+                "content": "A team uses /chat-stream?token=<jwt> for EventSource. Identify one concrete place that token might leak and why EventSource pushed the team toward this design.",
+            },
+            {
+                "type": "practice",
+                "title": "Practice 2 - Fix",
+                "content": "Propose a safer SSE authentication approach or mitigation plan for query-token streams while keeping browser EventSource compatibility.",
+            },
+            {
+                "type": "practice",
+                "title": "Practice 3 - Production hardening",
+                "content": "Design a production policy for SSE tokens that considers short lifetimes, logging redaction, HTTPS, refresh behavior, and what the client should do on auth failure.",
             },
             {
                 "type": "summary",
@@ -225,8 +255,18 @@ LESSONS = {
             },
             {
                 "type": "practice",
-                "title": "Practice",
-                "content": "Describe how the UI should behave when AI streaming fails after the user has already sent a message.",
+                "title": "Practice 1 - Diagnose",
+                "content": "A streamed AI response stops halfway through. Explain which parts of the system could have failed and why the backend should avoid saving a partial assistant message.",
+            },
+            {
+                "type": "practice",
+                "title": "Practice 2 - Fix",
+                "content": "Describe the backend and frontend behavior you would implement to send a safe SSE error and show a retry option without duplicating messages.",
+            },
+            {
+                "type": "practice",
+                "title": "Practice 3 - Production hardening",
+                "content": "Explain how you would monitor and harden AI streaming failures in production, including timeout handling, provider errors, client disconnects, and user-facing recovery.",
             },
             {
                 "type": "summary",
@@ -257,8 +297,18 @@ LESSONS = {
             },
             {
                 "type": "practice",
-                "title": "Practice",
-                "content": "Explain why WHERE lesson_id = ... is not enough when fetching practice history for a logged-in user.",
+                "title": "Practice 1 - Diagnose",
+                "content": "A practice history query filters only by lesson_id. Explain how this can leak another user's submissions in a multi-user application.",
+            },
+            {
+                "type": "practice",
+                "title": "Practice 2 - Fix",
+                "content": "Rewrite the query conceptually so practice history is scoped to both lesson_id and the authenticated current_user.id.",
+            },
+            {
+                "type": "practice",
+                "title": "Practice 3 - Production hardening",
+                "content": "Describe a review checklist or test strategy that would catch missing user_id filters across conversations, lesson progress, and practice submissions.",
             },
             {
                 "type": "summary",

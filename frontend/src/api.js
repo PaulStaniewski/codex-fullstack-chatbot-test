@@ -179,3 +179,7 @@ export function nextLessonStep(lessonId, token) {
 export function getLessonProgress(token) {
   return apiFetch("/lessons/progress", { token });
 }
+
+export function getPracticeHistory(lessonId, token) {
+  return apiFetch(`/lessons/${encodeURIComponent(lessonId)}/practice-history`, { token });
+}

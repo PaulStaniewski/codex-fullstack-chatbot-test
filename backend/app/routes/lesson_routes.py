@@ -292,6 +292,7 @@ async def lesson_practice_feedback_stream(
     openai_input = build_practice_feedback_prompt(lesson, step, clean_answer)
 
     async def event_generator():
+        chunks: list[str] = []
         try:
             try:
                 async for chunk in _stream_openai_text(openai_input):
@@ -302,29 +303,70 @@ async def lesson_practice_feedback_stream(
                         )
                         return
                     if chunk:
+                        chunks.append(chunk)
                         yield _format_sse_data(chunk)
             except AuthenticationError:
                 logger.exception("OpenAI authentication failed during practice feedback stream")
                 yield _format_sse_data(SAFE_STREAM_ERROR)
+                return
             except APITimeoutError:
                 logger.exception("OpenAI request timed out during practice feedback stream")
                 yield _format_sse_data(SAFE_STREAM_ERROR)
+                return
             except APIConnectionError:
                 logger.exception("OpenAI network connection failed during practice feedback stream")
                 yield _format_sse_data(SAFE_STREAM_ERROR)
+                return
             except APIStatusError:
                 logger.exception("OpenAI API returned an error status during practice feedback stream")
                 yield _format_sse_data(SAFE_STREAM_ERROR)
+                return
             except APIError:
                 logger.exception("OpenAI API error during practice feedback stream")
                 yield _format_sse_data(SAFE_STREAM_ERROR)
+                return
             except OpenAIError:
                 logger.exception("OpenAI error during practice feedback stream")
                 yield _format_sse_data(SAFE_STREAM_ERROR)
+                return
             except Exception:
                 logger.exception("Unexpected error during practice feedback stream")
                 yield _format_sse_data(SAFE_STREAM_ERROR)
+                return
+
+            feedback = "".join(chunks).strip()
+            if not feedback:
+                return
+
+            db.add(
+                models.PracticeSubmission(
+                    user_id=current_user.id,
+                    lesson_id=lesson["lesson_id"],
+                    step_index=step_index,
+                    answer=clean_answer,
+                    feedback=feedback,
+                )
+            )
+            db.commit()
         finally:
             db.close()
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+
+@router.get("/{lesson_id}/practice-history", response_model=list[schemas.PracticeSubmissionRead])
+def get_practice_history(
+    lesson_id: str,
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db),
+):
+    get_lesson_or_404(lesson_id)
+    return (
+        db.query(models.PracticeSubmission)
+        .filter(
+            models.PracticeSubmission.user_id == current_user.id,
+            models.PracticeSubmission.lesson_id == lesson_id,
+        )
+        .order_by(models.PracticeSubmission.created_at.desc(), models.PracticeSubmission.id.desc())
+        .all()
+    )

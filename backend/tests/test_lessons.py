@@ -10,6 +10,11 @@ def _register_and_login(client, email="lesson@example.com"):
     return response.json()["access_token"]
 
 
+async def _fake_feedback_stream(_openai_input):
+    yield "Good start. "
+    yield "Mention the route decorator too."
+
+
 def test_get_lesson_creates_progress(client):
     token = _register_and_login(client)
 
@@ -255,3 +260,93 @@ def test_practice_feedback_prompt_includes_instruction_and_user_answer():
     assert step["title"] in combined_content
     assert step["content"] in combined_content
     assert "I would use @app.get('/health')." in combined_content
+
+
+def test_practice_submission_saved_after_feedback(client, monkeypatch):
+    monkeypatch.setattr("app.routes.lesson_routes._stream_openai_text", _fake_feedback_stream)
+    token = _register_and_login(client)
+
+    response = client.get(
+        "/lessons/fastapi_routing/practice-feedback-stream",
+        params={
+            "step_index": 2,
+            "answer": "I would create a health function.",
+            "token": token,
+        },
+    )
+
+    assert response.status_code == 200
+    assert "Good start" in response.text
+
+    history_response = client.get(
+        "/lessons/fastapi_routing/practice-history",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    history = history_response.json()
+
+    assert len(history) == 1
+    assert history[0]["answer"] == "I would create a health function."
+    assert history[0]["feedback"] == "Good start. Mention the route decorator too."
+
+
+def test_practice_history_returns_user_only_submissions(client, monkeypatch):
+    monkeypatch.setattr("app.routes.lesson_routes._stream_openai_text", _fake_feedback_stream)
+    first_token = _register_and_login(client, "practice-one@example.com")
+    second_token = _register_and_login(client, "practice-two@example.com")
+
+    client.get(
+        "/lessons/fastapi_routing/practice-feedback-stream",
+        params={"step_index": 2, "answer": "First user answer", "token": first_token},
+    )
+    client.get(
+        "/lessons/fastapi_routing/practice-feedback-stream",
+        params={"step_index": 2, "answer": "Second user answer", "token": second_token},
+    )
+
+    response = client.get(
+        "/lessons/fastapi_routing/practice-history",
+        headers={"Authorization": f"Bearer {first_token}"},
+    )
+    history = response.json()
+
+    assert len(history) == 1
+    assert history[0]["answer"] == "First user answer"
+
+
+def test_practice_history_ordered_newest_first(client, monkeypatch):
+    monkeypatch.setattr("app.routes.lesson_routes._stream_openai_text", _fake_feedback_stream)
+    token = _register_and_login(client)
+
+    client.get(
+        "/lessons/fastapi_routing/practice-feedback-stream",
+        params={"step_index": 2, "answer": "Older answer", "token": token},
+    )
+    client.get(
+        "/lessons/fastapi_routing/practice-feedback-stream",
+        params={"step_index": 2, "answer": "Newer answer", "token": token},
+    )
+
+    response = client.get(
+        "/lessons/fastapi_routing/practice-history",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    history = response.json()
+
+    assert [item["answer"] for item in history] == ["Newer answer", "Older answer"]
+
+
+def test_practice_history_requires_auth(client):
+    response = client.get("/lessons/fastapi_routing/practice-history")
+
+    assert response.status_code == 401
+
+
+def test_practice_history_unknown_lesson_returns_404(client):
+    token = _register_and_login(client)
+
+    response = client.get(
+        "/lessons/unknown/practice-history",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 404

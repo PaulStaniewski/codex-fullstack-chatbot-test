@@ -120,3 +120,14 @@ class LessonProgressRead(BaseModel):
 class LessonRead(LessonProgressRead):
     title: str
     steps: list[LessonStepRead]
+
+
+class PracticeSubmissionRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    lesson_id: str
+    step_index: int
+    answer: str
+    feedback: str
+    created_at: datetime

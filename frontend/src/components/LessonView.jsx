@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
-import { streamLessonTutor, streamPracticeFeedback } from "../api.js";
+import { getPracticeHistory, streamLessonTutor, streamPracticeFeedback } from "../api.js";
 
 const QUICK_ACTIONS = ["Explain simply", "Give an example", "Why does this matter?"];
 
@@ -27,6 +27,9 @@ export default function LessonView({ lesson, isLoading, token, onNextStep }) {
   const [practiceFeedback, setPracticeFeedback] = useState("");
   const [practiceError, setPracticeError] = useState("");
   const [isPracticeStreaming, setIsPracticeStreaming] = useState(false);
+  const [practiceHistory, setPracticeHistory] = useState([]);
+  const [selectedAttemptId, setSelectedAttemptId] = useState(null);
+  const [historyError, setHistoryError] = useState("");
   const closeTutorStreamRef = useRef(null);
   const closePracticeStreamRef = useRef(null);
 
@@ -39,11 +42,27 @@ export default function LessonView({ lesson, isLoading, token, onNextStep }) {
     setPracticeFeedback("");
     setPracticeError("");
     setIsPracticeStreaming(false);
+    setPracticeHistory([]);
+    setSelectedAttemptId(null);
+    setHistoryError("");
     closeTutorStreamRef.current?.();
     closeTutorStreamRef.current = null;
     closePracticeStreamRef.current?.();
     closePracticeStreamRef.current = null;
   }, [lesson?.lesson_id, lesson?.current_step_index]);
+
+  useEffect(() => {
+    if (!lesson || lesson.completed) {
+      return;
+    }
+
+    const currentStep = lesson.steps[lesson.current_step_index] || lesson.steps[0];
+    if (currentStep?.type !== "practice") {
+      return;
+    }
+
+    loadPracticeHistory();
+  }, [lesson?.lesson_id, lesson?.current_step_index, lesson?.completed]);
 
   useEffect(() => {
     return () => {
@@ -62,6 +81,29 @@ export default function LessonView({ lesson, isLoading, token, onNextStep }) {
 
   const currentStep = lesson.steps[lesson.current_step_index] || lesson.steps[0];
   const stepNumber = Math.min(lesson.current_step_index + 1, lesson.steps.length);
+  const selectedAttempt = practiceHistory.find((attempt) => attempt.id === selectedAttemptId);
+
+  async function loadPracticeHistory() {
+    try {
+      setHistoryError("");
+      const history = await getPracticeHistory(lesson.lesson_id, token);
+      setPracticeHistory(history);
+      setSelectedAttemptId((currentId) =>
+        history.some((attempt) => attempt.id === currentId) ? currentId : null,
+      );
+    } catch (err) {
+      setHistoryError(err.message || "Unable to load practice history.");
+    }
+  }
+
+  function formatAttemptTime(value) {
+    return new Date(value).toLocaleString();
+  }
+
+  function previewAnswer(value) {
+    const cleanValue = value.trim().replace(/\s+/g, " ");
+    return cleanValue.length > 84 ? `${cleanValue.slice(0, 81)}...` : cleanValue;
+  }
 
   function askTutor(question = tutorQuestion) {
     const cleanQuestion = question.trim();
@@ -123,6 +165,7 @@ export default function LessonView({ lesson, isLoading, token, onNextStep }) {
       onDone: () => {
         setIsPracticeStreaming(false);
         closePracticeStreamRef.current = null;
+        loadPracticeHistory();
       },
     });
   }
@@ -203,6 +246,52 @@ export default function LessonView({ lesson, isLoading, token, onNextStep }) {
               <ReactMarkdown>{practiceFeedback}</ReactMarkdown>
             </div>
           ) : null}
+
+          <div className="practice-history">
+            <div>
+              <p className="eyebrow">Previous attempts</p>
+              {historyError ? <p className="form-error">{historyError}</p> : null}
+            </div>
+            {practiceHistory.length > 0 ? (
+              <div className="practice-attempt-list">
+                {practiceHistory.map((attempt, index) => (
+                  <button
+                    type="button"
+                    key={attempt.id}
+                    className={
+                      selectedAttemptId === attempt.id
+                        ? "practice-attempt active"
+                        : "practice-attempt"
+                    }
+                    onClick={() =>
+                      setSelectedAttemptId((currentId) =>
+                        currentId === attempt.id ? null : attempt.id,
+                      )
+                    }
+                  >
+                    <span>Attempt {practiceHistory.length - index}</span>
+                    <time dateTime={attempt.created_at}>{formatAttemptTime(attempt.created_at)}</time>
+                    <strong>{previewAnswer(attempt.answer)}</strong>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="practice-history-empty">No previous attempts for this lesson yet.</p>
+            )}
+
+            {selectedAttempt ? (
+              <div className="practice-attempt-detail">
+                <div>
+                  <h3>Your answer</h3>
+                  <p>{selectedAttempt.answer}</p>
+                </div>
+                <div>
+                  <h3>AI feedback</h3>
+                  <ReactMarkdown>{selectedAttempt.feedback}</ReactMarkdown>
+                </div>
+              </div>
+            ) : null}
+          </div>
         </div>
       ) : null}
 

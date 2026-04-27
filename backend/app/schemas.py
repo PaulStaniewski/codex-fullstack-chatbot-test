@@ -99,3 +99,24 @@ class ProgressResponse(BaseModel):
     progress: UserProgressStats
     achievements: list[AchievementRead]
     new_achievements: list[AchievementRead]
+
+
+class LessonStepRead(BaseModel):
+    type: str
+    title: str
+    content: str
+
+
+class LessonProgressRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    lesson_id: str
+    course_id: str
+    current_step_index: int
+    completed: bool
+    completed_at: datetime | None = None
+
+
+class LessonRead(LessonProgressRead):
+    title: str
+    steps: list[LessonStepRead]

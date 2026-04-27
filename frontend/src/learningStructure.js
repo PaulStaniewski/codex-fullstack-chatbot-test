@@ -3,27 +3,16 @@ export const learningStructure = [
     id: "fastapi",
     title: "FastAPI Fundamentals",
     lessons: [
-      { id: "intro", title: "Introduction" },
-      { id: "routing", title: "Routing" },
-      { id: "dependency", title: "Dependency Injection" },
-      { id: "async", title: "Async vs Sync" },
+      { id: "fastapi_intro", title: "FastAPI Introduction" },
+      { id: "fastapi_routing", title: "FastAPI Routing" },
+      { id: "fastapi_dependency", title: "Dependency Injection" },
     ],
   },
   {
-    id: "database",
-    title: "Database Basics",
+    id: "docker",
+    title: "Docker Foundations",
     lessons: [
-      { id: "postgres", title: "PostgreSQL" },
-      { id: "indexes", title: "Indexes" },
-    ],
-  },
-  {
-    id: "frontend",
-    title: "React Practice",
-    lessons: [
-      { id: "components", title: "Components" },
-      { id: "state", title: "State and Effects" },
-      { id: "streaming-ui", title: "Streaming UI" },
+      { id: "docker_basics", title: "Docker Basics" },
     ],
   },
 ];

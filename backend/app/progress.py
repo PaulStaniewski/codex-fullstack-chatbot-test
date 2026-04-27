@@ -9,6 +9,7 @@ ACTIVE_TIME_THRESHOLD_SECONDS = 10 * 60
 XP_PER_MESSAGE = 10
 XP_PER_SESSION = 25
 XP_PER_ACHIEVEMENT = 50
+XP_PER_LESSON_COMPLETION = 40
 
 DEFAULT_ACHIEVEMENTS = [
     {
@@ -137,6 +138,14 @@ def calculate_level(xp_points: int) -> int:
 
 def recalculate_level(progress: models.UserProgress) -> None:
     progress.level = calculate_level(progress.xp_points)
+
+
+def award_lesson_completion_xp(db: Session, user_id: int) -> models.UserProgress:
+    progress = get_or_create_progress(db, user_id)
+    progress.xp_points += XP_PER_LESSON_COMPLETION
+    recalculate_level(progress)
+    evaluate_achievements(progress, db)
+    return progress
 
 
 def update_time_spent(progress: models.UserProgress, now: datetime | None = None) -> None:

@@ -1,10 +1,19 @@
 import { useEffect, useRef, useState } from "react";
-import { apiFetch, getApiBaseUrl, getStreamUrl } from "./api.js";
+import {
+  apiFetch,
+  getApiBaseUrl,
+  getLesson,
+  getLessonProgress,
+  getStreamUrl,
+  nextLessonStep,
+} from "./api.js";
 import AchievementToast from "./components/AchievementToast.jsx";
 import AuthView from "./components/AuthView.jsx";
 import ChatWindow from "./components/ChatWindow.jsx";
+import LessonView from "./components/LessonView.jsx";
 import ProgressPage from "./components/ProgressPage.jsx";
 import Sidebar from "./components/Sidebar.jsx";
+import ThemeToggle from "./components/ThemeToggle.jsx";
 import ToastStack from "./components/ToastStack.jsx";
 
 const TOKEN_KEY = "chatbot_access_token";
@@ -36,6 +45,9 @@ export default function App() {
   const [activeView, setActiveView] = useState("chat");
   const [achievementToast, setAchievementToast] = useState(null);
   const [lessonContext, setLessonContext] = useState(null);
+  const [activeLesson, setActiveLesson] = useState(null);
+  const [lessonProgress, setLessonProgress] = useState([]);
+  const [isLessonLoading, setIsLessonLoading] = useState(false);
   const eventSourceRef = useRef(null);
 
   useEffect(() => {
@@ -46,6 +58,7 @@ export default function App() {
   useEffect(() => {
     if (token) {
       loadConversations();
+      loadLessonProgress();
     }
 
     return () => {
@@ -84,6 +97,8 @@ export default function App() {
     setActiveView("chat");
     setAchievementToast(null);
     setLessonContext(null);
+    setActiveLesson(null);
+    setLessonProgress([]);
   }
 
   function toggleTheme() {
@@ -118,6 +133,15 @@ export default function App() {
       showAchievementToast(data?.new_achievements || []);
     } catch {
       // Achievement notifications should never interrupt chat or navigation flows.
+    }
+  }
+
+  async function loadLessonProgress() {
+    try {
+      const data = await getLessonProgress(token);
+      setLessonProgress(data);
+    } catch (err) {
+      handleRequestError(err);
     }
   }
 
@@ -175,6 +199,7 @@ export default function App() {
 
   async function startNewConversation() {
     setLessonContext(null);
+    setActiveLesson(null);
     await createConversation();
   }
 
@@ -183,22 +208,57 @@ export default function App() {
     eventSourceRef.current = null;
     setIsStreaming(false);
     setLessonContext(null);
+    setActiveLesson(null);
     localStorage.setItem(ACTIVE_CONVERSATION_KEY, String(conversation.id));
     setSelectedConversation(conversation);
     setActiveView("chat");
     await loadMessages(conversation.id);
   }
 
-  function selectLesson(lesson) {
+  async function selectLesson(lesson) {
     eventSourceRef.current?.close();
     eventSourceRef.current = null;
     setIsStreaming(false);
     setFailedMessage(null);
+    setIsLessonLoading(true);
     localStorage.removeItem(ACTIVE_CONVERSATION_KEY);
     setSelectedConversation(null);
     setMessages([]);
     setLessonContext(lesson);
     setActiveView("chat");
+    try {
+      const data = await getLesson(lesson.lesson_id, token);
+      setActiveLesson(data);
+      await loadLessonProgress();
+    } catch (err) {
+      handleRequestError(err);
+      showToast("error", "Unable to load lesson.");
+    } finally {
+      setIsLessonLoading(false);
+    }
+  }
+
+  async function advanceLesson() {
+    if (!activeLesson || isLessonLoading) {
+      return;
+    }
+
+    setIsLessonLoading(true);
+    try {
+      const wasCompleted = activeLesson.completed;
+      const nextLesson = await nextLessonStep(activeLesson.lesson_id, token);
+      setActiveLesson(nextLesson);
+      await loadLessonProgress();
+      await checkProgressAchievements();
+      if (!wasCompleted && nextLesson.completed) {
+        showToast("success", `Lesson completed: ${nextLesson.title}`);
+      }
+    } catch (err) {
+      handleRequestError(err);
+      showToast("error", "Unable to update lesson.");
+    } finally {
+      setIsLessonLoading(false);
+    }
   }
 
   function showProgress() {
@@ -529,10 +589,11 @@ export default function App() {
         onRenameConversation={renameConversation}
         onDeleteConversation={deleteConversation}
         onTogglePin={toggleConversationPin}
-        onSelectLesson={selectLesson}
+        onSelectLesson={(lesson) => selectLesson(lesson).catch(handleRequestError)}
         onShowProgress={showProgress}
         onLogout={logout}
         selectedLessonId={lessonContext?.lesson_id}
+        lessonProgress={lessonProgress}
         isProgressActive={activeView === "progress"}
         isLoading={isConversationsLoading}
         isMessagesLoading={isMessagesLoading}
@@ -546,6 +607,19 @@ export default function App() {
           onToggleTheme={toggleTheme}
           onAchievementUnlocked={showAchievementToast}
         />
+      ) : lessonContext ? (
+        <main className="chat-shell">
+          <header className="chat-header">
+            <div className="chat-title">
+              <p className="eyebrow">{lessonContext.course_title}</p>
+              <h1>{lessonContext.lesson_title}</h1>
+            </div>
+            <div className="chat-actions">
+              <ThemeToggle theme={theme} onToggleTheme={toggleTheme} />
+            </div>
+          </header>
+          <LessonView lesson={activeLesson} isLoading={isLessonLoading} onNextStep={advanceLesson} />
+        </main>
       ) : (
         <ChatWindow
           conversation={selectedConversation}

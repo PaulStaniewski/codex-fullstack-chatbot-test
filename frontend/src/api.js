@@ -47,3 +47,18 @@ export async function apiFetch(path, { token, ...options } = {}) {
 
   return data;
 }
+
+export function getLesson(lessonId, token) {
+  return apiFetch(`/lessons/${encodeURIComponent(lessonId)}`, { token });
+}
+
+export function nextLessonStep(lessonId, token) {
+  return apiFetch(`/lessons/${encodeURIComponent(lessonId)}/next`, {
+    method: "POST",
+    token,
+  });
+}
+
+export function getLessonProgress(token) {
+  return apiFetch("/lessons/progress", { token });
+}

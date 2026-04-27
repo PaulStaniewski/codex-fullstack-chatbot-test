@@ -25,6 +25,7 @@ export default function Sidebar({
   onShowProgress,
   onLogout,
   selectedLessonId,
+  lessonProgress = [],
   isProgressActive,
   isLoading,
   isMessagesLoading,
@@ -49,6 +50,9 @@ export default function Sidebar({
     (conversation) => !conversation.is_pinned,
   );
   const groupedRecentConversations = groupConversationsByRecency(recentConversations);
+  const lessonProgressById = new Map(
+    lessonProgress.map((progress) => [progress.lesson_id, progress]),
+  );
 
   function openRename(conversation) {
     setDraftTitle(conversation.title);
@@ -175,25 +179,40 @@ export default function Sidebar({
   }
 
   function renderLesson(course, lesson) {
-    const lessonKey = `${course.id}:${lesson.id}`;
-    const isActive = lessonKey === selectedLessonId;
+    const lessonState = lessonProgressById.get(lesson.id);
+    const isActive = lesson.id === selectedLessonId;
+    const statusLabel = lessonState?.completed
+      ? "Completed"
+      : lessonState
+        ? "In progress"
+        : "Not started";
 
     return (
       <button
         type="button"
-        key={lessonKey}
+        key={lesson.id}
         className={isActive ? "lesson-item active" : "lesson-item"}
         onClick={() =>
           onSelectLesson({
-            lesson_id: lessonKey,
+            lesson_id: lesson.id,
             lesson_title: lesson.title,
             course_id: course.id,
             course_title: course.title,
           })
         }
         disabled={isMessagesLoading || isStreaming}
+        aria-label={`${lesson.title}: ${statusLabel}`}
       >
-        <span className="lesson-status" aria-hidden="true">
+        <span
+          className={[
+            "lesson-status",
+            lessonState?.completed ? "completed" : "",
+            lessonState && !lessonState.completed ? "in-progress" : "",
+          ]
+            .filter(Boolean)
+            .join(" ")}
+          aria-hidden="true"
+        >
           {isActive ? "●" : "○"}
         </span>
         <span className="lesson-title">{lesson.title}</span>

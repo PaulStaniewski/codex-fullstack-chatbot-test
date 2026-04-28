@@ -893,6 +893,10 @@ input:focus,
   gap: 16px;
 }
 
+.lesson-study-card {
+  gap: 16px;
+}
+
 .lesson-practice-card {
   gap: 16px;
 }

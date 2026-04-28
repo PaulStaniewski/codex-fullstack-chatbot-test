@@ -31,6 +31,17 @@ THEORY_STEP_XP = {
     "example": 10,
     "checklist": 10,
     "summary": 5,
+    "article": 20,
+}
+
+READING_STEP_TYPES = set(THEORY_STEP_XP)
+STUDY_ACTIONS = {
+    "summarize": "Summarize the lesson material in a concise, beginner-friendly way.",
+    "explain": "Explain the lesson material simply, using plain language.",
+    "example": "Give a practical example based on the lesson material.",
+    "key_points": "List the key points the learner should remember.",
+    "ask_questions": "Ask the learner a few short study questions about the material.",
+    "custom_question": "Answer the learner's custom question.",
 }
 
 
@@ -185,6 +196,58 @@ def build_lesson_tutor_prompt(
                 f"Current step type: {step['type']}\n"
                 f"Current step content:\n{step['content']}\n\n"
                 f"User question: {question}"
+            ),
+        },
+    ]
+
+
+def get_reading_steps_for_study(lesson: dict, step_index: int | None = None) -> list[dict]:
+    if step_index is not None:
+        step = resolve_lesson_step(lesson, None, step_index)
+        if step["type"] not in READING_STEP_TYPES:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Study assistant can focus only on reading steps",
+            )
+        return [step]
+
+    return [step for step in lesson["steps"] if step["type"] in READING_STEP_TYPES]
+
+
+def build_lesson_study_prompt(
+    lesson: dict,
+    reading_steps: list[dict],
+    action: str,
+    question: str | None = None,
+) -> list[dict[str, str]]:
+    action_instruction = STUDY_ACTIONS[action]
+    lesson_material = "\n\n".join(
+        f"{index + 1}. {step['title']} ({step['type']}):\n{step['content']}"
+        for index, step in enumerate(reading_steps)
+    )
+    custom_question = (question or "").strip()
+
+    return [
+        {
+            "role": "system",
+            "content": (
+                "You are an AI study assistant inside a programming learning platform.\n"
+                "Use the provided lesson material as the source of truth.\n"
+                "Keep answers focused on the lesson.\n"
+                "If the user asks about something outside the lesson, answer briefly and connect "
+                "it back to the lesson when possible.\n"
+                "Be clear, practical, and concise."
+            ),
+        },
+        {
+            "role": "user",
+            "content": (
+                f"Lesson title: {lesson['title']}\n"
+                f"Course ID: {lesson['course_id']}\n"
+                f"Action: {action}\n"
+                f"Instruction: {action_instruction}\n\n"
+                f"Lesson material:\n{lesson_material}\n\n"
+                f"User question: {custom_question if custom_question else 'No custom question provided.'}"
             ),
         },
     ]
@@ -440,6 +503,75 @@ async def lesson_tutor_stream(
                 yield _format_sse_data(SAFE_STREAM_ERROR)
             except Exception:
                 logger.exception("Unexpected error during lesson tutor stream")
+                yield _format_sse_data(SAFE_STREAM_ERROR)
+        finally:
+            db.close()
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+
+@router.get("/{lesson_id}/study-stream")
+async def lesson_study_stream(
+    request: Request,
+    lesson_id: str,
+    action: str,
+    question: str | None = Query(default=None),
+    step_index: int | None = Query(default=None),
+    token: str | None = Query(default=None),
+    db: Session = Depends(get_db),
+):
+    if not token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing token")
+
+    if action not in STUDY_ACTIONS:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid study action")
+
+    clean_question = (question or "").strip()
+    if action == "custom_question" and not clean_question:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Question cannot be empty")
+
+    current_user = auth.get_user_from_token(db, token)
+    lesson = get_lesson_or_404(lesson_id)
+    reading_steps = get_reading_steps_for_study(lesson, step_index)
+    openai_input = build_lesson_study_prompt(
+        lesson,
+        reading_steps,
+        action,
+        clean_question,
+    )
+
+    async def event_generator():
+        try:
+            try:
+                async for chunk in _stream_openai_text(openai_input):
+                    if await request.is_disconnected():
+                        logger.info(
+                            "Client disconnected from lesson study stream",
+                            extra={"lesson_id": lesson_id, "user_id": current_user.id},
+                        )
+                        return
+                    if chunk:
+                        yield _format_sse_data(chunk)
+            except AuthenticationError:
+                logger.exception("OpenAI authentication failed during lesson study stream")
+                yield _format_sse_data(SAFE_STREAM_ERROR)
+            except APITimeoutError:
+                logger.exception("OpenAI request timed out during lesson study stream")
+                yield _format_sse_data(SAFE_STREAM_ERROR)
+            except APIConnectionError:
+                logger.exception("OpenAI network connection failed during lesson study stream")
+                yield _format_sse_data(SAFE_STREAM_ERROR)
+            except APIStatusError:
+                logger.exception("OpenAI API returned an error status during lesson study stream")
+                yield _format_sse_data(SAFE_STREAM_ERROR)
+            except APIError:
+                logger.exception("OpenAI API error during lesson study stream")
+                yield _format_sse_data(SAFE_STREAM_ERROR)
+            except OpenAIError:
+                logger.exception("OpenAI error during lesson study stream")
+                yield _format_sse_data(SAFE_STREAM_ERROR)
+            except Exception:
+                logger.exception("Unexpected error during lesson study stream")
                 yield _format_sse_data(SAFE_STREAM_ERROR)
         finally:
             db.close()

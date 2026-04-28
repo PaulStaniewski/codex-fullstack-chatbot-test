@@ -2,8 +2,10 @@ from app import models
 from app.lessons import get_lesson
 from app.progress import XP_PER_LESSON_COMPLETION
 from app.routes.lesson_routes import (
+    build_lesson_study_prompt,
     build_lesson_tutor_prompt,
     build_practice_feedback_prompt,
+    get_reading_steps_for_study,
     parse_practice_feedback_metadata,
 )
 
@@ -329,6 +331,56 @@ def test_get_lesson_returns_step_completed_state(client):
     assert response.json()["steps"][1]["completed"] is True
     assert response.json()["steps"][1]["completed_at"] is not None
     assert response.json()["steps"][1]["xp_awarded"] == 10
+
+
+def test_lesson_study_stream_requires_auth(client):
+    response = client.get(
+        "/lessons/fastapi_intro/study-stream",
+        params={"action": "summarize"},
+    )
+
+    assert response.status_code == 401
+
+
+def test_lesson_study_stream_unknown_lesson_returns_404(client):
+    token = _register_and_login(client, "study-unknown@example.com")
+
+    response = client.get(
+        "/lessons/unknown/study-stream",
+        params={"action": "summarize", "token": token},
+    )
+
+    assert response.status_code == 404
+
+
+def test_lesson_study_stream_invalid_action_returns_400(client):
+    token = _register_and_login(client, "study-action@example.com")
+
+    response = client.get(
+        "/lessons/fastapi_intro/study-stream",
+        params={"action": "invalid", "token": token},
+    )
+
+    assert response.status_code == 400
+
+
+def test_lesson_study_prompt_includes_material_action_and_question():
+    lesson = get_lesson("fastapi_intro")
+    reading_steps = get_reading_steps_for_study(lesson)
+
+    prompt = build_lesson_study_prompt(
+        lesson,
+        reading_steps,
+        "custom_question",
+        "Why does this endpoint matter?",
+    )
+    combined_content = "\n".join(message["content"] for message in prompt)
+
+    assert lesson["title"] in combined_content
+    assert reading_steps[0]["title"] in combined_content
+    assert reading_steps[0]["content"] in combined_content
+    assert "custom_question" in combined_content
+    assert "Why does this endpoint matter?" in combined_content
 
 
 def test_lesson_tutor_stream_requires_auth(client):

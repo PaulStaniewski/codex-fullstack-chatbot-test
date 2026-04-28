@@ -74,6 +74,71 @@ export function streamLessonTutor({
   };
 }
 
+export function getLessonStudyStreamUrl({ lessonId, action, question, stepIndex, token }) {
+  const params = new URLSearchParams({
+    action,
+    token,
+  });
+
+  if (question) {
+    params.set("question", question);
+  }
+
+  if (stepIndex !== undefined && stepIndex !== null) {
+    params.set("step_index", String(stepIndex));
+  }
+
+  return `${getApiBaseUrl()}/lessons/${encodeURIComponent(lessonId)}/study-stream?${params.toString()}`;
+}
+
+export function streamLessonStudyAssistant({
+  lessonId,
+  action,
+  question,
+  stepIndex,
+  token,
+  onToken,
+  onError,
+  onDone,
+}) {
+  const stream = new EventSource(
+    getLessonStudyStreamUrl({ lessonId, action, question, stepIndex, token }),
+  );
+  let receivedContent = "";
+  let didFinalize = false;
+
+  stream.onmessage = (event) => {
+    receivedContent += event.data;
+    onToken?.(event.data, receivedContent);
+
+    if (receivedContent.startsWith("Error:")) {
+      didFinalize = true;
+      stream.close();
+      onError?.(receivedContent);
+      onDone?.(receivedContent);
+    }
+  };
+
+  stream.onerror = () => {
+    if (didFinalize) {
+      return;
+    }
+
+    didFinalize = true;
+    stream.close();
+    if (receivedContent) {
+      onDone?.(receivedContent);
+    } else {
+      onError?.("Unable to get study response.");
+    }
+  };
+
+  return () => {
+    didFinalize = true;
+    stream.close();
+  };
+}
+
 export function getPracticeFeedbackStreamUrl({ lessonId, stepIndex, answer, token }) {
   const params = new URLSearchParams({
     step_index: String(stepIndex),

@@ -1,8 +1,20 @@
 import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
-import { getPracticeHistory, streamLessonTutor, streamPracticeFeedback } from "../api.js";
+import {
+  getPracticeHistory,
+  streamLessonTutor,
+  streamLessonStudyAssistant,
+  streamPracticeFeedback,
+} from "../api.js";
 
-const QUICK_ACTIONS = ["Explain simply", "Give an example", "Why does this matter?"];
+const STUDY_ACTIONS = [
+  { action: "summarize", label: "Summarize" },
+  { action: "key_points", label: "Key points" },
+  { action: "explain", label: "Explain simply" },
+  { action: "example", label: "Give example" },
+  { action: "ask_questions", label: "Ask me questions" },
+];
+const TUTOR_QUICK_ACTIONS = ["Explain simply", "Give an example", "Why does this matter?"];
 const THEORY_STEP_TYPES = new Set([
   "intro",
   "concept",
@@ -11,6 +23,7 @@ const THEORY_STEP_TYPES = new Set([
   "example",
   "checklist",
   "summary",
+  "article",
 ]);
 
 function formatDifficulty(value) {
@@ -43,6 +56,10 @@ export default function LessonView({
   const [tutorAnswer, setTutorAnswer] = useState("");
   const [tutorError, setTutorError] = useState("");
   const [isTutorStreaming, setIsTutorStreaming] = useState(false);
+  const [studyQuestion, setStudyQuestion] = useState("");
+  const [studyAnswer, setStudyAnswer] = useState("");
+  const [studyError, setStudyError] = useState("");
+  const [isStudyStreaming, setIsStudyStreaming] = useState(false);
   const [practiceAnswer, setPracticeAnswer] = useState("");
   const [practiceFeedback, setPracticeFeedback] = useState("");
   const [practiceError, setPracticeError] = useState("");
@@ -51,6 +68,7 @@ export default function LessonView({
   const [selectedAttemptId, setSelectedAttemptId] = useState(null);
   const [historyError, setHistoryError] = useState("");
   const closeTutorStreamRef = useRef(null);
+  const closeStudyStreamRef = useRef(null);
   const closePracticeStreamRef = useRef(null);
 
   useEffect(() => {
@@ -58,6 +76,10 @@ export default function LessonView({
     setTutorAnswer("");
     setTutorError("");
     setIsTutorStreaming(false);
+    setStudyQuestion("");
+    setStudyAnswer("");
+    setStudyError("");
+    setIsStudyStreaming(false);
     setPracticeAnswer("");
     setPracticeFeedback("");
     setPracticeError("");
@@ -67,6 +89,8 @@ export default function LessonView({
     setHistoryError("");
     closeTutorStreamRef.current?.();
     closeTutorStreamRef.current = null;
+    closeStudyStreamRef.current?.();
+    closeStudyStreamRef.current = null;
     closePracticeStreamRef.current?.();
     closePracticeStreamRef.current = null;
   }, [lesson?.lesson_id, lesson?.current_step_index]);
@@ -87,6 +111,7 @@ export default function LessonView({
   useEffect(() => {
     return () => {
       closeTutorStreamRef.current?.();
+      closeStudyStreamRef.current?.();
       closePracticeStreamRef.current?.();
     };
   }, []);
@@ -133,6 +158,41 @@ export default function LessonView({
     return cleanValue.length > 84 ? `${cleanValue.slice(0, 81)}...` : cleanValue;
   }
 
+  function askStudyAssistant(action, question = "") {
+    const cleanQuestion = question.trim();
+    if (isStudyStreaming || (action === "custom_question" && !cleanQuestion)) {
+      return;
+    }
+
+    closeStudyStreamRef.current?.();
+    setStudyAnswer("");
+    setStudyError("");
+    setIsStudyStreaming(true);
+
+    closeStudyStreamRef.current = streamLessonStudyAssistant({
+      lessonId: lesson.lesson_id,
+      action,
+      question: cleanQuestion,
+      stepIndex: isTheoryStep ? lesson.current_step_index : null,
+      token,
+      onToken: (_chunk, fullAnswer) => {
+        setStudyAnswer(fullAnswer);
+      },
+      onError: (message) => {
+        setStudyError(message || "Unable to get study response.");
+      },
+      onDone: () => {
+        setIsStudyStreaming(false);
+        closeStudyStreamRef.current = null;
+      },
+    });
+  }
+
+  function handleTutorSubmit(event) {
+    event.preventDefault();
+    askTutor();
+  }
+
   function askTutor(question = tutorQuestion) {
     const cleanQuestion = question.trim();
     if (!cleanQuestion || isTutorStreaming) {
@@ -163,9 +223,9 @@ export default function LessonView({
     });
   }
 
-  function handleTutorSubmit(event) {
+  function handleStudySubmit(event) {
     event.preventDefault();
-    askTutor();
+    askStudyAssistant("custom_question", studyQuestion);
   }
 
   function requestPracticeFeedback() {
@@ -392,6 +452,55 @@ export default function LessonView({
         </div>
       ) : null}
 
+      {!lesson.completed ? (
+        <div className="lesson-card lesson-study-card">
+          <div className="lesson-card-header">
+            <div>
+              <p className="eyebrow">Study Assistant</p>
+              <h2>Study this lesson</h2>
+            </div>
+            {isStudyStreaming ? <span className="status-pill">Streaming</span> : null}
+          </div>
+
+          <div className="quick-actions">
+            {STUDY_ACTIONS.map((item) => (
+              <button
+                type="button"
+                key={item.action}
+                onClick={() => askStudyAssistant(item.action)}
+                disabled={isStudyStreaming}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+
+          <form className="lesson-tutor-form" onSubmit={handleStudySubmit}>
+            <textarea
+              value={studyQuestion}
+              onChange={(event) => setStudyQuestion(event.target.value)}
+              placeholder="Ask AI about this lesson..."
+              rows={3}
+              disabled={isStudyStreaming}
+            />
+            <button
+              className="primary-button"
+              type="submit"
+              disabled={!studyQuestion.trim() || isStudyStreaming}
+            >
+              {isStudyStreaming ? "Asking..." : "Ask AI"}
+            </button>
+          </form>
+
+          {studyError ? <p className="form-error">{studyError}</p> : null}
+          {studyAnswer ? (
+            <div className="lesson-tutor-answer">
+              <ReactMarkdown>{studyAnswer}</ReactMarkdown>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
       <div className="lesson-card lesson-tutor-card">
         <div className="lesson-card-header">
           <div>
@@ -402,7 +511,7 @@ export default function LessonView({
         </div>
 
         <div className="quick-actions">
-          {QUICK_ACTIONS.map((action) => (
+          {TUTOR_QUICK_ACTIONS.map((action) => (
             <button
               type="button"
               key={action}

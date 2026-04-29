@@ -230,7 +230,7 @@ export default function App() {
     setActiveView("chat");
     try {
       const data = await getLesson(lesson.lesson_id, token);
-      setActiveLesson(data);
+      setActiveLesson(data.completed ? { ...data, current_step_index: 0 } : data);
       await loadLessonProgress();
     } catch (err) {
       handleRequestError(err);
@@ -242,6 +242,23 @@ export default function App() {
 
   async function advanceLesson() {
     if (!activeLesson || isLessonLoading) {
+      return;
+    }
+
+    if (activeLesson.completed) {
+      setActiveLesson((currentLesson) => {
+        if (!currentLesson) {
+          return currentLesson;
+        }
+
+        return {
+          ...currentLesson,
+          current_step_index: Math.min(
+            currentLesson.current_step_index + 1,
+            currentLesson.steps.length - 1,
+          ),
+        };
+      });
       return;
     }
 
@@ -261,6 +278,23 @@ export default function App() {
     } finally {
       setIsLessonLoading(false);
     }
+  }
+
+  function previousLessonStep() {
+    if (!activeLesson || isLessonLoading) {
+      return;
+    }
+
+    setActiveLesson((currentLesson) => {
+      if (!currentLesson) {
+        return currentLesson;
+      }
+
+      return {
+        ...currentLesson,
+        current_step_index: Math.max(currentLesson.current_step_index - 1, 0),
+      };
+    });
   }
 
   async function markLessonStepRead(stepIndex) {
@@ -648,6 +682,7 @@ export default function App() {
             isLoading={isLessonLoading}
             isCompletingStep={isCompletingLessonStep}
             token={token}
+            onPreviousStep={previousLessonStep}
             onNextStep={advanceLesson}
             onMarkStepRead={markLessonStepRead}
           />

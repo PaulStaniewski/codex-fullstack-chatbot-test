@@ -12,8 +12,9 @@ from openai import (
     AuthenticationError,
     OpenAIError,
 )
-from sqlalchemy.orm import Session
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
 from app import auth, lessons, models, progress as progress_service, schemas
 from app.database import get_db
@@ -165,7 +166,19 @@ def get_or_create_lesson_step_progress(
         step_type=step_type,
     )
     db.add(step_progress)
-    db.flush()
+    try:
+        db.flush()
+    except IntegrityError:
+        db.rollback()
+        step_progress = (
+            db.query(models.LessonStepProgress)
+            .filter(
+                models.LessonStepProgress.user_id == user_id,
+                models.LessonStepProgress.lesson_id == lesson_id,
+                models.LessonStepProgress.step_index == step_index,
+            )
+            .one()
+        )
     return step_progress
 
 

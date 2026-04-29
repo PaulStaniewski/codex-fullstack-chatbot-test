@@ -736,7 +736,9 @@ input:focus,
 
 .lesson-view {
   display: grid;
+  width: 100%;
   min-height: 0;
+  min-width: 0;
   align-content: start;
   gap: 18px;
   overflow-y: auto;
@@ -745,6 +747,8 @@ input:focus,
 
 .lesson-card {
   display: grid;
+  min-width: 0;
+  width: 100%;
   max-width: 860px;
   gap: 22px;
   border: 1px solid var(--border);
@@ -825,13 +829,34 @@ input:focus,
 }
 
 .lesson-step-content {
+  min-width: 0;
+  max-width: 100%;
   color: var(--text-soft);
   font-size: 0.98rem;
   line-height: 1.65;
 }
 
+.lesson-content {
+  display: grid;
+  max-width: 100%;
+  gap: 1rem;
+  overflow-wrap: anywhere;
+  word-break: normal;
+  white-space: normal;
+  line-height: 1.7;
+  color: var(--text);
+}
+
+.lesson-content p {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
 .lesson-code {
+  max-width: 100%;
   overflow-x: auto;
+  white-space: pre;
+  word-break: normal;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   padding: 14px;
@@ -889,8 +914,25 @@ input:focus,
   color: var(--text-muted);
 }
 
-.lesson-tutor-card {
-  gap: 16px;
+.lesson-complete-review-banner {
+  display: grid;
+  gap: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  background: var(--surface-soft);
+  color: var(--text-muted);
+}
+
+.lesson-complete-review-banner strong {
+  color: var(--text);
+}
+
+.lesson-step-navigation {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .lesson-study-card {

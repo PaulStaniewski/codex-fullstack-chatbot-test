@@ -1,106 +1,4 @@
 LESSONS = {
-    "fastapi_intro": {
-        "lesson_id": "fastapi_intro",
-        "course_id": "fastapi",
-        "title": "FastAPI Introduction",
-        "difficulty": "easy",
-        "steps": [
-            {
-                "type": "intro",
-                "title": "What is FastAPI?",
-                "content": "FastAPI is a modern Python web framework for building HTTP APIs. It is popular because it lets developers describe request and response data with Python type hints while still keeping endpoint code small and readable.",
-            },
-            {
-                "type": "concept",
-                "title": "API functions become HTTP endpoints",
-                "content": "In FastAPI, a normal Python function becomes an API endpoint when it is connected to a path and method such as GET /health. The framework handles request routing, validation, response serialization, and OpenAPI documentation around that function.",
-            },
-            {
-                "type": "explanation",
-                "title": "Why developers use it",
-                "content": "FastAPI combines type hints, automatic validation, dependency injection, async support, and generated OpenAPI docs. That means a small amount of code can create an endpoint that is documented, testable, and predictable for frontend clients.",
-            },
-            {
-                "type": "example",
-                "title": "Minimal endpoint",
-                "content": "from fastapi import FastAPI\n\napp = FastAPI()\n\n@app.get('/health')\ndef health():\n    return {'status': 'ok'}",
-            },
-            {
-                "type": "checklist",
-                "title": "First endpoint checklist",
-                "content": "Choose the HTTP method, choose a clear path, keep the function focused, return JSON-friendly data, and test the endpoint from a browser or API client before adding more logic.",
-            },
-            {
-                "type": "practice",
-                "title": "Practice",
-                "difficulty": "easy",
-                "content": "In your own words, explain what the /health endpoint does and why a backend team might add one before deploying an API.",
-            },
-            {
-                "type": "summary",
-                "title": "Summary",
-                "content": "You learned what FastAPI is, why generated API docs help developers, and how a minimal endpoint turns a Python function into an HTTP response.",
-            },
-        ],
-    },
-    "fastapi_routing": {
-        "lesson_id": "fastapi_routing",
-        "course_id": "fastapi",
-        "title": "FastAPI Routing",
-        "difficulty": "easy",
-        "steps": [
-            {
-                "type": "intro",
-                "title": "Routes map requests",
-                "content": "A route connects an HTTP method and path to a Python function. It is the contract between the frontend or API client and the backend behavior that should run.",
-            },
-            {
-                "type": "explanation",
-                "title": "Path operations",
-                "content": "Decorators like @app.get('/items') and @app.post('/items') define path operations. The method communicates intent: GET reads data, POST creates data, PATCH updates part of a resource, and DELETE removes it.",
-            },
-            {
-                "type": "practice",
-                "title": "Practice",
-                "difficulty": "easy",
-                "content": "Describe how you would create a GET /health endpoint.",
-            },
-            {
-                "type": "summary",
-                "title": "Summary",
-                "content": "You learned how FastAPI routes organize API behavior by method and path, and why choosing a clear route shape makes frontend integration easier.",
-            },
-        ],
-    },
-    "fastapi_dependency": {
-        "lesson_id": "fastapi_dependency",
-        "course_id": "fastapi",
-        "title": "Dependency Injection",
-        "difficulty": "easy",
-        "steps": [
-            {
-                "type": "intro",
-                "title": "Reusable request logic",
-                "content": "Dependencies let you share authentication, database sessions, settings, authorization checks, and other request-time logic without copying it into every endpoint.",
-            },
-            {
-                "type": "example",
-                "title": "Depends",
-                "content": "from fastapi import Depends\n\ndef get_current_user():\n    return {'email': 'user@example.com'}\n\n@app.get('/me')\ndef me(user = Depends(get_current_user)):\n    return user\n\nThe endpoint declares that it needs a user. FastAPI resolves that dependency before calling the endpoint, which keeps request setup separate from endpoint behavior.",
-            },
-            {
-                "type": "practice",
-                "title": "Practice",
-                "difficulty": "easy",
-                "content": "Name one piece of request logic that would make sense as a dependency.",
-            },
-            {
-                "type": "summary",
-                "title": "Summary",
-                "content": "You learned how dependencies keep endpoint code focused, reusable, and easier to test as the API grows.",
-            },
-        ],
-    },
     "docker_basics": {
         "lesson_id": "docker_basics",
         "course_id": "docker",
@@ -109,706 +7,83 @@ LESSONS = {
         "steps": [
             {
                 "type": "intro",
-                "title": "Containers package apps",
-                "content": "Docker packages an application with the runtime, system packages, and language dependencies it needs. This helps a team run the same service more consistently on different machines.",
+                "title": "Why containers matter",
+                "content": """Docker solves a very ordinary engineering problem: software often works on one machine and fails on another because the runtime, operating system packages, environment variables, ports, and startup commands are different. A container gives the application a repeatable execution environment. Instead of telling every developer to install the right Python version, Node version, PostgreSQL client, system libraries, and shell tools manually, the project describes the environment in a Dockerfile and runs it as a container. This matters for fullstack teams because frontend, backend, database, and worker processes all need predictable setup. Docker does not remove the need to understand your app, but it makes the runtime easier to share, rebuild, inspect, and automate in development, CI, demos, and production-like training environments.""",
             },
             {
-                "type": "explanation",
-                "title": "Images and containers",
-                "content": "An image is a template built from instructions. A container is a running instance of that image. Rebuilding an image changes the template; restarting a container runs that template again.",
+                "type": "concept",
+                "title": "Images, containers, and reproducibility",
+                "content": """The core Docker concept is the difference between an image and a container. An image is a versioned template built from instructions: copy these files, install these packages, expose this port, and run this command. A container is a running instance of that image. This distinction solves a practical reproducibility problem. The team can rebuild the image when dependencies change, then run containers from that image in the same way on different machines. Docker also separates build-time concerns from run-time concerns. Installing dependencies belongs in the image build. Secrets, database URLs, and feature flags usually belong in environment variables at runtime. Use this model when you want a service to have a predictable filesystem and command, while still allowing configuration to change between local development, CI, and deployment.""",
+            },
+            {
+                "type": "deep_dive",
+                "title": "What Docker actually isolates",
+                "content": """A container is not a tiny virtual machine. It is a process running on the host kernel with isolation around its filesystem, process tree, networking, and environment. That is why containers start quickly and why they still depend on the host operating system capabilities. Docker builds images in layers. Each instruction in a Dockerfile can create a cached layer, which makes rebuilds faster when earlier layers do not change. This also creates edge cases: copying package files before the full source tree can improve cache behavior, while copying everything too early can force dependency reinstallations on every code change. Another common mistake is assuming files written inside a container are permanent. Container filesystems are disposable unless data is stored in a mounted volume. Good Docker usage means understanding what is baked into the image, what is supplied at runtime, what persists, and what disappears when the container is recreated.""",
             },
             {
                 "type": "example",
-                "title": "Common command",
-                "content": "docker compose up --build",
+                "title": "A small backend Dockerfile",
+                "content": """A simple Python backend image might start like this:\n\nFROM python:3.12-slim\nWORKDIR /app\nCOPY requirements.txt .\nRUN pip install --no-cache-dir -r requirements.txt\nCOPY . .\nCMD [\"uvicorn\", \"app.main:app\", \"--host\", \"0.0.0.0\", \"--port\", \"8000\"]\n\nFROM chooses the base runtime. WORKDIR creates a predictable application directory. COPY requirements.txt before copying the full source lets Docker reuse the dependency layer when only app code changes. RUN installs dependencies into the image. The second COPY adds the application code. CMD describes the default command when the container starts. The expected behavior is that the same image can start the API without relying on a developer's local Python environment. In a real project, you would also consider non-root users, healthchecks, build context size, and environment-specific configuration.""",
             },
             {
                 "type": "checklist",
                 "title": "Docker basics checklist",
-                "content": "Know which image is being built, which command starts the app, which ports are exposed, which environment variables are required, and whether any data should persist in a volume.",
+                "content": """- Confirm the Dockerfile starts from an appropriate base image for the language and runtime.\n- Keep dependency installation separate from application source copies so rebuilds stay fast.\n- Make the container command explicit and easy to inspect from logs or compose configuration.\n- Store runtime configuration in environment variables rather than hardcoding local paths or secrets.\n- Use volumes only for data that should survive container recreation.\n- Check which ports are exposed by the app and which ports are published to the host.\n- Rebuild the image when dependencies or Dockerfile instructions change, not just when code changes.""",
             },
             {
                 "type": "practice",
-                "title": "Practice",
+                "title": "Practice - Explain the runtime boundary",
                 "difficulty": "easy",
-                "content": "Describe the difference between a Docker image and a running container, then explain why docker compose up --build can be useful during local development.",
+                "content": "A teammate says Docker is unnecessary because the app already works on their laptop. Explain what problems Docker still solves for a fullstack team and what Docker does not automatically solve.",
             },
             {
                 "type": "summary",
                 "title": "Summary",
-                "content": "You learned how Docker images, containers, and Compose help run fullstack applications more consistently across environments.",
+                "content": """- Docker images are reusable templates; containers are running instances of those templates.\n- Containers isolate the app process and filesystem, but they are not full virtual machines.\n- Runtime configuration should stay outside the image when it changes by environment.\n- Container data is disposable unless it is stored in a volume or external service.\n- Good Dockerfiles improve reproducibility, build speed, and team onboarding.\n- Production Docker work still requires security, observability, and careful configuration.""",
             },
         ],
     },
-    "docker_startup_race_condition": {
-        "lesson_id": "docker_startup_race_condition",
+    "docker_compose_basics": {
+        "lesson_id": "docker_compose_basics",
         "course_id": "docker",
-        "title": "Docker Compose Startup Race Condition",
-        "difficulty": "medium",
-        "steps": [
-            {
-                "type": "intro",
-                "title": "Startup order is not readiness",
-                "content": "Docker Compose depends_on can start services in order, but it does not guarantee that PostgreSQL is ready to accept connections.",
-            },
-            {
-                "type": "concept",
-                "title": "Startup order is not a contract",
-                "content": "depends_on controls container start order, not application readiness. PostgreSQL may still be initializing files, accepting only local connections, or replaying logs when the backend tries to connect.",
-            },
-            {
-                "type": "deep_dive",
-                "title": "Readiness needs two layers",
-                "content": "Healthchecks help Compose understand service readiness, but the backend still needs application-level retry because networks, migrations, and database recovery can fail after a container is marked healthy.",
-            },
-            {
-                "type": "example",
-                "title": "Retry migrations before serving",
-                "content": "until alembic upgrade head; do\n  echo 'Database not ready, retrying...'\n  sleep 2\ndone\nuvicorn app.main:app --host 0.0.0.0 --port 8000",
-            },
-            {
-                "type": "checklist",
-                "title": "Startup reliability checklist",
-                "content": "Check database health, retry migrations with a limit, log each retry, fail loudly after timeout, and expose a backend health endpoint only after dependencies are ready.",
-            },
-            {
-                "type": "practice",
-                "title": "Practice 1 - Diagnose",
-                "difficulty": "medium",
-                "content": "A FastAPI container starts before PostgreSQL is ready and crashes with a connection refused error. Explain why depends_on did not prevent this failure.",
-            },
-            {
-                "type": "practice",
-                "title": "Practice 2 - Fix",
-                "difficulty": "hard",
-                "content": "Propose a Docker Compose and backend startup strategy that waits safely for PostgreSQL before running Alembic migrations and starting Uvicorn.",
-            },
-            {
-                "type": "practice",
-                "title": "Practice 3 - Production hardening",
-                "difficulty": "production",
-                "content": "Describe how you would make the startup flow resilient in production, including retry limits, logging, healthchecks, and what should happen if the database never becomes ready.",
-            },
-            {
-                "type": "summary",
-                "title": "Summary",
-                "content": "You learned why startup order can race database readiness and how healthchecks plus retries make container startup safer.",
-            },
-        ],
-    },
-    "alembic_missing_column": {
-        "lesson_id": "alembic_missing_column",
-        "course_id": "backend",
-        "title": "Debugging Alembic Missing Column Errors",
-        "difficulty": "medium",
-        "steps": [
-            {
-                "type": "intro",
-                "title": "What the error usually means",
-                "content": "A 'column does not exist' error often means your SQLAlchemy model expects a column that the actual database schema does not have yet.",
-            },
-            {
-                "type": "concept",
-                "title": "Model state vs migration state",
-                "content": "Changing a SQLAlchemy model updates Python expectations, but the database changes only after an Alembic migration is created and applied.",
-            },
-            {
-                "type": "deep_dive",
-                "title": "Why the app fails at runtime",
-                "content": "The ORM may generate SELECT, INSERT, or UPDATE statements that reference the new column. If production is still on an older migration revision, PostgreSQL rejects the query even though the code looks correct.",
-            },
-            {
-                "type": "example",
-                "title": "Useful Alembic checks",
-                "content": "alembic current\nalembic heads\nalembic upgrade head",
-            },
-            {
-                "type": "checklist",
-                "title": "Missing-column checklist",
-                "content": "Check the failing SQL, confirm the model contains the column, inspect alembic current, compare with alembic heads, then apply or repair the missing migration path.",
-            },
-            {
-                "type": "practice",
-                "title": "Practice 1 - Diagnose",
-                "difficulty": "medium",
-                "content": "A user sees: column user_progress.current_streak_days does not exist. Explain the most likely mismatch between SQLAlchemy models and the actual database schema.",
-            },
-            {
-                "type": "practice",
-                "title": "Practice 2 - Fix",
-                "difficulty": "hard",
-                "content": "Write the sequence of Alembic checks and commands you would run to confirm the current revision, compare it with heads, and apply the missing migration safely.",
-            },
-            {
-                "type": "practice",
-                "title": "Practice 3 - Production hardening",
-                "difficulty": "production",
-                "content": "Explain how you would prevent missing-column errors during deploys, including migration ordering, release checks, rollback thinking, and avoiding manual database edits.",
-            },
-            {
-                "type": "summary",
-                "title": "Summary",
-                "content": "You learned to compare model expectations with database migration state before changing application logic.",
-            },
-        ],
-    },
-    "alembic_revision_too_long": {
-        "lesson_id": "alembic_revision_too_long",
-        "course_id": "backend",
-        "title": "Alembic Revision ID Too Long",
-        "difficulty": "hard",
-        "steps": [
-            {
-                "type": "intro",
-                "title": "Revision IDs have practical limits",
-                "content": "Alembic revision identifiers are stored in the database and referenced by migration files, so overly long IDs can break tooling or exceed column limits.",
-            },
-            {
-                "type": "concept",
-                "title": "Revision IDs are stored data",
-                "content": "Alembic revision IDs are not just filenames. They are persisted in alembic_version and used to link migrations together.",
-            },
-            {
-                "type": "deep_dive",
-                "title": "Why generated names can fail",
-                "content": "Custom migration templates, branch names, or manual revisions can create identifiers longer than the database column allows. This turns migration metadata into a deploy blocker.",
-            },
-            {
-                "type": "example",
-                "title": "Typical symptom",
-                "content": "sqlalchemy.exc.DataError: value too long for type character varying(32)\n\nCheck the revision id in the migration file and the version_num column length.",
-            },
-            {
-                "type": "checklist",
-                "title": "Revision safety checklist",
-                "content": "Keep revision IDs short, avoid branch names as revision IDs, run migrations in CI, and review the revision and down_revision fields before merge.",
-            },
-            {
-                "type": "practice",
-                "title": "Practice 1 - Diagnose",
-                "difficulty": "medium",
-                "content": "A deploy fails while inserting a migration revision into alembic_version because the value is too long. Explain what you would inspect first and why.",
-            },
-            {
-                "type": "practice",
-                "title": "Practice 2 - Fix",
-                "difficulty": "hard",
-                "content": "Describe a safe fix for an overly long Alembic revision ID before it has been deployed to shared environments.",
-            },
-            {
-                "type": "practice",
-                "title": "Practice 3 - Production hardening",
-                "difficulty": "production",
-                "content": "Design a migration review rule that prevents invalid revision IDs from reaching CI or production.",
-            },
-            {
-                "type": "summary",
-                "title": "Summary",
-                "content": "You learned how revision ID length can break migrations and how to catch invalid migration metadata early.",
-            },
-        ],
-    },
-    "duplicate_migration_head": {
-        "lesson_id": "duplicate_migration_head",
-        "course_id": "backend",
-        "title": "Duplicate Alembic Migration Head",
-        "difficulty": "hard",
-        "steps": [
-            {
-                "type": "intro",
-                "title": "Multiple heads mean branches diverged",
-                "content": "Alembic can report multiple heads when two migration files were created from the same previous revision.",
-            },
-            {
-                "type": "concept",
-                "title": "Migration graphs can branch",
-                "content": "Each migration points to a down_revision. If two migrations point to the same parent, Alembic sees two valid latest revisions instead of one linear path.",
-            },
-            {
-                "type": "deep_dive",
-                "title": "Why teams hit this",
-                "content": "Parallel feature branches often add migrations independently. The conflict may not appear until the branches are merged and CI tries to upgrade to head.",
-            },
-            {
-                "type": "example",
-                "title": "Useful commands",
-                "content": "alembic heads\nalembic history --verbose\nalembic merge -m \"merge heads\" <head_a> <head_b>",
-            },
-            {
-                "type": "checklist",
-                "title": "Multiple-head checklist",
-                "content": "Run alembic heads, inspect both migration branches, confirm both schema changes are valid, create a merge migration, and rerun upgrade from a clean database.",
-            },
-            {
-                "type": "practice",
-                "title": "Practice 1 - Diagnose",
-                "difficulty": "medium",
-                "content": "CI fails with 'Multiple head revisions are present'. Explain what this says about the migration graph and how you would identify the divergent heads.",
-            },
-            {
-                "type": "practice",
-                "title": "Practice 2 - Fix",
-                "difficulty": "hard",
-                "content": "Describe how to create and review an Alembic merge migration without losing either branch's schema changes.",
-            },
-            {
-                "type": "practice",
-                "title": "Practice 3 - Production hardening",
-                "difficulty": "production",
-                "content": "Propose a CI check and team workflow that prevents duplicate migration heads from surprising production deploys.",
-            },
-            {
-                "type": "summary",
-                "title": "Summary",
-                "content": "You learned how duplicate heads happen and how merge migrations restore a single migration path.",
-            },
-        ],
-    },
-    "missing_foreign_key_constraint": {
-        "lesson_id": "missing_foreign_key_constraint",
-        "course_id": "backend",
-        "title": "Missing Foreign Key Constraint",
-        "difficulty": "hard",
-        "steps": [
-            {
-                "type": "intro",
-                "title": "Relationships need database enforcement",
-                "content": "A SQLAlchemy relationship in code does not guarantee the database enforces referential integrity unless the schema includes a foreign key constraint.",
-            },
-            {
-                "type": "concept",
-                "title": "Application relationships are not constraints",
-                "content": "SQLAlchemy relationships help Python navigate objects, but the database needs an actual foreign key to enforce valid references.",
-            },
-            {
-                "type": "deep_dive",
-                "title": "What goes wrong",
-                "content": "Without a real foreign key, orphan rows can survive deletes, joins can hide data quality issues, and later migrations may fail when they try to enforce integrity.",
-            },
-            {
-                "type": "example",
-                "title": "Constraint shape",
-                "content": "user_id = Column(Integer, ForeignKey('users.id'), nullable=False)\n\nCheck the generated Alembic migration includes op.create_foreign_key or a ForeignKey column.",
-            },
-            {
-                "type": "checklist",
-                "title": "Constraint review checklist",
-                "content": "Verify the model has ForeignKey, the migration creates the constraint, existing rows are valid, delete behavior is intentional, and indexes support common joins.",
-            },
-            {
-                "type": "practice",
-                "title": "Practice 1 - Diagnose",
-                "difficulty": "medium",
-                "content": "Practice submissions have a user_id column but deleting a user leaves orphan submissions. Explain what schema issue you suspect and how you would confirm it.",
-            },
-            {
-                "type": "practice",
-                "title": "Practice 2 - Fix",
-                "difficulty": "hard",
-                "content": "Describe how to add the missing foreign key safely, including how you would handle existing orphan rows before applying the constraint.",
-            },
-            {
-                "type": "practice",
-                "title": "Practice 3 - Production hardening",
-                "difficulty": "production",
-                "content": "Create a checklist for reviewing migrations that add user-owned tables so missing constraints and cascade behavior are caught early.",
-            },
-            {
-                "type": "summary",
-                "title": "Summary",
-                "content": "You learned why relationships should be backed by database constraints and how to repair missing foreign keys safely.",
-            },
-        ],
-    },
-    "sse_eventsource_auth": {
-        "lesson_id": "sse_eventsource_auth",
-        "course_id": "frontend",
-        "title": "SSE Authentication with EventSource",
+        "title": "Docker Compose Basics",
         "difficulty": "easy",
         "steps": [
             {
                 "type": "intro",
-                "title": "EventSource has header limits",
-                "content": "The browser EventSource API does not let you attach custom Authorization headers like fetch does.",
+                "title": "Why Compose exists",
+                "content": """A fullstack application rarely consists of one process. A realistic development setup may include a React frontend, a FastAPI backend, PostgreSQL, a migration command, and sometimes a cache or background worker. Starting each service manually creates hidden setup knowledge: which terminal starts which command, which ports must be open, which environment variables are required, and which service must exist before another one can work. Docker Compose turns that operational knowledge into a versioned file. This is valuable because setup becomes repeatable instead of tribal. A new developer can run one command and see the same service layout as everyone else. Compose is not only a local convenience; it is a way to learn service boundaries, networking, persistence, and startup behavior in a controlled environment.""",
             },
             {
                 "type": "concept",
-                "title": "EventSource authentication tradeoff",
-                "content": "EventSource is simple for browser streaming, but it cannot attach custom Authorization headers. Many apps use a short-lived token in the URL instead.",
+                "title": "A service graph in configuration",
+                "content": """Docker Compose describes a group of services and the relationships between them. A service is a role in the system, such as backend, frontend, or db. Each service can define an image, build context, command, environment variables, ports, volumes, and healthchecks. Compose also creates a project network where services can reach each other by service name. This solves the problem of coordinating multiple processes consistently. Instead of documenting separate commands in a README and hoping every person runs them correctly, the compose file becomes executable documentation. Use Compose for local development, integration tests, demos, and benchmark projects where repeatability matters. It is especially useful for teaching because it makes dependencies visible: the backend depends on the database, the frontend depends on the API, and persistent state depends on volumes.""",
             },
             {
                 "type": "deep_dive",
-                "title": "Why query tokens are sensitive",
-                "content": "URLs can appear in access logs, browser history, analytics tools, and error reports. Query-token SSE should use HTTPS, short lifetimes, and log redaction.",
+                "title": "How Compose wiring behaves",
+                "content": """When docker compose up runs, Compose reads the YAML file, creates a default network, creates named volumes if needed, builds missing images, and starts containers for each service. Services on the same network can communicate using service names as DNS hostnames. That means a backend container should connect to PostgreSQL with host db, not localhost. Inside the backend container, localhost means the backend container itself. Compose also manages host port publishing separately from internal service communication. A port mapping like 8000:8000 lets your browser reach the backend from the host, but other containers usually use the service name and container port. Edge cases include stale named volumes, old images that were not rebuilt, environment variables interpolated on the host instead of passed into containers, and depends_on being mistaken for a readiness guarantee. Compose gives structure, but the application still needs explicit readiness and error handling.""",
             },
             {
                 "type": "example",
-                "title": "Authenticated stream URL",
-                "content": "/chat-stream?message=Explain%20SSE&token=<jwt>",
+                "title": "Compose file for a small API stack",
+                "content": """A minimal API stack can be described like this:\n\nservices:\n  backend:\n    build: ./backend\n    ports:\n      - \"8000:8000\"\n    environment:\n      DATABASE_URL: postgresql://postgres:postgres@db:5432/app\n    depends_on:\n      - db\n  db:\n    image: postgres:16\n    environment:\n      POSTGRES_DB: app\n      POSTGRES_USER: postgres\n      POSTGRES_PASSWORD: postgres\n    volumes:\n      - postgres_data:/var/lib/postgresql/data\n\nvolumes:\n  postgres_data:\n\nThe backend builds from local source and publishes port 8000 to the host. DATABASE_URL points to db because db is the service name. The db service initializes PostgreSQL and stores data in a named volume. The expected behavior is that containers share a network and the database keeps data after restarts. This is still not production complete: readiness checks, secrets management, and safer startup commands are still needed.""",
             },
             {
                 "type": "checklist",
-                "title": "SSE auth checklist",
-                "content": "Use HTTPS, keep stream tokens short-lived, redact query strings in logs, handle 401 clearly, and close EventSource when the stream finishes or fails.",
+                "title": "Compose review checklist",
+                "content": """- Name services by their role so connection strings are readable and stable.\n- Use service names for container-to-container hostnames instead of localhost.\n- Publish only ports that humans or external tools need from the host machine.\n- Store database files in named volumes when data should survive container recreation.\n- Keep required environment variables explicit and avoid committing real secrets.\n- Rebuild images after dependency or Dockerfile changes, not only after source code changes.\n- Add healthchecks or retry behavior for services that depend on databases, queues, or external APIs.""",
             },
             {
                 "type": "practice",
-                "title": "Practice 1 - Diagnose",
-                "difficulty": "medium",
-                "content": "A team uses /chat-stream?token=<jwt> for EventSource. Identify one concrete place that token might leak and why EventSource pushed the team toward this design.",
-            },
-            {
-                "type": "practice",
-                "title": "Practice 2 - Fix",
-                "difficulty": "hard",
-                "content": "Propose a safer SSE authentication approach or mitigation plan for query-token streams while keeping browser EventSource compatibility.",
-            },
-            {
-                "type": "practice",
-                "title": "Practice 3 - Production hardening",
-                "difficulty": "production",
-                "content": "Design a production policy for SSE tokens that considers short lifetimes, logging redaction, HTTPS, refresh behavior, and what the client should do on auth failure.",
+                "title": "Practice - Design a local stack",
+                "difficulty": "easy",
+                "content": "Sketch a Compose setup for a React, FastAPI, and PostgreSQL application. Explain which services need ports, which services need volumes, and how the backend should connect to the database.",
             },
             {
                 "type": "summary",
                 "title": "Summary",
-                "content": "You learned why SSE authentication often needs careful tradeoffs when using browser EventSource.",
-            },
-        ],
-    },
-    "eventsource_token_expired": {
-        "lesson_id": "eventsource_token_expired",
-        "course_id": "frontend",
-        "title": "EventSource Token Expired",
-        "difficulty": "production",
-        "steps": [
-            {
-                "type": "intro",
-                "title": "Long streams can outlive tokens",
-                "content": "SSE connections may stay open long enough for a JWT or short-lived stream token to expire while the user is still interacting.",
-            },
-            {
-                "type": "concept",
-                "title": "Expiration is a normal stream state",
-                "content": "A token can expire before a user starts a new stream or while the UI still appears signed in. The client needs a clear recovery path.",
-            },
-            {
-                "type": "deep_dive",
-                "title": "How expiration appears",
-                "content": "The server may reject a new stream with 401, close an active stream, or send a safe SSE error depending on whether auth is checked before or during streaming.",
-            },
-            {
-                "type": "example",
-                "title": "Client recovery path",
-                "content": "eventSource.onerror = () => {\n  showFriendlyError('Your session expired. Please sign in again.');\n  eventSource.close();\n}",
-            },
-            {
-                "type": "checklist",
-                "title": "Expired-token checklist",
-                "content": "Detect auth failures separately from network errors, close the stream, avoid retry loops, preserve the user's draft, and route the user to sign in again.",
-            },
-            {
-                "type": "practice",
-                "title": "Practice 1 - Diagnose",
-                "difficulty": "medium",
-                "content": "A user can load conversations but every new EventSource stream immediately fails after their token expires. Explain how you would distinguish auth expiration from a network failure.",
-            },
-            {
-                "type": "practice",
-                "title": "Practice 2 - Fix",
-                "difficulty": "hard",
-                "content": "Design a frontend and backend response flow for expired SSE tokens that avoids duplicate messages and gives the user a clear next action.",
-            },
-            {
-                "type": "practice",
-                "title": "Practice 3 - Production hardening",
-                "difficulty": "production",
-                "content": "Propose a secure token lifetime and refresh strategy for SSE that balances usability, logging risk, and forced logout behavior.",
-            },
-            {
-                "type": "summary",
-                "title": "Summary",
-                "content": "You learned how token expiration affects EventSource streams and how clients should recover safely.",
-            },
-        ],
-    },
-    "duplicate_stream_messages": {
-        "lesson_id": "duplicate_stream_messages",
-        "course_id": "frontend",
-        "title": "Duplicate Stream Messages",
-        "difficulty": "hard",
-        "steps": [
-            {
-                "type": "intro",
-                "title": "Streaming UI can duplicate state",
-                "content": "A live assistant bubble can appear twice if the UI both appends streamed content and reloads persisted messages without reconciliation.",
-            },
-            {
-                "type": "concept",
-                "title": "One response needs one identity",
-                "content": "A streamed response should have a stable temporary identity so chunks update the same bubble instead of creating new messages.",
-            },
-            {
-                "type": "deep_dive",
-                "title": "Where duplication comes from",
-                "content": "Duplicate messages often happen when optimistic UI state, final persisted state, reload-after-stream logic, and retry handling all append separate assistant entries.",
-            },
-            {
-                "type": "example",
-                "title": "Stable live message pattern",
-                "content": "Use one temporary assistant message during streaming, update its content as chunks arrive, then finalize that same message instead of appending another one.",
-            },
-            {
-                "type": "checklist",
-                "title": "Streaming state checklist",
-                "content": "Create one live assistant bubble, append chunks into it, finalize it in place, skip immediate full reloads, and guard retry paths from duplicating user messages.",
-            },
-            {
-                "type": "practice",
-                "title": "Practice 1 - Diagnose",
-                "difficulty": "medium",
-                "content": "A chat UI shows two identical assistant answers after streaming completes. Explain which state transitions you would inspect first.",
-            },
-            {
-                "type": "practice",
-                "title": "Practice 2 - Fix",
-                "difficulty": "hard",
-                "content": "Describe a simple message-state approach that keeps one live assistant bubble during streaming and prevents duplicate final messages.",
-            },
-            {
-                "type": "practice",
-                "title": "Practice 3 - Production hardening",
-                "difficulty": "production",
-                "content": "Design a retry and reconnect strategy that prevents duplicate user or assistant messages when a stream fails midway.",
-            },
-            {
-                "type": "summary",
-                "title": "Summary",
-                "content": "You learned how stable message identity keeps streamed chat responses from duplicating or flickering.",
-            },
-        ],
-    },
-    "openai_streaming_errors": {
-        "lesson_id": "openai_streaming_errors",
-        "course_id": "ai",
-        "title": "Handling OpenAI Streaming Errors",
-        "difficulty": "medium",
-        "steps": [
-            {
-                "type": "intro",
-                "title": "Streams can fail mid-response",
-                "content": "AI streaming depends on network, provider, and client connections, so failures can happen after a response has already started.",
-            },
-            {
-                "type": "concept",
-                "title": "Streaming errors need safe boundaries",
-                "content": "A streamed response may fail after the HTTP connection starts, so the backend needs a safe way to tell the client that generation did not complete.",
-            },
-            {
-                "type": "deep_dive",
-                "title": "Graceful SSE error events",
-                "content": "A safe streamed error lets the client show a friendly message without crashing the server, leaking provider details, or saving incomplete assistant output.",
-            },
-            {
-                "type": "example",
-                "title": "Safe fallback message",
-                "content": "SAFE_STREAM_ERROR = 'Error: Unable to generate response.'\nyield format_sse_data(SAFE_STREAM_ERROR)",
-            },
-            {
-                "type": "checklist",
-                "title": "AI stream error checklist",
-                "content": "Catch provider errors, timeouts, network failures, auth failures, and client disconnects. Show a safe message, log the real cause, and avoid persisting failed output.",
-            },
-            {
-                "type": "practice",
-                "title": "Practice 1 - Diagnose",
-                "difficulty": "medium",
-                "content": "A streamed AI response stops halfway through. Explain which parts of the system could have failed and why the backend should avoid saving a partial assistant message.",
-            },
-            {
-                "type": "practice",
-                "title": "Practice 2 - Fix",
-                "difficulty": "hard",
-                "content": "Describe the backend and frontend behavior you would implement to send a safe SSE error and show a retry option without duplicating messages.",
-            },
-            {
-                "type": "practice",
-                "title": "Practice 3 - Production hardening",
-                "difficulty": "production",
-                "content": "Explain how you would monitor and harden AI streaming failures in production, including timeout handling, provider errors, client disconnects, and user-facing recovery.",
-            },
-            {
-                "type": "summary",
-                "title": "Summary",
-                "content": "You learned how safe SSE errors protect the user experience and keep persistence logic clean.",
-            },
-        ],
-    },
-    "openai_rate_limit_handling": {
-        "lesson_id": "openai_rate_limit_handling",
-        "course_id": "ai",
-        "title": "OpenAI Rate Limit Handling",
-        "difficulty": "production",
-        "steps": [
-            {
-                "type": "intro",
-                "title": "Provider limits are normal",
-                "content": "AI applications must expect rate limits from upstream providers and respond without crashing or overwhelming the provider.",
-            },
-            {
-                "type": "concept",
-                "title": "Rate limits are backpressure",
-                "content": "Provider rate limits protect shared capacity. Your app should slow down gracefully instead of retrying aggressively or exposing raw provider errors.",
-            },
-            {
-                "type": "deep_dive",
-                "title": "User-safe backpressure",
-                "content": "Good rate-limit handling combines clear user messaging, retry-after behavior, local per-user throttling, and logs that help operators tune usage.",
-            },
-            {
-                "type": "example",
-                "title": "Safe response",
-                "content": "If the provider returns a rate limit error, stream or return a friendly message such as: 'The AI service is busy. Please try again shortly.'",
-            },
-            {
-                "type": "checklist",
-                "title": "Rate-limit checklist",
-                "content": "Limit per user, respect retry timing, avoid duplicate retries, log provider status, expose friendly UI recovery, and monitor saturation trends.",
-            },
-            {
-                "type": "practice",
-                "title": "Practice 1 - Diagnose",
-                "difficulty": "medium",
-                "content": "Users report intermittent AI failures during busy periods. Explain how you would determine whether provider rate limits are the root cause.",
-            },
-            {
-                "type": "practice",
-                "title": "Practice 2 - Fix",
-                "difficulty": "hard",
-                "content": "Design a minimal backend strategy for catching OpenAI rate limit errors and returning a safe SSE error without saving a failed assistant response.",
-            },
-            {
-                "type": "practice",
-                "title": "Practice 3 - Production hardening",
-                "difficulty": "production",
-                "content": "Propose a production plan for per-user limits, retry timing, monitoring, and communicating provider saturation to users.",
-            },
-            {
-                "type": "summary",
-                "title": "Summary",
-                "content": "You learned how to handle AI provider rate limits with graceful user experience and operational backpressure.",
-            },
-        ],
-    },
-    "partial_stream_failure": {
-        "lesson_id": "partial_stream_failure",
-        "course_id": "ai",
-        "title": "Partial Stream Failure",
-        "difficulty": "hard",
-        "steps": [
-            {
-                "type": "intro",
-                "title": "Partial output is risky",
-                "content": "A stream can fail after sending useful-looking text, but the response may be incomplete, misleading, or unsafe to persist as final.",
-            },
-            {
-                "type": "concept",
-                "title": "Draft text is not final content",
-                "content": "While a stream is active, the UI is showing draft output. It should not be treated as a complete assistant answer until the stream finishes successfully.",
-            },
-            {
-                "type": "deep_dive",
-                "title": "Finalization matters",
-                "content": "Applications should distinguish between streamed draft content, failed partial content, and successfully completed assistant messages before writing to history.",
-            },
-            {
-                "type": "example",
-                "title": "State transition",
-                "content": "streaming -> completed: save assistant message\nstreaming -> failed: show retry and avoid persisting incomplete assistant output",
-            },
-            {
-                "type": "checklist",
-                "title": "Partial-stream checklist",
-                "content": "Track stream state, keep a retry action, avoid saving failed drafts, log where the stream failed, and make reload behavior reconcile with the last known final message.",
-            },
-            {
-                "type": "practice",
-                "title": "Practice 1 - Diagnose",
-                "difficulty": "medium",
-                "content": "A user sees half an answer and then an error. Explain why persisting that partial text as a normal assistant message could cause product and data problems.",
-            },
-            {
-                "type": "practice",
-                "title": "Practice 2 - Fix",
-                "difficulty": "hard",
-                "content": "Describe backend and frontend changes that separate live streamed text from final persisted assistant content.",
-            },
-            {
-                "type": "practice",
-                "title": "Practice 3 - Production hardening",
-                "difficulty": "production",
-                "content": "Design observability and recovery behavior for partial stream failures, including logs, metrics, retry UI, and client disconnect handling.",
-            },
-            {
-                "type": "summary",
-                "title": "Summary",
-                "content": "You learned why partial streams need explicit failure handling before content is treated as final.",
-            },
-        ],
-    },
-    "sqlAlchemy_user_scoped_queries": {
-        "lesson_id": "sqlAlchemy_user_scoped_queries",
-        "course_id": "backend",
-        "title": "User-Scoped Database Queries",
-        "difficulty": "production",
-        "steps": [
-            {
-                "type": "intro",
-                "title": "Every owned query needs user scope",
-                "content": "When data belongs to a user, queries should filter by both the resource identifier and current user_id.",
-            },
-            {
-                "type": "concept",
-                "title": "Ownership belongs in every query",
-                "content": "For user-owned resources, the authenticated user_id should be part of the query condition, not just checked in UI state.",
-            },
-            {
-                "type": "deep_dive",
-                "title": "Preventing cross-user leaks",
-                "content": "Filtering only by a public or guessable identifier can expose another user's conversations, lessons, or submissions. This becomes a security incident, not just a bug.",
-            },
-            {
-                "type": "example",
-                "title": "Scoped query pattern",
-                "content": "db.query(PracticeSubmission).filter(\n    PracticeSubmission.user_id == current_user.id,\n    PracticeSubmission.lesson_id == lesson_id,\n)",
-            },
-            {
-                "type": "checklist",
-                "title": "User-scope checklist",
-                "content": "Filter by current_user.id, test with two users, avoid trusting client IDs, review export/history endpoints, and add database constraints where ownership is required.",
-            },
-            {
-                "type": "practice",
-                "title": "Practice 1 - Diagnose",
-                "difficulty": "medium",
-                "content": "A practice history query filters only by lesson_id. Explain how this can leak another user's submissions in a multi-user application.",
-            },
-            {
-                "type": "practice",
-                "title": "Practice 2 - Fix",
-                "difficulty": "hard",
-                "content": "Rewrite the query conceptually so practice history is scoped to both lesson_id and the authenticated current_user.id.",
-            },
-            {
-                "type": "practice",
-                "title": "Practice 3 - Production hardening",
-                "difficulty": "production",
-                "content": "Describe a review checklist or test strategy that would catch missing user_id filters across conversations, lesson progress, and practice submissions.",
-            },
-            {
-                "type": "summary",
-                "title": "Summary",
-                "content": "You learned why user-scoped filters are a core backend safety habit for multi-user apps.",
+                "content": """- Compose describes a multi-service development environment in one file.\n- Services communicate by service name on the Compose network.\n- Host port mappings are separate from internal container networking.\n- Named volumes preserve state across container recreation.\n- depends_on helps with order but does not prove readiness.\n- A good compose file is both runnable infrastructure and useful documentation.""",
             },
         ],
     },
@@ -816,55 +91,55 @@ LESSONS = {
         "lesson_id": "postgres_container_not_ready",
         "course_id": "docker",
         "title": "Postgres Container Not Ready",
-        "difficulty": "hard",
+        "difficulty": "medium",
         "steps": [
             {
                 "type": "intro",
-                "title": "Running is not ready",
-                "content": "A PostgreSQL container can be running while the database is still initializing and not yet accepting application connections.",
+                "title": "The container is running, but Postgres is not ready",
+                "content": """A PostgreSQL container can be running before the database is actually ready for application work. This creates one of the most common Docker Compose failures: the backend starts, immediately tries to connect, and crashes with connection refused, timeout, or authentication errors. A restart often appears to fix it because PostgreSQL finished initializing while the developer was reading the logs. That makes the problem feel random, but it is a startup sequencing issue. This matters in local development, CI, and deployment pipelines because unreliable startup reduces trust in the environment. A dependable Docker setup does not assume that a running container means a usable database. It verifies readiness with checks that match the real application connection and uses bounded retries around startup work such as migrations.""",
             },
             {
                 "type": "concept",
-                "title": "Database readiness is observable",
-                "content": "A database service should be considered ready only when it can accept the same kind of connection the application will use.",
+                "title": "Readiness means useful work can happen",
+                "content": """Database readiness means the database can perform the operation the application needs now. For a FastAPI backend, that usually means resolving the database hostname, opening a TCP connection, authenticating as the configured user, selecting the configured database, and running a simple query or migration. This concept solves the gap between process status and service capability. Docker can tell you that a container process exists, but only PostgreSQL can prove that it is accepting the same kind of connection the backend will use. Use readiness checks before running migrations, before marking an API healthy, and before allowing dependent services to handle traffic. Strong readiness checks use the real host, user, and database rather than only checking whether port 5432 is open.""",
             },
             {
                 "type": "deep_dive",
-                "title": "Initialization takes time",
-                "content": "Startup scripts, volume initialization, WAL recovery, and container networking can all delay database readiness after the process starts.",
+                "title": "Postgres startup phases and hidden state",
+                "content": """The official PostgreSQL image performs several phases during startup. On a fresh volume it creates the database cluster, applies environment-based initialization, may run scripts from docker-entrypoint-initdb.d, and then starts the server. On an existing volume it skips some initialization but may still replay logs, recover from an unclean shutdown, or wait on disk operations. During parts of this lifecycle, the container is alive but PostgreSQL is not ready for the backend's connection. Edge cases include wrong database names, credentials that changed after a volume was created, slow CI disks, old local volumes preserving unexpected state, and Compose networks that were recreated while containers were still restarting. A common mistake is adding a fixed sleep. Sleeps hide the race when the machine is fast and fail again when the environment is slower. A better design uses pg_isready plus application-level retry with clear logs and a deadline.""",
             },
             {
                 "type": "example",
-                "title": "Readiness check",
-                "content": "pg_isready -U postgres -d app_db\n\nUse readiness checks with retries instead of assuming the port is ready immediately.",
+                "title": "Database-aware readiness check",
+                "content": """A useful readiness check targets the same service identity the app uses:\n\npg_isready -h db -U postgres -d app\n\nThe -h db option uses the Compose service name. The -U postgres option checks the configured user. The -d app option checks the intended database. In Compose, this can become a healthcheck, while the backend still retries its startup operation:\n\nuntil alembic upgrade head; do\n  echo \"Database not ready for migrations, retrying...\"\n  sleep 2\ndone\nuvicorn app.main:app --host 0.0.0.0 --port 8000\n\nThe expected behavior is not infinite waiting. Normal initialization should delay startup briefly. Bad credentials, missing databases, or broken migrations should eventually fail with logs that explain which operation could not complete.""",
             },
             {
                 "type": "checklist",
                 "title": "Postgres readiness checklist",
-                "content": "Use pg_isready with the real database/user, retry with limits, log connection failures, keep migrations idempotent, and alert if readiness never succeeds.",
+                "content": """- Read the exact error: connection refused, timeout, authentication failed, and unknown database point to different causes.\n- Run readiness checks from inside the Compose network so hostname and routing match the backend.\n- Confirm DATABASE_URL uses the database service name, not localhost.\n- Check that POSTGRES_DB, POSTGRES_USER, and POSTGRES_PASSWORD match the backend connection string.\n- Inspect Postgres logs for initialization, recovery, permissions, or script failures.\n- Treat persistent volumes as possible hidden state when environment variables changed.\n- Wrap migrations or startup queries in bounded retry logic with clear failure messages.""",
             },
             {
                 "type": "practice",
                 "title": "Practice 1 - Diagnose",
                 "difficulty": "medium",
-                "content": "A backend fails on the first deploy attempt but works after docker compose restart. Explain why this points to a database readiness race.",
+                "content": "A backend fails on first compose up with connection refused, then works after docker compose restart. Diagnose why this points to readiness rather than a missing dependency.",
             },
             {
                 "type": "practice",
                 "title": "Practice 2 - Fix",
                 "difficulty": "hard",
-                "content": "Describe a startup sequence that waits for PostgreSQL readiness before running migrations or accepting traffic.",
+                "content": "Design a startup script that waits for PostgreSQL by retrying the real migration command with a maximum wait time and useful logs.",
             },
             {
                 "type": "practice",
                 "title": "Practice 3 - Production hardening",
                 "difficulty": "production",
-                "content": "Explain how to handle repeated readiness failures with retry limits, clear logs, container health, and alerting.",
+                "content": "Explain how you would adapt this local readiness pattern for production, including health endpoints, migration ownership, alerts, and what should happen if the database never becomes ready.",
             },
             {
                 "type": "summary",
                 "title": "Summary",
-                "content": "You learned why PostgreSQL readiness needs explicit checks in containerized applications.",
+                "content": """- A running database container is not the same as a ready database service.\n- Readiness checks should use the same host, user, and database as the application.\n- Fixed sleeps are fragile because startup time changes across machines and environments.\n- Application-level retry should be bounded and should log the failing operation.\n- Persistent volumes can preserve old state and make configuration changes confusing.\n- Reliable startup combines database-aware checks, migration retry, and clear failure behavior.""",
             },
         ],
     },
@@ -872,713 +147,699 @@ LESSONS = {
         "lesson_id": "docker_healthcheck_missing",
         "course_id": "docker",
         "title": "Docker Healthcheck Missing",
-        "difficulty": "production",
-        "steps": [
-            {
-                "type": "intro",
-                "title": "Containers need health signals",
-                "content": "Without healthchecks, orchestration tools may treat a process as healthy even when the application cannot serve real requests.",
-            },
-            {
-                "type": "concept",
-                "title": "Health is a product signal",
-                "content": "A useful healthcheck answers whether the service should receive traffic, not merely whether a process exists.",
-            },
-            {
-                "type": "deep_dive",
-                "title": "Healthchecks describe behavior",
-                "content": "A good healthcheck verifies the service is actually ready, such as an API returning /health only after dependencies are reachable or a database accepting connections.",
-            },
-            {
-                "type": "example",
-                "title": "Compose healthcheck",
-                "content": "healthcheck:\n  test: [\"CMD\", \"curl\", \"-f\", \"http://localhost:8000/health\"]\n  interval: 10s\n  timeout: 3s\n  retries: 5",
-            },
-            {
-                "type": "checklist",
-                "title": "Healthcheck checklist",
-                "content": "Verify the right endpoint, keep checks cheap, tune retries and startup grace, avoid leaking secrets, and ensure orchestration reacts to unhealthy services.",
-            },
-            {
-                "type": "practice",
-                "title": "Practice 1 - Diagnose",
-                "difficulty": "medium",
-                "content": "A container is marked running but the reverse proxy sends users to a failing backend. Explain why a missing healthcheck makes this harder to detect.",
-            },
-            {
-                "type": "practice",
-                "title": "Practice 2 - Fix",
-                "difficulty": "hard",
-                "content": "Design a healthcheck for a FastAPI backend and a PostgreSQL service, including what each should verify.",
-            },
-            {
-                "type": "practice",
-                "title": "Practice 3 - Production hardening",
-                "difficulty": "production",
-                "content": "Explain how you would tune healthcheck interval, timeout, retries, and startup grace periods to avoid noisy restarts.",
-            },
-            {
-                "type": "summary",
-                "title": "Summary",
-                "content": "You learned how healthchecks turn process status into useful readiness signals.",
-            },
-        ],
-    },
-    "env_variable_not_loaded": {
-        "lesson_id": "env_variable_not_loaded",
-        "course_id": "docker",
-        "title": "Environment Variable Not Loaded",
         "difficulty": "medium",
         "steps": [
             {
                 "type": "intro",
-                "title": "Config can disappear at runtime",
-                "content": "Environment variables may exist locally but be missing inside a container if Compose, env_file, or deployment configuration is incorrect.",
+                "title": "Why healthchecks change debugging",
+                "content": """Without healthchecks, Docker can usually tell you whether a container process is running, but it cannot tell whether the service inside that container is actually usable. A backend process might be alive while its database connection is broken. PostgreSQL might be running while it is still initializing. A frontend server might listen on a port while serving stale configuration. Healthchecks give containers a small self-test that reports whether the service is healthy from the perspective that matters to dependents. This matters because logs alone are reactive: you notice failure after another service crashes or a user reports a problem. Healthchecks make service state visible earlier, improve Compose orchestration, and provide a shared diagnostic vocabulary when a multi-container app starts behaving strangely.""",
             },
             {
                 "type": "concept",
-                "title": "Container config is explicit",
-                "content": "The variables available to your terminal are not automatically available inside Docker containers unless Compose or the runtime passes them in.",
+                "title": "A healthcheck is an executable contract",
+                "content": """A healthcheck is a command that Docker runs inside a container on a schedule. The command exits with success when the service is healthy and failure when it is not. This solves the problem of guessing whether a dependency is usable. For PostgreSQL, the check might run pg_isready. For a FastAPI backend, it might call a /health endpoint that verifies the app has started and can reach required dependencies. Healthchecks are used by Compose, operators, and humans to understand service state. They should be cheap, deterministic, and specific enough to catch meaningful failure. A weak healthcheck that only checks whether a process exists can create false confidence. A strong healthcheck tells you whether the service can do the basic work other services depend on.""",
             },
             {
                 "type": "deep_dive",
-                "title": "Why config bugs hide",
-                "content": "A service may work locally because your shell has variables, then fail in Docker, CI, or production when env_file paths, secret mounts, or deployment settings differ.",
+                "title": "Designing useful health signals",
+                "content": """A healthcheck runs repeatedly, so it must balance accuracy with cost. If it checks too little, it misses real failures. If it checks too much, it can overload dependencies or fail during harmless transient states. Docker healthchecks have interval, timeout, retries, and start_period options. start_period is important for services like databases that need time to initialize before failures should count. Edge cases include commands missing from minimal images, shell syntax that works locally but not inside the container, credentials not available to the healthcheck process, and checks that depend on external internet access. Healthchecks also do not replace application retry. A service can become unhealthy after startup, and dependent apps still need runtime error handling. The goal is layered reliability: healthchecks expose state, startup scripts wait intelligently, and application code handles failures that occur after the system is already running.""",
             },
             {
                 "type": "example",
-                "title": "Compose env wiring",
-                "content": "services:\n  backend:\n    env_file:\n      - .env\n    environment:\n      DATABASE_URL: ${DATABASE_URL}",
+                "title": "Compose healthcheck examples",
+                "content": """A database healthcheck can look like this:\n\nservices:\n  db:\n    image: postgres:16\n    healthcheck:\n      test: [\"CMD-SHELL\", \"pg_isready -U postgres -d app\"]\n      interval: 5s\n      timeout: 3s\n      retries: 10\n      start_period: 10s\n\nA backend healthcheck can call an internal endpoint:\n\n  backend:\n    build: ./backend\n    healthcheck:\n      test: [\"CMD\", \"python\", \"-c\", \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\"]\n      interval: 10s\n      timeout: 3s\n      retries: 5\n\nThe expected behavior is that Docker reports health based on real service checks. If the command fails repeatedly after the start period, the container is marked unhealthy, which gives developers a direct signal instead of forcing them to infer readiness from logs.""",
             },
             {
                 "type": "checklist",
-                "title": "Config loading checklist",
-                "content": "Document required variables, validate at startup, avoid logging secret values, verify Compose env_file paths, and separate local defaults from production secrets.",
+                "title": "Healthcheck checklist",
+                "content": """- Choose a check that proves the service can perform useful work, not only that a process exists.\n- Keep the command available inside the image; minimal images may not include curl, wget, or shell tools.\n- Set start_period long enough for normal initialization so slow startup is not reported as failure.\n- Keep checks cheap and local when possible to avoid creating load or depending on the public internet.\n- Log enough information in the app so failed healthchecks can be diagnosed quickly.\n- Pair healthchecks with application retry because dependencies can fail after startup.\n- Test healthcheck behavior by intentionally breaking credentials, ports, or readiness assumptions.""",
             },
             {
                 "type": "practice",
                 "title": "Practice 1 - Diagnose",
                 "difficulty": "medium",
-                "content": "A backend container logs 'OPENAI_API_KEY is missing' even though .env exists on the host. Explain the likely configuration gap.",
+                "content": "A backend starts before the database is usable, and docker ps only shows both containers as running. Explain what diagnostic signal is missing.",
             },
             {
                 "type": "practice",
                 "title": "Practice 2 - Fix",
                 "difficulty": "hard",
-                "content": "Describe how to pass required environment variables to a Docker Compose service without committing secrets.",
+                "content": "Write a Compose healthcheck strategy for PostgreSQL and the backend. Explain what each check proves and what it does not prove.",
             },
             {
                 "type": "practice",
                 "title": "Practice 3 - Production hardening",
                 "difficulty": "production",
-                "content": "Design a startup validation approach for required config that fails fast, logs safely, and avoids exposing secret values.",
+                "content": "Describe how healthchecks should interact with deployment readiness, runtime monitoring, restart policies, and alerting in a production environment.",
             },
             {
                 "type": "summary",
                 "title": "Summary",
-                "content": "You learned how container environment configuration differs from local shell configuration and how to validate it safely.",
+                "content": """- Healthchecks turn hidden service readiness into an observable signal.\n- A useful check proves basic service capability, not just process existence.\n- start_period, interval, timeout, and retries control how noisy or patient the check is.\n- Healthchecks do not replace application-level retry or runtime error handling.\n- Minimal images may not contain the tools your healthcheck command assumes.\n- Production systems use healthchecks as one layer in readiness, monitoring, and recovery.""",
+            },
+        ],
+    },
+    "docker_startup_race_condition": {
+        "lesson_id": "docker_startup_race_condition",
+        "course_id": "docker",
+        "title": "Docker Compose Startup Race Condition",
+        "difficulty": "hard",
+        "steps": [
+            {
+                "type": "intro",
+                "title": "Timing bugs in multi-container apps",
+                "content": """A startup race condition happens when one container begins work before another container is ready to support it. In a fullstack Docker setup, the backend might start and run Alembic migrations before PostgreSQL accepts connections. The failure often disappears after a restart, which makes it tempting to blame Docker itself. The real issue is usually that the system depended on timing instead of an explicit readiness contract. This matters because timing bugs create flaky development, flaky CI, and risky deployments. They also train teams to use fixed sleeps, which work only until the environment gets slower. A reliable container system describes service order, checks readiness, retries expected transient failures, and exits clearly when a dependency never becomes usable.""",
+            },
+            {
+                "type": "concept",
+                "title": "Startup order is not readiness",
+                "content": """The central concept is that container startup order is not the same as application readiness. Compose can start the database container before the backend container, but it cannot automatically know when PostgreSQL is ready for migrations. depends_on describes a structural relationship, not a complete operational guarantee. This distinction solves a common misconception. Orchestration can help arrange containers, but the application must still handle the real dependency operation it needs: connect to the database, authenticate, acquire locks, run migrations, and start serving only when required setup is complete. This pattern applies beyond PostgreSQL. Caches, queues, object storage emulators, model servers, and internal APIs can all have process startup that happens before usable readiness. Correct systems use layered checks rather than relying on luck.""",
+            },
+            {
+                "type": "deep_dive",
+                "title": "Layered startup reliability",
+                "content": """A mature startup flow usually has several layers. Compose can express dependency order and optional health conditions. The dependency can expose a healthcheck that proves basic readiness. The dependent service can retry the exact operation it needs, such as alembic upgrade head, because that operation proves more than an open port. The backend can expose its own health endpoint only after startup initialization succeeds. Finally, logs and monitoring should show whether startup is slow, repeatedly failing, or blocked by configuration. Edge cases include migrations that are not safe to run from multiple replicas, healthchecks that pass before a required extension or database exists, old volumes with incompatible schema, and retry loops that hide permanent failures. The goal is not to wait forever. The goal is to tolerate normal transient startup delay while failing loudly and safely when the dependency is genuinely broken.""",
+            },
+            {
+                "type": "example",
+                "title": "Bounded retry before serving",
+                "content": """A simple startup command can retry migrations before starting the web server:\n\n#!/bin/sh\nset -e\n\nattempt=1\nmax_attempts=30\n\nuntil alembic upgrade head; do\n  if [ \"$attempt\" -ge \"$max_attempts\" ]; then\n    echo \"Database never became ready for migrations\"\n    exit 1\n  fi\n  echo \"Migration attempt $attempt failed; retrying in 2 seconds\"\n  attempt=$((attempt + 1))\n  sleep 2\ndone\n\nexec uvicorn app.main:app --host 0.0.0.0 --port 8000\n\nThe script retries the real startup operation, not just a generic ping. set -e stops on unexpected failures outside the retry loop. exec lets Uvicorn receive container signals properly. The expected behavior is patient startup during normal database initialization and clear failure when the database or migration chain is actually broken.""",
+            },
+            {
+                "type": "checklist",
+                "title": "Race-condition checklist",
+                "content": """- Identify which operation fails first: DNS resolution, TCP connection, authentication, migration, or application import.\n- Remove fixed sleeps and replace them with checks or retries tied to real dependency behavior.\n- Add a maximum retry budget so broken configuration does not loop forever.\n- Make logs include attempt count, target service, and failing operation.\n- Ensure only one process owns schema migrations in multi-replica deployments.\n- Expose backend readiness only after required startup work is complete.\n- Test slow database startup intentionally instead of waiting for the race to appear randomly.""",
+            },
+            {
+                "type": "practice",
+                "title": "Practice 1 - Diagnose",
+                "difficulty": "hard",
+                "content": "A FastAPI container crashes on alembic upgrade head during docker compose up, but succeeds when restarted. Explain why this is a startup race and identify which logs you would inspect first.",
+            },
+            {
+                "type": "practice",
+                "title": "Practice 2 - Fix",
+                "difficulty": "hard",
+                "content": "Design a bounded retry startup flow for a backend that must run migrations before serving traffic. Include how it should log and how it should fail.",
+            },
+            {
+                "type": "practice",
+                "title": "Practice 3 - Production hardening",
+                "difficulty": "production",
+                "content": "Explain how the design changes when the backend runs multiple replicas and migrations should not be executed concurrently by every container.",
+            },
+            {
+                "type": "summary",
+                "title": "Summary",
+                "content": """- Startup order does not guarantee that a dependency is ready for useful work.\n- depends_on can express structure, but readiness needs healthchecks and application retry.\n- Retrying the real startup operation often proves more than checking an open port.\n- Retry loops must have limits and clear logs so permanent failures are visible.\n- Migration ownership becomes important when multiple backend replicas exist.\n- Reliable startup is layered across Compose, scripts, app readiness, and monitoring.""",
+            },
+        ],
+    },
+    "docker_production_hardening": {
+        "lesson_id": "docker_production_hardening",
+        "course_id": "docker",
+        "title": "Docker Production Hardening",
+        "difficulty": "production",
+        "steps": [
+            {
+                "type": "intro",
+                "title": "From runnable to dependable",
+                "content": """A container that runs locally is not automatically ready for production. Production hardening is the work of making the image, configuration, runtime behavior, and operational signals safe enough for real users. Local Docker setups often optimize for convenience: broad environment access, root users, bind mounts, verbose logs, and quick rebuilds. Production needs different priorities: smaller images, limited privileges, explicit configuration, predictable shutdown, health and readiness signals, secret handling, resource awareness, and vulnerability management. This matters because containers can make deployment feel simple while hiding serious operational risk. A hardened Docker service should be reproducible, observable, least-privileged, and recoverable. The goal is not perfection; it is reducing avoidable failure modes before users and operators pay for them.""",
+            },
+            {
+                "type": "concept",
+                "title": "Hardening reduces blast radius",
+                "content": """The core concept of production hardening is blast-radius reduction. If something fails or is compromised, the container should expose as little as possible and recover as predictably as possible. This includes running as a non-root user, avoiding unnecessary packages, keeping secrets out of images, pinning important dependency versions, exposing only required ports, and ensuring shutdown signals are handled cleanly. Hardening is used when moving from a benchmark or demo to an environment where uptime, data protection, and incident response matter. It solves practical problems: a leaked image should not contain credentials, a compromised process should not have root privileges by default, and a restart should not corrupt state. Good hardening also improves debugging because the system's assumptions are explicit.""",
+            },
+            {
+                "type": "deep_dive",
+                "title": "Operational details that matter",
+                "content": """Production Docker reliability is shaped by many small decisions. Image size affects deploy speed and vulnerability surface. Running as root increases risk if the app or dependency is exploited. A process that does not receive SIGTERM correctly may be killed before finishing in-flight work. Logs written only to files inside the container may disappear during recreation; logs should usually go to stdout or stderr for the platform to collect. Healthchecks and readiness endpoints need to reflect real service state without overloading dependencies. Secrets should come from the runtime platform, not the Dockerfile. Resource limits should be understood because memory pressure can kill containers abruptly. Edge cases include multi-stage builds that accidentally copy build tools into runtime images, cached layers that keep vulnerable dependencies, and environment variables that differ silently between staging and production. Hardening is a review habit, not a one-time checklist.""",
+            },
+            {
+                "type": "example",
+                "title": "A more production-minded Dockerfile",
+                "content": """A backend image can be improved like this:\n\nFROM python:3.12-slim AS runtime\nENV PYTHONDONTWRITEBYTECODE=1 \\\n    PYTHONUNBUFFERED=1\nWORKDIR /app\nRUN adduser --disabled-password --gecos \"\" appuser\nCOPY requirements.txt .\nRUN pip install --no-cache-dir -r requirements.txt\nCOPY . .\nUSER appuser\nCMD [\"uvicorn\", \"app.main:app\", \"--host\", \"0.0.0.0\", \"--port\", \"8000\"]\n\nThe slim base reduces unnecessary packages. PYTHONUNBUFFERED helps logs appear promptly. The non-root user reduces privilege if the process is compromised. Dependencies are installed before source copy to preserve build caching. The command keeps the process in the foreground so the container runtime can manage it. This example is not complete security, but it demonstrates the direction: fewer privileges, clearer runtime behavior, and image contents that match production needs.""",
+            },
+            {
+                "type": "checklist",
+                "title": "Production hardening checklist",
+                "content": """- Run the application as a non-root user unless there is a documented reason not to.\n- Keep secrets out of Dockerfiles, images, build logs, and committed compose files.\n- Use small runtime images and remove build-only tools from production images.\n- Send logs to stdout or stderr so the platform can collect and retain them.\n- Add health and readiness checks that represent real service capability.\n- Confirm the process handles shutdown signals and does not lose important in-flight work.\n- Scan images and rebuild regularly when base images or dependencies receive security fixes.\n- Set resource expectations and observe memory, CPU, restart count, and startup duration.""",
+            },
+            {
+                "type": "practice",
+                "title": "Practice 1 - Diagnose",
+                "difficulty": "production",
+                "content": "Review a Dockerfile that runs as root, copies .env into the image, and writes logs to /tmp/app.log. Identify the production risks and rank the most urgent fixes.",
+            },
+            {
+                "type": "practice",
+                "title": "Practice 2 - Fix",
+                "difficulty": "production",
+                "content": "Propose a hardened Dockerfile and runtime configuration for a FastAPI backend. Include user permissions, logging, secrets, and startup command choices.",
+            },
+            {
+                "type": "practice",
+                "title": "Practice 3 - Production hardening",
+                "difficulty": "production",
+                "content": "Design an operational review checklist for Docker images before release, including vulnerability scanning, healthchecks, rollback readiness, and secret handling.",
+            },
+            {
+                "type": "summary",
+                "title": "Summary",
+                "content": """- A locally runnable container still needs production hardening before serving users.\n- Hardening reduces blast radius through least privilege, smaller images, and explicit runtime behavior.\n- Secrets should be injected at runtime, not baked into images or source control.\n- Logs, healthchecks, and shutdown behavior are part of production reliability.\n- Image scanning and rebuild discipline matter because base images and dependencies age.\n- Production Docker quality comes from repeated operational review, not one magic setting.""",
             },
         ],
     },
 }
 
 
-def _beginner_lesson(
-    lesson_id: str,
-    course_id: str,
-    title: str,
-    *,
-    difficulty: str,
-    intro: str,
-    concept: str,
-    example: str,
-    practice: str,
-    summary: str,
-) -> dict:
-    return {
-        "lesson_id": lesson_id,
-        "course_id": course_id,
-        "title": title,
-        "difficulty": difficulty,
-        "steps": [
-            {"type": "intro", "title": "Why this matters", "content": intro},
-            {"type": "concept", "title": "Core idea", "content": concept},
-            {"type": "example", "title": "Small example", "content": example},
-            {
-                "type": "practice",
-                "title": "Practice",
-                "difficulty": difficulty,
-                "content": practice,
-            },
-            {"type": "summary", "title": "Summary", "content": summary},
-        ],
-    }
+DOCKER_DEPTH_SUPPLEMENTS = {
+    "docker_basics": {
+        1: " In practice, this lets teams separate three questions that are often confused: what software is installed, what command starts the service, and what configuration changes between environments. Once those questions are separate, Docker becomes easier to reason about during onboarding, debugging, and deployment reviews.",
+        2: " Docker also gives each container its own network view. A service can listen on port 8000 inside the container while the host maps that port differently, or not at all. That distinction prevents accidental assumptions about what is reachable from the browser, from another container, or from the host operating system. Understanding those boundaries is essential when a backend cannot reach a database, a frontend cannot reach an API, or a port appears to be in use.",
+    },
+    "docker_compose_basics": {
+        1: " A well-written Compose file also gives reviewers a map of the system. They can see which service owns the database, which service exposes HTTP traffic, which values are configurable, and which parts of the stack are stateful. That makes Compose useful beyond startup because it documents architecture in a form the machine can execute.",
+        2: " Compose also scopes resources by project. Networks, containers, and volumes may be named with a project prefix, which is why two checkouts of the same repository can sometimes create separate stacks. That isolation is helpful, but it means debugging should always confirm which project, volume, and container are actually running. Otherwise a developer may inspect logs from an old container or wonder why a schema change did not appear after rebuilding an image.",
+    },
+    "postgres_container_not_ready": {
+        1: " This is especially important before schema migrations. A migration is not just a connection test; it proves the application can reach the database, authenticate, inspect version state, and apply changes. When readiness is defined around the real operation, failures become easier to classify and logs become more useful.",
+        2: " Readiness can also regress after startup. A database may pass an initial check and later restart because of memory pressure, disk problems, or an operator action. That is why readiness checks should be paired with normal runtime error handling and observability. Startup retry gets the service online safely; runtime handling keeps it honest after the first successful connection.",
+    },
+    "docker_healthcheck_missing": {
+        1: " The best healthchecks are written from the perspective of the service contract. If other services need PostgreSQL to accept SQL connections, check that. If users need the backend to answer HTTP requests after startup, check that. A healthcheck should therefore be small, repeatable evidence that the service can satisfy its most basic promise.",
+        2: " Healthchecks also affect human debugging behavior. When a container is marked unhealthy, developers know to inspect that service first instead of chasing failures in every dependent container. In CI, health status can explain why an integration test started too early. In production, health status can drive load balancers, restart policies, or alerts, depending on the platform. The signal is only useful if it represents the real service condition rather than an overly shallow command.",
+    },
+    "docker_startup_race_condition": {
+        0: " These issues are worth studying because they are easy to create accidentally and hard to trust once they appear. A race condition damages confidence in the whole environment: developers stop believing fresh setup works, CI reruns become normal, and deployment failures are dismissed as timing noise instead of fixed directly.",
+        1: " A useful mental model is to ask what fact has actually been proven. Starting a container proves that Docker launched a process. Opening a port proves that something is listening. Running a migration proves much more: name resolution, network path, credentials, database selection, migration locks, and schema history are all usable enough for the app to proceed.",
+        2: " There is also a coordination issue when teams grow. One developer may add depends_on, another may add a healthcheck, and another may add a startup script. If those pieces are not designed together, the system can still fail in confusing ways. The cleanest approach defines which layer provides which guarantee and documents that boundary near the Compose file or startup script.",
+    },
+    "docker_production_hardening": {
+        0: " The same image that feels convenient in development can become a liability when it contains unnecessary tools, runs with broad privileges, or depends on configuration that only exists on one laptop. Hardening turns local success into an operational contract that can be reviewed, repeated, and monitored.",
+        1: " This concept is used during release preparation, security review, incident response, and platform migration. It helps teams ask concrete questions: what can this process access, what happens when it is restarted, how are secrets supplied, how do we know it is healthy, and how quickly can we rebuild it after a dependency vulnerability?",
+        2: " Multi-stage builds are another important production tool. They let the build stage contain compilers or package managers while the runtime stage contains only what the service needs to run. This reduces image size and removes tools attackers do not need to find. Production hardening also means checking the surrounding runtime: filesystem permissions, network exposure, environment injection, restart policy, and whether the platform can stop the service gracefully during deploys.",
+    },
+}
 
+for lesson_id, step_updates in DOCKER_DEPTH_SUPPLEMENTS.items():
+    for step_index, extra_content in step_updates.items():
+        LESSONS[lesson_id]["steps"][step_index]["content"] += extra_content
 
-def _advanced_lesson(
-    lesson_id: str,
-    course_id: str,
-    title: str,
-    *,
-    difficulty: str,
-    intro: str,
-    concept: str,
-    deep_dive: str,
-    example: str,
-    checklist: str,
-    diagnose: str,
-    fix: str,
-    harden: str,
-    summary: str,
-) -> dict:
-    return {
-        "lesson_id": lesson_id,
-        "course_id": course_id,
-        "title": title,
-        "difficulty": difficulty,
-        "steps": [
-            {"type": "intro", "title": "Scenario", "content": intro},
-            {"type": "concept", "title": "Core concept", "content": concept},
-            {"type": "deep_dive", "title": "Deep dive", "content": deep_dive},
-            {"type": "example", "title": "Example", "content": example},
-            {"type": "checklist", "title": "Checklist", "content": checklist},
-            {
-                "type": "practice",
-                "title": "Practice 1 - Diagnose",
-                "difficulty": "medium",
-                "content": diagnose,
-            },
-            {
-                "type": "practice",
-                "title": "Practice 2 - Fix",
-                "difficulty": "hard",
-                "content": fix,
-            },
-            {
-                "type": "practice",
-                "title": "Practice 3 - Production hardening",
-                "difficulty": "production",
-                "content": harden,
-            },
-            {"type": "summary", "title": "Summary", "content": summary},
-        ],
-    }
+DOCKER_CONTENT_POLISH = {
+    "docker_basics": {
+        3: """\n\nA useful way to read this Dockerfile is to separate build preparation from runtime behavior. The requirements file is copied before the application source so dependency installation can be cached independently from normal code edits. The final CMD is not executed during image build; it becomes the default command when the container starts. If the app fails at runtime, inspect whether the image built successfully, whether dependencies were installed in the image, whether the working directory contains the expected files, and whether the command binds to 0.0.0.0 so traffic from outside the container can reach the server.""",
+        4: """\n- Inspect the final image with docker image history when builds are unexpectedly slow or large.\n- Run docker logs on a failed container before rebuilding, because startup errors often explain the real issue.\n- Confirm the app listens on an interface reachable from outside the container, usually 0.0.0.0 for web services.""",
+        6: """\n- When debugging, ask whether the problem belongs to image build, container runtime, networking, or persistent data.\n- In production, avoid treating a working local container as proof that security, observability, and lifecycle behavior are ready.""",
+    },
+    "docker_compose_basics": {
+        3: """\n\nRead this configuration as a small service contract. The backend service owns application startup, while the db service owns persistent database state. The DATABASE_URL deliberately uses db as the hostname because Compose provides DNS for service names on the project network. The volume declaration is separate from the service definition because named volumes are managed resources in the Compose project. If the backend cannot connect, the first checks should be the service name, the database credentials, the active Compose project, and whether an old volume was initialized with different values.""",
+        4: """\n- Use docker compose ps to see container state, published ports, and health information in one place.\n- Use docker compose logs <service> to inspect one service without losing the context of the full stack.\n- Keep compose service names stable because connection strings and documentation often depend on them.""",
+        6: """\n- A Compose file should make the system understandable before anyone runs it.\n- If a service depends on another service, document both the network path and the readiness expectation.\n- Review Compose changes like application code because they affect developer setup, tests, and release behavior.""",
+    },
+    "postgres_container_not_ready": {
+        3: """\n\nThe migration retry loop is intentionally tied to the real operation the backend needs. A generic wait-for-port script can say that something is listening, but it cannot prove the configured database exists or that Alembic can record schema state. The loop should be paired with a maximum attempt count because infinite startup hides broken credentials and blocks deployment feedback. In a team setting, the log message should name the failing dependency and operation so developers can distinguish normal initialization delay from a migration conflict or configuration mistake.""",
+        4: """\n- Compare the DATABASE_URL used by the app with the values printed in container environment inspection.\n- Remove or recreate only the intended local volume when testing first-start behavior; do not casually destroy shared data.\n- Verify whether failures happen before migrations start, during migration locking, or after the backend begins serving.""",
+        8: """\n- The most reliable check is close to the real workload, not merely close to the container process.\n- Production systems should expose readiness separately from liveness so traffic is not routed too early.\n- A startup fix is incomplete unless permanent misconfiguration still fails loudly.""",
+    },
+    "docker_healthcheck_missing": {
+        3: """\n\nThe database healthcheck uses CMD-SHELL because pg_isready is executed as a shell command with arguments. The interval controls how often Docker runs it, timeout controls how long one check may take, retries controls how many failures are tolerated, and start_period gives the service time to initialize before failures count. The backend example uses Python instead of curl so it works even in images that do not install curl. The expected behavior is that health status becomes a visible signal for humans and tooling, but the application still handles real runtime failures after startup.""",
+        4: """\n- Confirm the healthcheck command exists inside the container image, not only on the host machine.\n- Test both success and failure paths by temporarily breaking credentials or stopping a dependency.\n- Keep healthcheck output clear enough that logs explain what the check attempted.\n- Avoid checks that depend on unrelated public services unless the app truly cannot operate without them.""",
+        8: """\n- A healthcheck is useful only if it reflects the service promise other components rely on.\n- Health status should guide debugging, not replace logs, metrics, or application error handling.\n- In production, tune healthcheck timing so normal startup is tolerated but real failure is detected quickly.""",
+    },
+    "docker_startup_race_condition": {
+        3: """\n\nThis script also demonstrates a clean handoff between setup and serving. Migration retry happens before Uvicorn starts, so the backend does not accept requests while schema state is unknown. The final exec is important because it replaces the shell with the Uvicorn process, allowing container stop signals to reach the server directly. In production, this exact pattern may move into an entrypoint script, init job, or release task, but the principle is the same: startup dependencies should be verified before the service advertises readiness.""",
+        4: """\n- Check whether multiple backend replicas could run the same startup migration at the same time.\n- Separate transient dependency errors from deterministic migration errors in logs and alerting.\n- Test the failure path by using bad credentials and confirming the container exits instead of looping forever.""",
+        8: """\n- Race conditions often look random because timing changes between machines and restarts.\n- Make readiness explicit in configuration, startup scripts, and application health endpoints.\n- Production hardening includes deciding who owns migrations when services scale horizontally.""",
+    },
+    "docker_production_hardening": {
+        3: """\n\nThis Dockerfile still needs project-specific review, but it shows several production habits. The runtime image is intentionally slim, Python writes logs without buffering, and the process does not run as root. Dependency installation happens before source copy for cache efficiency. A real release pipeline would also pin dependency versions, scan the final image, avoid copying test fixtures or local secrets, and verify that the service can shut down gracefully. Expected behavior is not just that the API starts, but that it starts with fewer unnecessary privileges and fewer hidden assumptions.""",
+        4: """\n- Verify the build context does not include .env files, local databases, node_modules, virtual environments, or generated secrets.\n- Check that the container can be stopped gracefully within the platform's termination window.\n- Confirm runtime configuration comes from the deployment environment and is visible enough to debug without exposing secrets.\n- Review whether the image can be rebuilt quickly when a base-image vulnerability is announced.""",
+        8: """\n- Production readiness includes the image, the runtime platform, release process, and operational signals.\n- Least privilege, secret hygiene, health signals, and graceful shutdown reduce avoidable incident risk.\n- The safest Docker systems are reviewed continuously as dependencies, infrastructure, and threat models change.""",
+    },
+}
 
+for lesson_id, step_updates in DOCKER_CONTENT_POLISH.items():
+    for step_index, extra_content in step_updates.items():
+        LESSONS[lesson_id]["steps"][step_index]["content"] += extra_content
 
-LESSONS.update(
-    {
-        "fastapi_dependency_injection": _advanced_lesson(
-            "fastapi_dependency_injection",
-            "fastapi",
-            "FastAPI Dependency Injection",
-            difficulty="medium",
-            intro="Real FastAPI apps reuse database sessions, authenticated users, settings, and permission checks across many endpoints.",
-            concept="Depends lets endpoint functions declare reusable request-time logic while keeping the endpoint focused on business behavior.",
-            deep_dive="Dependencies can depend on other dependencies, yield resources such as database sessions, and be overridden in tests. Poorly scoped dependencies can leak sessions or make tests brittle.",
-            example="def get_db():\n    db = SessionLocal()\n    try:\n        yield db\n    finally:\n        db.close()\n\n@app.get('/items')\ndef list_items(db = Depends(get_db)):\n    return db.query(Item).all()",
-            checklist="Keep dependencies small, type them clearly, close yielded resources, avoid hidden global state, and use dependency overrides for tests.",
-            diagnose="An endpoint opens a database session manually and forgets to close it during exceptions. Explain why a dependency would be safer.",
-            fix="Refactor the endpoint conceptually so a yielded get_db dependency owns the session lifecycle.",
-            harden="Describe how you would test dependency cleanup, authentication overrides, and failure cases in a production FastAPI service.",
-            summary="You learned how dependency injection makes FastAPI endpoints cleaner, safer, and easier to test.",
-        ),
-        "fastapi_request_validation": _advanced_lesson(
-            "fastapi_request_validation",
-            "fastapi",
-            "FastAPI Request Validation",
-            difficulty="medium",
-            intro="APIs need to reject malformed input before it reaches business logic or database writes.",
-            concept="FastAPI uses type hints and Pydantic models to parse, validate, and document request bodies, path parameters, and query parameters.",
-            deep_dive="Validation should express real domain rules, not just data shapes. Constraints such as string length, positive numbers, and enum values prevent invalid state early.",
-            example="class MessageCreate(BaseModel):\n    conversation_id: int\n    content: str = Field(min_length=1, max_length=2000)",
-            checklist="Validate required fields, set length limits, use explicit enums, return clear errors, and keep server-side validation even if the frontend validates too.",
-            diagnose="A chat endpoint accepts an empty message and later crashes when streaming. Explain what validation rule is missing.",
-            fix="Design a Pydantic request model for a message endpoint with content length and required conversation_id.",
-            harden="Explain how validation helps rate limiting, logging, and abuse prevention in a public API.",
-            summary="You learned how request validation protects API boundaries before invalid input reaches core logic.",
-        ),
-        "fastapi_error_handling": _advanced_lesson(
-            "fastapi_error_handling",
-            "fastapi",
-            "FastAPI Error Handling",
-            difficulty="medium",
-            intro="Good APIs fail clearly. Clients need useful status codes while servers need detailed logs.",
-            concept="FastAPI supports HTTPException for expected errors and exception handlers for consistent response shapes.",
-            deep_dive="A production API should separate safe client messages from internal details. Database errors, provider errors, and auth failures should not leak stack traces.",
-            example="if not conversation:\n    raise HTTPException(status_code=404, detail='Conversation not found')",
-            checklist="Use correct status codes, log internal causes, keep response details safe, test error paths, and avoid swallowing exceptions silently.",
-            diagnose="A frontend receives 'Internal Server Error' when a user selects a missing conversation. Explain what endpoint behavior should change.",
-            fix="Describe how to return a safe 404 response while logging enough context for debugging.",
-            harden="Design an error-handling policy for auth errors, validation errors, database failures, and upstream AI failures.",
-            summary="You learned how FastAPI error handling keeps APIs predictable for users and useful for operators.",
-        ),
-        "fastapi_auth_jwt_flow": _advanced_lesson(
-            "fastapi_auth_jwt_flow",
-            "fastapi",
-            "FastAPI JWT Auth Flow",
-            difficulty="hard",
-            intro="JWT auth connects login, token creation, request verification, and user-scoped database access.",
-            concept="A JWT proves a client has authenticated, but every protected endpoint still needs to resolve and trust the current user server-side.",
-            deep_dive="Common failures include accepting expired tokens, trusting user IDs from request bodies, and using different auth paths for HTTP and streaming endpoints.",
-            example="def get_current_user(token: str = Depends(oauth2_scheme)):\n    payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])\n    return get_user(payload['sub'])",
-            checklist="Hash passwords, expire tokens, validate signatures, resolve current_user centrally, scope queries by user_id, and handle token errors safely.",
-            diagnose="A user can request another user's conversation by changing an ID in the URL. Explain why JWT auth alone did not prevent the leak.",
-            fix="Describe how the endpoint should combine current_user from the token with user-scoped database filtering.",
-            harden="Propose a production JWT policy covering expiration, refresh, secret rotation, logging, and streaming endpoints.",
-            summary="You learned how JWT auth must connect to server-side ownership checks to protect user data.",
-        ),
-        "fastapi_database_sessions": _advanced_lesson(
-            "fastapi_database_sessions",
-            "fastapi",
-            "FastAPI Database Sessions",
-            difficulty="hard",
-            intro="Database sessions are request-scoped units of work. Mishandling them can cause leaks, stale data, or partial commits.",
-            concept="A FastAPI dependency can create a session per request and close it reliably after the endpoint finishes.",
-            deep_dive="Session bugs often appear only under errors or concurrency: a commit happens too early, rollback is missing, or a long-lived session returns stale objects.",
-            example="try:\n    db.add(item)\n    db.commit()\nexcept Exception:\n    db.rollback()\n    raise",
-            checklist="Use one session per request, commit intentionally, rollback on failure, refresh returned rows, and avoid global sessions.",
-            diagnose="A request fails halfway through but still leaves a partial database row. Explain what transaction boundary likely failed.",
-            fix="Describe a session and transaction pattern that makes a create endpoint atomic.",
-            harden="Design tests for rollback behavior, concurrent requests, and stale object refresh in a FastAPI app.",
-            summary="You learned how session lifecycle and transactions keep FastAPI database writes reliable.",
-        ),
-        "fastapi_background_tasks": _advanced_lesson(
-            "fastapi_background_tasks",
-            "fastapi",
-            "FastAPI Background Tasks",
-            difficulty="hard",
-            intro="Background tasks are useful for lightweight follow-up work after a response, such as sending email or cleanup.",
-            concept="FastAPI BackgroundTasks run after the response is sent, but they still run in the application process and are not a durable queue.",
-            deep_dive="Production mistakes include doing critical work in in-process tasks, losing tasks on restart, and passing request-scoped database sessions into delayed work.",
-            example="@app.post('/invite')\ndef invite(email: str, tasks: BackgroundTasks):\n    tasks.add_task(send_invite_email, email)\n    return {'status': 'queued'}",
-            checklist="Use background tasks for non-critical work, pass plain data not sessions, log failures, keep tasks short, and use a real queue for durable jobs.",
-            diagnose="A background task tries to use a database session after the request ends and fails. Explain the lifecycle issue.",
-            fix="Redesign the task so it receives IDs or payload data and opens its own resources safely.",
-            harden="Decide when to replace BackgroundTasks with a queue and describe monitoring for failed asynchronous work.",
-            summary="You learned where FastAPI background tasks fit and where production queues are safer.",
-        ),
-        "fastapi_startup_shutdown_lifespan": _advanced_lesson(
-            "fastapi_startup_shutdown_lifespan",
-            "fastapi",
-            "FastAPI Startup, Shutdown, and Lifespan",
-            difficulty="production",
-            intro="Production services need predictable startup and shutdown so dependencies, clients, and workers are initialized and cleaned up safely.",
-            concept="FastAPI lifespan handlers manage application-level resources such as clients, connection pools, and startup checks.",
-            deep_dive="Bad startup behavior can accept traffic before dependencies are ready. Bad shutdown behavior can drop in-flight work or leave connections open.",
-            example="@asynccontextmanager\nasync def lifespan(app):\n    app.state.client = create_client()\n    yield\n    await app.state.client.close()\n\napp = FastAPI(lifespan=lifespan)",
-            checklist="Initialize shared clients once, check critical dependencies, expose readiness accurately, close resources on shutdown, and test failure paths.",
-            diagnose="A service starts successfully but first requests fail because an external client was not initialized. Explain what startup check is missing.",
-            fix="Design a lifespan handler that initializes and closes a shared client safely.",
-            harden="Plan readiness, graceful shutdown, and deploy rollback behavior for a FastAPI app using database and AI provider clients.",
-            summary="You learned how lifespan management turns startup and shutdown into explicit production behavior.",
-        ),
-        "fastapi_rate_limits_and_security": _advanced_lesson(
-            "fastapi_rate_limits_and_security",
-            "fastapi",
-            "FastAPI Rate Limits and Security",
-            difficulty="production",
-            intro="Public APIs need basic abuse protection so one user cannot overload expensive endpoints or providers.",
-            concept="Rate limits restrict request frequency per user, token, or IP. Security controls also include input size limits, safe errors, and ownership checks.",
-            deep_dive="In-memory limits are simple for demos but reset on restart and do not coordinate across multiple workers. Production systems usually need shared storage or gateway controls.",
-            example="if len(message) > 2000:\n    raise HTTPException(status_code=400, detail='Message too long')",
-            checklist="Limit expensive routes, cap input sizes, return safe errors, log abuse signals, scope by authenticated user, and document retry behavior.",
-            diagnose="A single user sends many streaming requests and drives up provider costs. Explain what limits should exist.",
-            fix="Design a simple per-user rate limit for a FastAPI streaming endpoint.",
-            harden="Compare in-memory, Redis-backed, and gateway-level rate limits for a scaled production deployment.",
-            summary="You learned how FastAPI security controls protect reliability, cost, and user data.",
-        ),
-    }
-)
+DOCKER_ARTICLE_REWRITE = {
+    "docker_basics": {
+        0: """Docker is often introduced as a packaging tool, but the bigger idea is repeatable runtime behavior. A backend that works on one laptop can fail on another because the Python version, operating system packages, environment variables, ports, or startup command are different.
 
+Containers give a team a shared boundary around the application process. Instead of relying on every developer to manually recreate the same environment, the project describes that environment in a Dockerfile and runs it as a container.
 
-LESSONS.update(
-    {
-        "backend_api_design_basics": _beginner_lesson(
-            "backend_api_design_basics",
-            "backend",
-            "Backend API Design Basics",
-            difficulty="easy",
-            intro="A backend API is the boundary between client code and server behavior. A good API gives the frontend predictable ways to read, create, update, and delete data without exposing database tables or internal implementation details.",
-            concept="Good API design starts with resources. A resource is something the product cares about, such as conversations, messages, lessons, or practice submissions. HTTP methods then describe what the client wants to do with that resource.",
-            example="GET /conversations lists conversations for the current user.\nPOST /conversations creates a new conversation.\nGET /messages?conversation_id=1 reads messages for one conversation.",
-            practice="Pick a resource in a chatbot app and describe one GET endpoint and one POST endpoint for it.",
-            summary="You learned how resources, HTTP methods, status codes, and response shapes make APIs easier for frontend clients to use and easier for backend teams to maintain.",
-        ),
-        "backend_user_owned_resources": _beginner_lesson(
-            "backend_user_owned_resources",
-            "backend",
-            "Backend User-Owned Resources",
-            difficulty="easy",
-            intro="Many backend records belong to a specific user, including conversations, messages, lesson progress, and practice submissions. If ownership is not enforced, one user may accidentally or maliciously access another user's data.",
-            concept="A user-owned resource should be created with the authenticated user's ID from the server-side auth context. The client can request an action, but it should not decide who owns the new row.",
-            example="conversation = Conversation(title='New', user_id=current_user.id)\n\n# Later reads should also filter by current_user.id.",
-            practice="Explain why a client should not be allowed to choose the user_id when creating a conversation.",
-            summary="You learned the basic ownership rule behind safe multi-user APIs: create with the current user, read with the current user, and never trust a client-supplied owner.",
-        ),
-        "database_transaction_basics": _advanced_lesson(
-            "database_transaction_basics",
-            "backend",
-            "Database Transaction Basics",
-            difficulty="medium",
-            intro="A transaction groups database changes so they succeed or fail together. In a backend API, this matters whenever one user action creates or updates more than one row.",
-            concept="Transactions protect consistency by giving the application an all-or-nothing boundary. If every required write succeeds, the transaction commits. If one write fails, the transaction rolls back so the database does not keep partial state.",
-            deep_dive="Without rollback, an exception can leave partial state. Without careful commit timing, later failures may not undo earlier writes. Long transactions can also hold locks longer than needed, so production code should keep them focused and short.",
-            example="try:\n    db.add(order)\n    db.add(audit_log)\n    db.commit()\nexcept Exception:\n    db.rollback()\n    raise",
-            checklist="Define transaction boundaries, commit once at the end of the unit of work, rollback on errors, keep transactions short, avoid external network calls inside transactions, and test partial failure paths.",
-            diagnose="A create endpoint writes a parent row but fails before writing child rows. Explain what transaction problem occurred.",
-            fix="Describe how to make both writes succeed or fail together.",
-            harden="Plan transaction handling for retries, idempotency, and audit logs in production.",
-            summary="You learned how transactions protect backend data consistency.",
-        ),
-        "backend_data_isolation_audit": _advanced_lesson(
-            "backend_data_isolation_audit",
-            "backend",
-            "Backend Data Isolation Audit",
-            difficulty="production",
-            intro="A data isolation audit checks whether one user can ever read, modify, export, or infer another user's data. In multi-user apps this is one of the most important backend safety reviews.",
-            concept="Isolation must be enforced in every endpoint, background task, export path, and history query. Authentication identifies the user; authorization and query scoping decide what that user may access.",
-            deep_dive="Security bugs often hide in secondary features: export endpoints, progress views, rename/delete actions, and practice history pages. These paths may be added after the main CRUD flow and miss the same ownership checks.",
-            example="Test with user A and user B. Create data as A, then attempt to read it as B through every endpoint.",
-            checklist="Inventory user-owned tables, review every query, add two-user tests, check exports and history endpoints, verify delete/rename ownership, and log suspicious access attempts without leaking sensitive data.",
-            diagnose="A practice history endpoint filters by lesson_id but not user_id. Explain the isolation failure.",
-            fix="Write a review plan to find and fix similar missing filters across the API.",
-            harden="Design an automated test suite and code review checklist for user isolation before release.",
-            summary="You learned how to audit a backend for cross-user data leaks.",
-        ),
-        "backend_migration_release_strategy": _advanced_lesson(
-            "backend_migration_release_strategy",
-            "backend",
-            "Backend Migration Release Strategy",
-            difficulty="production",
-            intro="Schema changes and application deploys must be ordered so old and new code can survive the transition. A migration that is correct locally can still cause downtime if release timing is wrong.",
-            concept="Safe migrations are backward compatible when possible and are deployed before code that requires the new schema. Many teams use expand-and-contract: add first, migrate data, switch code, then remove later.",
-            deep_dive="Breaking deploys happen when code expects a column before migration, removes a column still used by old code, or runs irreversible data changes without rollback planning. Long-running migrations can also lock tables and slow production traffic.",
-            example="Deploy order: add nullable column -> deploy code writing both fields -> backfill -> enforce not null -> remove old field later.",
-            checklist="Plan expand-and-contract changes, run migrations in CI, check lock risk, back up data, monitor deploys, document rollback options, and avoid coupling irreversible data changes to risky app releases.",
-            diagnose="A deploy fails because new code reads a column before migration ran. Explain the release-order problem.",
-            fix="Design a safer multi-step migration release for adding a required column.",
-            harden="Create a production migration playbook covering backups, locks, long-running migrations, and rollback.",
-            summary="You learned how migration strategy reduces deploy risk for evolving backend schemas.",
-        ),
-        "frontend_component_state_basics": _beginner_lesson(
-            "frontend_component_state_basics",
-            "frontend",
-            "Frontend Component State Basics",
-            difficulty="easy",
-            intro="Interactive React screens need state for selected items, form inputs, loading indicators, errors, streamed text, and temporary UI feedback. State is what lets the screen respond to user actions.",
-            concept="Component state should represent what the UI needs to render right now. If a value affects what the user sees or what action is enabled, it probably belongs in state or can be derived from state.",
-            example="const [message, setMessage] = useState('');",
-            practice="Name three pieces of state a chat window needs and explain what each controls.",
-            summary="You learned how local state drives basic React interactions and why clear state names make complex screens easier to reason about.",
-        ),
-        "frontend_api_client_basics": _beginner_lesson(
-            "frontend_api_client_basics",
-            "frontend",
-            "Frontend API Client Basics",
-            difficulty="easy",
-            intro="A frontend API client centralizes fetch behavior so components do not repeat headers, parsing, base URLs, auth handling, and error handling. This keeps data access consistent across the app.",
-            concept="A small apiFetch helper can attach auth tokens, parse JSON, throw friendly errors, and keep the API base URL in one place. Components can then focus on user workflows instead of HTTP details.",
-            example="const conversations = await apiFetch('/conversations', { token });",
-            practice="Describe why centralizing API calls is safer than calling fetch differently in every component.",
-            summary="You learned how an API helper reduces duplication, improves error handling, and makes frontend/backend integration easier to change.",
-        ),
-        "frontend_auth_token_storage": _advanced_lesson(
-            "frontend_auth_token_storage",
-            "frontend",
-            "Frontend Auth Token Storage",
-            difficulty="medium",
-            intro="Frontend apps need to remember auth state across refreshes without exposing tokens carelessly. The storage choice affects login persistence, logout behavior, streaming authentication, and security risk.",
-            concept="localStorage is simple and works with EventSource query-token patterns, but tokens stored there can be read by injected scripts if XSS exists. httpOnly cookies reduce script access but change CSRF and streaming design.",
-            deep_dive="Token storage is a tradeoff among convenience, XSS risk, CSRF behavior, refresh UX, and backend auth design. The safest approach depends on token lifetime, whether refresh tokens exist, and how the app authenticates long-lived streams.",
-            example="localStorage.setItem('chatbot_access_token', token)",
-            checklist="Use HTTPS, keep access tokens short-lived, avoid rendering unsafe HTML, clear tokens on logout, handle expired sessions, redact URLs that contain stream tokens, and document the tradeoff chosen for the app.",
-            diagnose="A user remains logged in after refresh because a token is in localStorage. Explain the benefit and the risk.",
-            fix="Design logout and expired-token behavior for a React app using localStorage tokens.",
-            harden="Compare localStorage and httpOnly cookies for this app's auth and streaming needs.",
-            summary="You learned the tradeoffs behind frontend token persistence.",
-        ),
-        "frontend_loading_error_states": _advanced_lesson(
-            "frontend_loading_error_states",
-            "frontend",
-            "Frontend Loading and Error States",
-            difficulty="medium",
-            intro="A polished app tells users when work is loading, when it failed, and what they can do next.",
-            concept="Loading and error states should be specific to the operation: conversations, messages, lessons, streaming, or practice feedback.",
-            deep_dive="A single global loading flag often blocks unrelated actions or hides useful UI. Localized states keep the app responsive.",
-            example="Disable the Send button while streaming, but keep theme toggle and sidebar scrolling available.",
-            checklist="Show skeletons or text, disable only relevant controls, preserve drafts, show retry actions, and avoid layout jumps.",
-            diagnose="A user loses their typed answer after a network error. Explain what state should have been preserved.",
-            fix="Design loading and error states for submitting practice feedback.",
-            harden="Create a failure-state checklist for every API call in a React app.",
-            summary="You learned how thoughtful loading and error states make frontend workflows resilient.",
-        ),
-        "frontend_markdown_rendering": _advanced_lesson(
-            "frontend_markdown_rendering",
-            "frontend",
-            "Frontend Markdown Rendering",
-            difficulty="medium",
-            intro="AI answers often include headings, lists, links, tables, and code blocks that are hard to read as plain text. Markdown rendering turns those answers into a more usable learning experience.",
-            concept="Markdown rendering improves readability, but rendered content must be treated as untrusted input. The model can output text that looks like HTML, links, or scripts even when it was not asked to.",
-            deep_dive="Syntax highlighting, link behavior, HTML escaping, horizontal scrolling, and copy buttons all affect the safety and usability of AI-generated content. A good renderer is both readable and conservative about what it allows.",
-            example="<ReactMarkdown>{assistantMessage}</ReactMarkdown>",
-            checklist="Escape raw HTML, style code blocks, handle long lines, open external links safely, preserve whitespace in code, and keep user messages plain text unless there is a clear product reason.",
-            diagnose="A markdown answer contains a long code block that breaks mobile layout. Explain the rendering issue.",
-            fix="Describe CSS and component choices that keep markdown readable and safe.",
-            harden="Plan markdown security checks for links, HTML, and future plugin support.",
-            summary="You learned how markdown rendering improves AI UX while introducing safety responsibilities.",
-        ),
-        "stale_state_after_refresh": _advanced_lesson(
-            "stale_state_after_refresh",
-            "frontend",
-            "Stale State After Refresh",
-            difficulty="hard",
-            intro="After a browser refresh, in-memory React state disappears but localStorage and backend data remain.",
-            concept="Apps need a restore flow that loads saved IDs, validates them with the backend, and clears stale references.",
-            deep_dive="Stale state bugs appear when a saved conversation or lesson no longer exists, belongs to another user, or is loaded before auth is ready.",
-            example="const savedId = localStorage.getItem('chatbot_active_conversation_id')",
-            checklist="Restore after login, validate IDs server-side, clear missing resources, show empty states, and avoid rendering old messages during reload.",
-            diagnose="A deleted conversation ID remains in localStorage and the app opens an empty broken chat. Explain the restore bug.",
-            fix="Design a safe refresh restore flow for active conversation selection.",
-            harden="Plan tests for refresh, logout/login as another user, deleted resources, and slow network restores.",
-            summary="You learned how refresh-safe state keeps React apps coherent across browser reloads.",
-        ),
-        "frontend_stream_reconnect_strategy": _advanced_lesson(
-            "frontend_stream_reconnect_strategy",
-            "frontend",
-            "Frontend Stream Reconnect Strategy",
-            difficulty="production",
-            intro="Streaming connections can fail because of network changes, expired tokens, provider issues, browser tab sleep, or server restarts. A polished app needs recovery behavior that does not confuse the conversation.",
-            concept="A reconnect strategy decides when to retry, when to stop, and how to protect message ordering. The UI should know whether a response is still draft, completed, failed, or ready for manual retry.",
-            deep_dive="Blind reconnects can duplicate prompts, append repeated chunks, or keep retrying after auth failure. Safe reconnects need state, limits, error classification, and a clear rule for whether the same user message may be resent.",
-            example="Retry only if no final assistant message was saved and the error is retryable.",
-            checklist="Classify errors, cap retries, preserve drafts, avoid duplicate messages, close old EventSource objects, show user control, and never retry automatically after authentication failures.",
-            diagnose="A stream reconnects automatically and creates two assistant bubbles. Explain what state was missing.",
-            fix="Design a reconnect flow that preserves one live message and allows manual retry.",
-            harden="Define production reconnect behavior for offline mode, token expiration, provider errors, and tab sleep.",
-            summary="You learned how reconnect policy protects streaming UX from duplication and confusion.",
-        ),
-        "frontend_security_xss_markdown": _advanced_lesson(
-            "frontend_security_xss_markdown",
-            "frontend",
-            "Frontend Security for Markdown and XSS",
-            difficulty="production",
-            intro="Rendering AI or user-provided content can become dangerous if the app allows scripts or unsafe HTML. This matters even when the content comes from an assistant instead of a human user.",
-            concept="XSS happens when untrusted content executes as code in the browser. If an attacker can influence rendered markdown and access tokens are stored in the browser, the impact can include account takeover.",
-            deep_dive="Markdown libraries vary in how they handle raw HTML, links, and plugins. A safe app assumes AI output is untrusted, disables raw HTML unless sanitized, and reviews link behavior carefully.",
-            example="Render markdown without raw HTML and use safe link attributes for external URLs.",
-            checklist="Disable raw HTML, sanitize if needed, avoid dangerouslySetInnerHTML, protect tokens, review link behavior, set safe link attributes, and test malicious markdown examples.",
-            diagnose="An assistant response includes an HTML script tag. Explain what should happen when it renders.",
-            fix="Describe safe markdown rendering settings and CSS behavior for code blocks and links.",
-            harden="Create a frontend security review checklist for AI-generated markdown and stored user messages.",
-            summary="You learned how to keep rich AI content readable without turning it into executable code.",
-        ),
-    }
-)
+This matters most when an application grows beyond a single script. A fullstack project may include a backend API, frontend build tooling, a database client, migration commands, and system libraries. Docker makes those assumptions visible.
 
+In real projects, Docker also helps with onboarding. A new contributor should not need a long checklist of local installations before they can run the app. The container becomes a documented, executable setup path.
 
-LESSONS.update(
-    {
-        "docker_compose_basics": _beginner_lesson(
-            "docker_compose_basics",
-            "docker",
-            "Docker Compose Basics",
-            difficulty="easy",
-            intro="Fullstack apps usually need several services: frontend, backend, database, and sometimes workers.",
-            concept="Docker Compose describes services, networks, volumes, and environment configuration in one file for local development.",
-            example="services:\n  backend:\n    build: ./backend\n  db:\n    image: postgres:16",
-            practice="Sketch the services you would include for a React, FastAPI, PostgreSQL app and explain what each service does.",
-            summary="You learned how Compose organizes multi-service local development.",
-        ),
-        "docker_environment_variables": _advanced_lesson(
-            "docker_environment_variables",
-            "docker",
-            "Docker Environment Variables",
-            difficulty="medium",
-            intro="Containers need configuration for database URLs, API keys, and runtime settings.",
-            concept="Compose can pass values with environment and env_file, but secrets still need careful handling.",
-            deep_dive="Config bugs often come from mixing host shell variables, .env interpolation, service env_file values, and production secret injection.",
-            example="services:\n  api:\n    env_file: .env\n    environment:\n      APP_ENV: development",
-            checklist="List required variables, avoid committing secrets, validate at startup, document defaults, and redact secret values from logs.",
-            diagnose="A variable is present in your terminal but missing inside the backend container. Explain the likely difference.",
-            fix="Describe how to wire .env and explicit environment values for a Compose service.",
-            harden="Design a production config strategy that separates local defaults, CI settings, and secret manager values.",
-            summary="You learned how Docker configuration moves from local convenience toward production safety.",
-        ),
-        "docker_networking": _advanced_lesson(
-            "docker_networking",
-            "docker",
-            "Docker Networking",
-            difficulty="medium",
-            intro="Services inside Compose talk to each other by service name, not by localhost.",
-            concept="Each Compose project creates a network where service DNS names resolve to containers.",
-            deep_dive="A common bug is using localhost from one container to reach another. Inside a container, localhost means that same container.",
-            example="DATABASE_URL=postgresql://postgres:postgres@db:5432/app_db",
-            checklist="Use service names, expose only needed ports, separate internal and public access, and verify URLs from inside the container.",
-            diagnose="A backend container tries to connect to localhost:5432 and fails. Explain why this address is wrong.",
-            fix="Rewrite the connection string to target the Compose database service.",
-            harden="Design a network layout that keeps PostgreSQL internal while exposing only the frontend or reverse proxy.",
-            summary="You learned how Compose DNS and container networking shape service-to-service communication.",
-        ),
-        "docker_volumes": _advanced_lesson(
-            "docker_volumes",
-            "docker",
-            "Docker Volumes",
-            difficulty="medium",
-            intro="Containers are disposable, but databases and development dependencies often need persistent data.",
-            concept="Volumes store data outside the container filesystem so it survives rebuilds and restarts.",
-            deep_dive="Volume bugs can hide schema changes, stale data, or permission problems because old state survives new containers.",
-            example="volumes:\n  postgres_data:\n\nservices:\n  db:\n    volumes:\n      - postgres_data:/var/lib/postgresql/data",
-            checklist="Name volumes clearly, know when to reset local state, back up production volumes, and avoid mounting secrets accidentally.",
-            diagnose="A migration seems missing locally even after rebuilding containers. Explain how an old database volume might be involved.",
-            fix="Describe a safe local reset flow and a safer production migration approach.",
-            harden="Plan backup, restore, and permission checks for persistent database volumes.",
-            summary="You learned how volumes preserve state and why that matters for debugging and operations.",
-        ),
-        "docker_production_hardening": _advanced_lesson(
-            "docker_production_hardening",
-            "docker",
-            "Docker Production Hardening",
-            difficulty="production",
-            intro="A production container should be small, predictable, observable, and run with the least privilege practical.",
-            concept="Hardening reduces attack surface and improves reliability through image hygiene, resource limits, healthchecks, and safe configuration.",
-            deep_dive="Development images often contain build tools, debug settings, broad permissions, and unpinned dependencies that are risky in production.",
-            example="Use a multi-stage build, run as a non-root user, pin base images, and configure healthchecks and resource limits.",
-            checklist="Use minimal images, scan dependencies, avoid root, pin versions, set resource limits, include healthchecks, and keep secrets out of images.",
-            diagnose="A production image contains .env and build tools. Explain the security and operational risks.",
-            fix="Design a multi-stage image layout for a FastAPI backend.",
-            harden="Create a production container review checklist for security, reliability, observability, and rollback.",
-            summary="You learned how container hardening turns local images into production-ready artifacts.",
-        ),
-    }
-)
+Docker does not remove the need to understand deployment, security, networking, or persistence. It gives you a controlled environment where those concerns can be discussed more clearly.
 
+The practical goal is not just to make the app start. The goal is to know what is inside the runtime, what is configured from outside, what data survives restarts, and how to debug the service when something fails.""",
+        1: """The central Docker concept is the difference between an image and a container. An image is a template built from instructions. A container is a running process created from that template.
 
-LESSONS.update(
-    {
-        "ai_prompting_basics": _beginner_lesson(
-            "ai_prompting_basics",
-            "ai",
-            "AI Prompting Basics",
-            difficulty="easy",
-            intro="A prompt tells the model what role to take, what context to use, and what kind of answer to produce. In product code, prompts are part of the application behavior, not just casual text.",
-            concept="Good prompts are specific about task, audience, constraints, and output style. They also say what source material the model should trust and what it should avoid inventing.",
-            example="You are a friendly programming tutor. Explain this FastAPI route in simple terms.",
-            practice="Rewrite a vague prompt into a clearer one for explaining Docker networking to a beginner.",
-            summary="You learned how clearer prompts produce more useful AI responses and why production prompts should include role, context, constraints, and expected output.",
-        ),
-        "ai_context_window_basics": _beginner_lesson(
-            "ai_context_window_basics",
-            "ai",
-            "AI Context Window Basics",
-            difficulty="easy",
-            intro="Models can only use the information included in their current context window. If important lesson material is not sent to the model, the model has to guess or answer from general knowledge.",
-            concept="Context includes system instructions, user messages, retrieved content, selected lesson steps, and any previous conversation history sent to the model. More context is not always better; relevant context is better.",
-            example="For lesson tutoring, include the lesson title, current step title, current step content, and the user's exact question.",
-            practice="List the minimum context an AI tutor needs to answer a question about a specific lesson step.",
-            summary="You learned why AI features must choose context intentionally so answers stay grounded, focused, and useful.",
-        ),
-        "openai_streaming_basics": _advanced_lesson(
-            "openai_streaming_basics",
-            "ai",
-            "OpenAI Streaming Basics",
-            difficulty="medium",
-            intro="Streaming sends model output in small chunks so users see progress before the full answer is complete. This is especially useful for long explanations, code walkthroughs, and tutoring flows.",
-            concept="The backend receives chunks from the provider and forwards them to the browser over SSE or another streaming transport. The frontend appends each chunk to one live assistant response.",
-            deep_dive="Streaming improves perceived speed, but it complicates errors, final persistence, retries, and UI state. The app has to know the difference between draft streamed text, a completed answer, and a failed partial answer.",
-            example="async for chunk in stream:\n    yield format_sse_data(chunk)",
-            checklist="Stream chunks safely, track final state, handle provider errors, close client connections, avoid saving partial output on failure, and make retry behavior explicit.",
-            diagnose="A user sees no text until a long answer finishes. Explain how streaming changes the experience.",
-            fix="Describe the backend and frontend pieces required for SSE-based AI streaming.",
-            harden="Plan stream monitoring, timeout handling, and final-message persistence for production.",
-            summary="You learned the basic moving parts of provider-to-browser AI streaming.",
-        ),
-        "ai_structured_outputs": _advanced_lesson(
-            "ai_structured_outputs",
-            "ai",
-            "AI Structured Outputs",
-            difficulty="medium",
-            intro="Some AI features need machine-readable data, not just prose.",
-            concept="Structured output asks the model to return predictable fields such as score, strengths, and improvements.",
-            deep_dive="Even with instructions, models can produce malformed or partial structure. Parsers should fail safely and keep raw feedback when metadata parsing fails.",
-            example="Score: 82\nStrengths:\n- Clear diagnosis\nImprovements:\n- Mention retry limits",
-            checklist="Keep schemas small, validate ranges, parse defensively, store raw output, and test malformed responses.",
-            diagnose="A feedback parser fails because the model wrote 'Score - eighty'. Explain how the app should behave.",
-            fix="Design a defensive parser for score and bullet-list metadata.",
-            harden="Plan regression tests for structured output parsing across realistic model responses.",
-            summary="You learned how structured AI metadata improves product features while requiring defensive parsing.",
-        ),
-        "ai_prompt_builder_design": _advanced_lesson(
-            "ai_prompt_builder_design",
-            "ai",
-            "AI Prompt Builder Design",
-            difficulty="medium",
-            intro="Prompt builders keep AI behavior consistent across routes and features. Instead of scattering long prompt strings through endpoint code, the app builds prompts from structured product state.",
-            concept="A prompt builder converts product state into system and user messages for the model. It decides the assistant role, the allowed source material, the user's task, and the response style.",
-            deep_dive="Duplicated prompt strings drift over time. Shared builders make it easier to test lesson context, practice instructions, safety constraints, and structured-output requirements before any request reaches the AI provider.",
-            example="build_lesson_tutor_prompt(lesson, step, question)",
-            checklist="Separate system behavior from user context, include source-of-truth content, avoid secrets, keep prompts deterministic where possible, and test important prompt fields.",
-            diagnose="A tutor answer ignores the current lesson step. Explain what prompt context may be missing.",
-            fix="Design a prompt builder that includes lesson title, step type, content, and user question.",
-            harden="Plan prompt tests that prevent accidental removal of safety and context instructions.",
-            summary="You learned how prompt builders make AI features maintainable and testable.",
-        ),
-        "invalid_json_from_model": _advanced_lesson(
-            "invalid_json_from_model",
-            "ai",
-            "Invalid JSON from Model",
-            difficulty="hard",
-            intro="Models sometimes return malformed JSON even when asked for structured data. This can break a feature if the application assumes the model will always follow formatting instructions perfectly.",
-            concept="AI output should be treated as untrusted text until parsed and validated. A parser should check both syntax and meaning, such as whether a score is actually between 0 and 100.",
-            deep_dive="Malformed JSON can come from extra prose, trailing commas, markdown fences, truncated streams, missing fields, or fields with unexpected types. Robust systems keep raw feedback and fail metadata parsing safely.",
-            example="{\"score\": 90, \"strengths\": [\"Clear\"],}",
-            checklist="Parse defensively, validate schema, keep raw output, return safe errors, leave optional metadata null when parsing fails, and test common malformed cases.",
-            diagnose="A practice scoring endpoint crashes when the model returns a trailing comma. Explain the failure boundary.",
-            fix="Design parsing behavior that stores feedback but leaves metadata null when parsing fails.",
-            harden="Create a regression suite for malformed JSON, missing fields, partial streams, and out-of-range scores.",
-            summary="You learned how robust AI products survive malformed structured output.",
-        ),
-        "ai_safe_error_handling": _advanced_lesson(
-            "ai_safe_error_handling",
-            "ai",
-            "AI Safe Error Handling",
-            difficulty="production",
-            intro="AI provider failures should not expose secrets, stack traces, request payloads, or confusing technical details to users. The user needs a recovery path, while operators need enough diagnostics to fix the issue.",
-            concept="Safe errors separate user-facing recovery from operator-facing diagnostics. The UI can say generation failed, while logs record whether the cause was authentication, rate limit, timeout, network, or provider status.",
-            deep_dive="Provider auth failures, rate limits, network timeouts, and client disconnects all need different logs but similarly safe UI messages. Persistence should also know that failed output is not a completed assistant response.",
-            example="data: Error: Unable to generate response.",
-            checklist="Catch known provider errors, log clear internal causes, return safe messages, avoid persisting failed output, redact sensitive content, and offer retry only when appropriate.",
-            diagnose="A user sees an OpenAI stack trace in the chat window. Explain why this is unsafe.",
-            fix="Design a safe SSE error path for provider failures.",
-            harden="Plan monitoring and alerting for repeated AI failures without leaking request content or secrets.",
-            summary="You learned how safe AI error handling protects users, operators, and sensitive data.",
-        ),
-        "ai_evaluation_and_regression_tests": _advanced_lesson(
-            "ai_evaluation_and_regression_tests",
-            "ai",
-            "AI Evaluation and Regression Tests",
-            difficulty="production",
-            intro="AI features change over time as prompts, models, and product requirements evolve. Without evaluation, a small prompt edit can silently weaken tutoring, scoring, safety, or formatting.",
-            concept="Evaluation checks whether AI outputs still meet product expectations for important scenarios. It can be automated, human-reviewed, or a mix of both depending on risk.",
-            deep_dive="Regression tests for prompt builders, parsers, safety behavior, and representative examples catch breakage without calling real providers in every test. Provider-backed evaluations can run less often for quality checks.",
-            example="Assert the prompt includes lesson title, step content, and user answer before streaming feedback.",
-            checklist="Test prompt inputs, mock provider streams, include failure cases, track quality examples, review prompt changes, and run targeted evaluations before model upgrades.",
-            diagnose="A prompt refactor removes practice instructions from feedback. Explain what test should have caught it.",
-            fix="Design a small regression suite for tutor prompts, practice prompts, and metadata parsing.",
-            harden="Plan an evaluation workflow for model upgrades, safety regressions, and production incident reviews.",
-            summary="You learned how tests and evaluations keep AI features reliable as they evolve.",
-        ),
-    }
-)
+This separation solves an important engineering problem. The team can review and rebuild the image when dependencies change, then run containers from that image in a consistent way across machines.
 
+A Dockerfile describes build-time decisions. It chooses a base image, copies files, installs dependencies, sets a working directory, and defines a default command. Those decisions become part of the image.
 
-LESSONS["sqlAlchemy_user_scoped_queries"]["difficulty"] = "medium"
-LESSONS["env_variable_not_loaded"]["difficulty"] = "hard"
-LESSONS["docker_startup_race_condition"]["difficulty"] = "hard"
-LESSONS["missing_foreign_key_constraint"]["difficulty"] = "medium"
-LESSONS["alembic_missing_column"]["difficulty"] = "hard"
-LESSONS["eventsource_token_expired"]["difficulty"] = "hard"
-LESSONS["openai_rate_limit_handling"]["difficulty"] = "hard"
-LESSONS["openai_streaming_errors"]["difficulty"] = "production"
+Runtime configuration is different. Database URLs, feature flags, API keys, and environment-specific values are usually passed when the container starts. This keeps one image usable in more than one environment.
+
+Docker is used when the application needs a predictable filesystem, dependency set, and startup command. It is especially useful when different services in the same project require different runtimes.
+
+The model also helps debugging. If a dependency is missing, ask whether the image was built correctly. If a secret is wrong, ask whether runtime configuration was supplied correctly.
+
+Good Docker practice means keeping the image reproducible while keeping environment-specific configuration outside the image. That boundary is the foundation for the rest of the course.""",
+        2: """A container is not a small virtual machine. It is a process running on the host kernel with isolation around filesystem, networking, process visibility, and environment.
+
+When Docker builds an image, it creates layers. Each Dockerfile instruction can create a layer that may be cached during future builds. This is why instruction order affects build speed.
+
+For example, copying requirements.txt before copying the whole application lets Docker reuse the dependency-install layer when only source code changes. Copying all source first often invalidates the cache too early.
+
+At runtime, the container has its own filesystem view. Files written inside the container disappear when the container is removed unless they are stored in a volume or an external service.
+
+Networking has similar boundaries. An app can listen on port 8000 inside the container, but the host cannot reach that port unless it is published. Other containers may reach it differently through a Docker network.
+
+A common mistake is using localhost from inside a container when the developer means another service. Inside the backend container, localhost means the backend container itself, not the host machine and not the database container.
+
+Another mistake is rebuilding an image when the real problem is runtime configuration. If the Dockerfile did not change but DATABASE_URL did, the fix is usually configuration, not a new image layer.
+
+The internal behavior matters because Docker bugs are often boundary bugs. You debug them by asking which boundary is involved: build cache, container filesystem, host networking, service networking, environment variables, or persistent storage.""",
+        3: """A small backend Dockerfile might look like this:
+
+FROM python:3.12-slim
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY . .
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+FROM selects the base runtime. In this case, the image starts from a slim Python 3.12 environment rather than depending on Python installed on the host machine.
+
+WORKDIR creates a predictable directory for the application. Every following command runs from /app unless another working directory is set.
+
+COPY requirements.txt and RUN pip install create a dependency layer. This is intentionally placed before copying the full source tree so normal code edits do not reinstall dependencies every time.
+
+COPY . . adds the application source. CMD defines what runs when the container starts. Binding Uvicorn to 0.0.0.0 is important because the server must listen beyond the container's loopback interface.
+
+The expected behavior is that anyone with Docker can build the image and run the backend without installing Python packages directly on their machine. Production versions would also review user permissions, image size, secret handling, and healthchecks.""",
+        4: """- Check whether a failure happens during image build or container startup; those are different phases with different fixes.
+- Inspect the Dockerfile instruction order when builds are unexpectedly slow or dependencies reinstall too often.
+- Confirm the application listens on an interface reachable from outside the container, usually 0.0.0.0 for HTTP services.
+- Verify which configuration comes from runtime environment variables instead of hardcoded files.
+- Check whether important data is written to a disposable container filesystem or to a volume.
+- Use docker logs before rebuilding; startup errors often explain the real cause.
+- Ask whether networking should use a host port, a container port, or a service name on a Docker network.""",
+        6: """- Docker images are reusable runtime templates; containers are running instances of those templates.
+- Build-time dependencies belong in the image, while environment-specific configuration usually belongs at runtime.
+- Containers isolate the process and filesystem, but they are not full virtual machines.
+- Files inside a container are disposable unless stored in a volume or external service.
+- Most Docker debugging starts by identifying the boundary involved: build, runtime config, network, or persistence.
+- A working local container is a starting point, not proof that production security and operations are ready.""",
+    },
+    "docker_compose_basics": {
+        0: """Docker Compose exists because real applications are rarely one process. A useful development environment often needs a backend, frontend, database, migration command, and sometimes a cache or worker.
+
+Without Compose, every developer has to remember several commands and run them in the right order. That knowledge usually lives in a README, terminal history, or one teammate's memory.
+
+Compose turns that knowledge into configuration. The compose file describes which services exist, how they start, which ports they expose, which variables they need, and which volumes keep data.
+
+This matters for onboarding and debugging. A new developer can run one command and see the same service graph as the rest of the team instead of assembling the stack by hand.
+
+Compose also makes architecture visible. When you read the file, you can see the backend depends on the database, the frontend talks to the API, and the database stores state in a volume.
+
+In production, teams may use other orchestrators, but the Compose mental model remains valuable. You learn to think in services, networks, configuration, startup behavior, and persistent state.""",
+        1: """A Compose file describes a group of services. Each service represents one role in the application, such as backend, frontend, db, worker, or cache.
+
+The service definition can choose an image, build from a Dockerfile, publish ports, pass environment variables, mount volumes, and define healthchecks. This creates an executable service graph.
+
+Compose creates a default network for the project. Services on that network can reach each other by service name, which means the backend can connect to the database using db as the hostname.
+
+This solves a common local-development problem. Instead of asking whether PostgreSQL is installed locally or which port it uses on the host, the backend connects to the Compose-managed database service.
+
+Compose is used for development environments, demos, integration tests, and benchmark projects. It is best when the goal is repeatable multi-service setup rather than full production orchestration.
+
+The file also documents state. A named volume shows that database data should survive container recreation, while a bind mount shows that host files are being shared into a container.
+
+The important concept is that Compose coordinates services, but it does not automatically make those services correct. Readiness, credentials, migrations, and safe shutdown still need deliberate design.""",
+        2: """When docker compose up runs, Compose reads the YAML file and creates project resources. Those resources usually include containers, a default network, and any named volumes declared by the project.
+
+If a service has a build section, Compose can build an image from a Dockerfile. If a service uses image, Compose pulls or reuses that image. Then it starts containers for each service.
+
+Networking is one of the most important behaviors. Inside the Compose network, service names become DNS names. A backend should usually connect to postgresql://...@db:5432/... rather than localhost.
+
+Port publishing is separate. A mapping like 8000:8000 lets the host browser reach the backend, but other containers do not need the host mapping to communicate on the internal network.
+
+Volumes are also managed separately from containers. Removing and recreating containers does not necessarily remove named volumes, which is why old database state can survive many rebuilds.
+
+Environment variables have two phases that are easy to confuse. Compose may interpolate values from the host while reading the YAML, and it may also pass values into the container environment.
+
+A common mistake is assuming depends_on means the dependency is ready. It mostly expresses startup order. A database can be started but still initializing, so readiness checks and retry logic remain necessary.
+
+The internal behavior explains many local bugs. If the wrong database state appears, inspect volumes. If a hostname fails, inspect the service name and network. If a value is missing, inspect both host interpolation and container environment.""",
+        3: """A small Compose file for an API and database can look like this:
+
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/app
+    depends_on:
+      - db
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: app
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
+
+The backend service builds from local source and publishes port 8000 so the host browser can reach it. DATABASE_URL uses db because db is the service name on the Compose network.
+
+The db service uses the official PostgreSQL image and declares initial database settings. The named volume stores database files outside the disposable container lifecycle.
+
+The expected behavior is that Compose creates one network, starts both containers, and lets the backend connect to PostgreSQL through the service name. A more reliable version would add healthchecks and bounded backend startup retry.""",
+        4: """- Use service names for container-to-container hostnames instead of localhost.
+- Publish only the ports humans or host tools need to access directly.
+- Inspect named volumes when database state survives rebuilds or appears stale.
+- Keep required environment variables explicit and avoid committing real secrets.
+- Use docker compose ps to check service state, ports, and health information.
+- Use docker compose logs <service> to debug one service while preserving stack context.
+- Add healthchecks or retries for services that depend on databases, queues, or external APIs.""",
+        6: """- Compose describes a multi-service application in one executable configuration file.
+- Services communicate by name on the Compose network, while host port mappings serve host access.
+- Named volumes preserve state after containers are recreated.
+- depends_on can help with order, but it does not prove readiness.
+- A good compose file documents architecture as well as startup commands.
+- Debug Compose issues by checking service names, networks, volumes, environment variables, and logs.""",
+    },
+    "postgres_container_not_ready": {
+        0: """A PostgreSQL container can be running while PostgreSQL itself is still not ready for the backend. This is one of the most common Docker Compose problems in fullstack projects.
+
+The symptom is usually frustrating. The backend fails on the first startup with connection refused, timeout, or migration errors, then works after a restart.
+
+That restart is the clue. If time fixes the issue without a code change, the system probably relied on timing rather than a clear readiness signal.
+
+This matters in local development because unreliable startup makes the whole environment feel flaky. It matters even more in CI, where slower machines and parallel jobs make timing problems more visible.
+
+It also matters in production-style deployments. A database can be alive as a process while it is recovering, applying initialization, or not yet accepting the exact connection the app needs.
+
+The lesson is simple but important: container running state is not the same as service readiness. A reliable app verifies readiness with checks and retries that match the real database operation.""",
+        1: """Database readiness means the database can do the useful work the application needs right now. For a backend, that is more than opening a TCP port.
+
+A useful readiness check should prove that the backend can resolve the database hostname, open a connection, authenticate as the configured user, select the configured database, and run a basic operation.
+
+This concept solves the gap between infrastructure state and application state. Docker can report that the postgres container is running, but PostgreSQL must prove it can serve the app.
+
+Readiness is used before running migrations, before accepting HTTP traffic, and before marking a deployment as available. It is part of startup safety.
+
+The exact check depends on the workload. A simple app may use pg_isready. A backend that must run migrations may retry the migration command because that is the operation that must succeed.
+
+Readiness is not a permanent guarantee. A database can become unavailable later because of restart, disk pressure, memory pressure, network interruption, or operator action.
+
+That is why startup readiness and runtime error handling work together. Startup checks get the app online safely; runtime handling keeps the app honest after the first successful connection.""",
+        2: """The official PostgreSQL image performs several steps during startup. On a fresh volume, it creates the database cluster, applies environment-based initialization, and may run scripts from docker-entrypoint-initdb.d.
+
+Only after that setup does the server become ready for normal client connections. During the earlier phases, the container process can exist even though the app cannot yet use the database.
+
+On an existing volume, initialization may be skipped, but startup can still involve recovery, log replay, or permission checks. Existing state can make one machine behave differently from another.
+
+Credentials are another common edge case. If a volume was initialized with old credentials, changing POSTGRES_PASSWORD in Compose does not rewrite the existing database state.
+
+Networking adds another layer. The backend must use the Compose service name and correct port. Using localhost inside the backend container points to the backend container, not the database.
+
+Fixed sleeps are a fragile workaround. A five-second sleep may pass on a fast laptop and fail in CI. A thirty-second sleep may hide real configuration mistakes and slow every startup.
+
+Better systems use bounded retry around the real operation. If migrations must run before serving, retry migrations with clear logs and a maximum wait time.
+
+The step-by-step debugging path is to inspect the error type, verify the connection string, check database logs, test readiness from inside the Docker network, and confirm whether persistent volume state is involved.""",
+        3: """A database-aware readiness check can target the same identity the app uses:
+
+pg_isready -h db -U postgres -d app
+
+The -h db option uses the Compose service name. The -U postgres option checks the configured user. The -d app option checks the intended database.
+
+For a backend that must run migrations, the startup command can retry the real migration:
+
+until alembic upgrade head; do
+  echo "Database not ready for migrations, retrying..."
+  sleep 2
+done
+uvicorn app.main:app --host 0.0.0.0 --port 8000
+
+The readiness check tells you whether PostgreSQL accepts connections. The migration retry tells you whether the application can perform the operation required before serving.
+
+The expected behavior is patient startup during normal database initialization and clear failure when credentials, database names, or migrations are truly broken. In production, the loop should also have a maximum attempt count.""",
+        4: """- Read the exact error message before changing configuration; connection refused, timeout, authentication failed, and unknown database mean different things.
+- Run readiness checks from inside the Compose network so hostname and routing match the backend.
+- Confirm DATABASE_URL uses the database service name, not localhost.
+- Compare POSTGRES_DB, POSTGRES_USER, and POSTGRES_PASSWORD with the backend connection string.
+- Inspect PostgreSQL logs for initialization, recovery, permissions, or script failures.
+- Treat persistent volumes as possible hidden state when credentials or database names changed.
+- Wrap migrations or startup queries in bounded retry logic with clear failure messages.""",
+        8: """- A running PostgreSQL container is not necessarily ready for application connections.
+- Readiness should prove the operation the application actually needs.
+- Fixed sleeps are unreliable because startup time changes between environments.
+- Persistent volumes can preserve old credentials, databases, and schema state.
+- Backend startup should retry expected transient failures but fail clearly after a deadline.
+- Production readiness should be separate from liveness so traffic is not routed too early.""",
+    },
+    "docker_healthcheck_missing": {
+        0: """Without healthchecks, Docker can tell you whether a container process is running, but not whether the service is useful. That distinction matters in multi-container systems.
+
+A backend process might be alive while its database connection is broken. PostgreSQL might be running while it is still initializing. A frontend server might respond while serving the wrong configuration.
+
+Healthchecks give the container a small self-test. The result becomes visible as healthy, unhealthy, or starting, which is much more informative than running alone.
+
+This matters during development because it points debugging at the right service. If the database is unhealthy, the backend failure is probably a symptom rather than the first cause.
+
+It matters in CI because tests often start as soon as containers exist. A health signal can prevent integration tests from racing the services they depend on.
+
+It matters in production because platforms can use health and readiness signals to decide when to route traffic, restart services, or alert operators. The signal must be meaningful, not decorative.""",
+        1: """A healthcheck is an executable contract. It is a command that runs inside the container and exits successfully when the service passes its basic self-test.
+
+The contract should match what other services need. If the backend needs PostgreSQL to accept SQL connections, the database healthcheck should test PostgreSQL readiness, not just process existence.
+
+For an API, a healthcheck may call an HTTP endpoint. That endpoint might simply confirm the process is alive, or it might also verify required dependencies depending on whether it is liveness or readiness.
+
+This concept is used whenever service state should be observable. Developers use it during local debugging. CI uses it before tests. Production platforms use it for routing and recovery decisions.
+
+The healthcheck command should be cheap enough to run repeatedly. A check that performs expensive work can create load or introduce its own failure mode.
+
+It should also be specific enough to catch meaningful failures. A check that always returns success gives false confidence and can make incidents harder to understand.
+
+The best healthchecks are boring, local, deterministic, and tied to a real service promise. They do not replace logs or metrics, but they make service state visible sooner.""",
+        2: """Docker healthchecks run repeatedly according to timing settings. interval controls how often the check runs, timeout controls how long one check may take, retries controls how many failures are tolerated, and start_period gives startup time before failures count.
+
+These settings matter because services have different startup profiles. PostgreSQL may need time to initialize a fresh volume, while a simple static server may be ready almost immediately.
+
+The command runs inside the container. This creates a common edge case: curl may exist on the host but not inside a minimal runtime image. The healthcheck must use tools available in the image.
+
+Another edge case is checking too much. If a healthcheck depends on an external public API, the container may become unhealthy because the internet is briefly unavailable, even though the local service is fine.
+
+Checking too little is also risky. A command that only confirms a process exists may miss broken credentials, missing databases, or a backend that cannot finish startup.
+
+Healthchecks are signals, not complete recovery systems. An unhealthy container still needs logs, metrics, and operator context to explain why it is unhealthy.
+
+They also do not replace application retry. A dependency can pass a healthcheck and then fail later. Runtime code still needs timeouts and error handling.
+
+A useful design layers these concerns: healthchecks expose state, startup scripts wait for required dependencies, application code handles runtime failures, and monitoring tracks patterns over time.""",
+        3: """A PostgreSQL healthcheck can look like this:
+
+services:
+  db:
+    image: postgres:16
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d app"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+The test command runs inside the database container. pg_isready checks whether PostgreSQL is accepting connections for the configured user and database.
+
+The start_period gives PostgreSQL time to initialize before failures count. retries prevents one transient failure from immediately marking the service unhealthy.
+
+A backend healthcheck might call a local endpoint:
+
+test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+
+This uses Python instead of curl so it works in images that do not install curl. The expected behavior is that health status reflects real service capability, while logs explain the cause when the check fails.""",
+        4: """- Confirm the healthcheck command exists inside the container image, not only on the host.
+- Choose a check that proves useful service behavior rather than process existence alone.
+- Tune start_period so normal initialization is not reported as failure.
+- Keep healthchecks cheap and local unless the service truly depends on an external system.
+- Test the failure path by temporarily breaking credentials, ports, or dependencies.
+- Make application logs explain what failed when healthchecks report unhealthy status.
+- Pair healthchecks with retry and runtime error handling because health can change after startup.""",
+        8: """- Healthchecks turn hidden readiness assumptions into visible service state.
+- A useful healthcheck is an executable version of the service's basic contract.
+- Timing settings control whether checks are patient, noisy, strict, or too slow.
+- Healthchecks should guide debugging but not replace logs, metrics, or error handling.
+- Minimal images may not include the tools your healthcheck command assumes.
+- Production systems use health signals as one layer in readiness, routing, restart, and alerting decisions.""",
+    },
+    "docker_startup_race_condition": {
+        0: """A startup race condition happens when one service begins work before another service is ready. In Docker Compose, this often appears when a backend starts before PostgreSQL can accept connections.
+
+The failure may look random. The first docker compose up fails, but a restart works. Nothing changed except time, which is the strongest clue that readiness was assumed instead of verified.
+
+This topic matters because race conditions destroy trust in the development environment. Developers start rerunning commands instead of understanding failures.
+
+It also matters in CI. Automated jobs are less forgiving than humans, and slower runners often expose startup assumptions that fast laptops hide.
+
+In production-style systems, startup races can turn into deployment incidents. A service may announce readiness before migrations, dependencies, or caches are actually prepared.
+
+The real lesson is that container orchestration cannot guess every application requirement. The app must define what must be true before it starts accepting work.""",
+        1: """Startup order is not readiness. Compose can start one container before another, but it does not automatically know when the application inside a container is ready.
+
+depends_on expresses a structural dependency. It can say the backend should start after the database container starts, but container start does not mean PostgreSQL can run migrations.
+
+Readiness is application-specific. For one service, readiness might mean an HTTP port is open. For another, it might mean a database connection, a completed migration, or a warmed cache.
+
+This concept is used whenever a service performs startup work before serving. Databases, queues, caches, object storage emulators, and internal APIs can all have delayed readiness.
+
+The fix is not always one tool. Healthchecks, startup scripts, migration ownership, application retries, and readiness endpoints each solve part of the problem.
+
+A helpful mental model is to ask what has actually been proven. Starting a container proves Docker launched a process. Running a migration proves much more about the database path.
+
+Reliable startup design means choosing the proof that matches the risk. If schema state matters before requests are served, prove schema setup before the server announces readiness.""",
+        2: """A mature startup sequence has layers. Compose defines services and relationships. Healthchecks expose basic service state. Startup scripts wait for required operations. The application exposes readiness only after initialization succeeds.
+
+Consider database migrations. A backend may need to resolve the database hostname, authenticate, select the correct database, inspect the migration table, acquire locks, apply schema changes, and then start serving HTTP.
+
+Checking only that port 5432 is open proves very little. It does not prove credentials, database name, migration history, or migration safety.
+
+Retrying the real migration command proves much more, but it must be bounded. Infinite retry loops hide broken configuration and can make deployments appear stuck instead of failed.
+
+Multiple replicas create another edge case. If every backend container runs migrations at startup, they may compete or corrupt assumptions. Production systems often move migrations to one release step or job.
+
+Healthchecks can also be misleading. A database can pass pg_isready before a specific database extension or schema is available. A backend can pass liveness while still not ready for traffic.
+
+Old volumes add another failure mode. The database may be ready but contain schema state from an earlier branch, causing migrations or application queries to fail.
+
+Debugging proceeds step by step: identify the first failed operation, check whether startup order or readiness was assumed, inspect logs, reproduce slow startup, and add explicit proof where the system relied on timing.""",
+        3: """A bounded startup script can retry migrations before serving:
+
+#!/bin/sh
+set -e
+
+attempt=1
+max_attempts=30
+
+until alembic upgrade head; do
+  if [ "$attempt" -ge "$max_attempts" ]; then
+    echo "Database never became ready for migrations"
+    exit 1
+  fi
+  echo "Migration attempt $attempt failed; retrying in 2 seconds"
+  attempt=$((attempt + 1))
+  sleep 2
+done
+
+exec uvicorn app.main:app --host 0.0.0.0 --port 8000
+
+set -e stops the script on unexpected failures outside the retry loop. The loop retries the real dependency operation with a maximum attempt count.
+
+The final exec replaces the shell with Uvicorn so container stop signals reach the server process. The expected behavior is patient startup during normal database initialization and clear failure when the dependency never becomes usable.""",
+        4: """- Identify the first operation that fails: DNS, TCP connection, authentication, migration lock, schema query, or app import.
+- Replace fixed sleeps with readiness checks or retries tied to real dependency behavior.
+- Add a maximum retry budget so broken configuration does not loop forever.
+- Include attempt count, target service, and failing operation in startup logs.
+- Decide whether migrations are safe to run from every container or need one owner.
+- Expose backend readiness only after required startup work has completed.
+- Test slow database startup intentionally so the race is reproduced under controlled conditions.""",
+        8: """- Startup races often look random because timing changes between restarts and machines.
+- Container startup order does not prove application readiness.
+- Retrying the real startup operation is usually stronger than checking an open port.
+- Retry loops must have deadlines and useful logs.
+- Multi-replica deployments need a clear migration ownership strategy.
+- Reliable startup is layered across Compose configuration, dependency health, startup scripts, app readiness, and monitoring.""",
+    },
+    "docker_production_hardening": {
+        0: """A container that runs locally is not automatically ready for production. Local setups often optimize for speed and convenience, while production needs safety, observability, and predictable recovery.
+
+Production hardening is the process of reducing avoidable risk in the image, runtime configuration, process behavior, and operational signals.
+
+This matters because containers can make deployment feel deceptively simple. The same abstraction that hides local setup complexity can also hide root users, copied secrets, missing healthchecks, and poor shutdown behavior.
+
+Real systems fail in ordinary ways. A dependency vulnerability appears. A container restarts during traffic. A secret is accidentally copied into an image. Logs disappear because they were written to an internal file.
+
+Hardening does not mean making the container perfect. It means making the most common and expensive failure modes less likely, easier to detect, and easier to recover from.
+
+The practical outcome is a service that can be rebuilt, deployed, stopped, observed, and reviewed with confidence. Production Docker is operational engineering, not just packaging.""",
+        1: """The core concept is blast-radius reduction. If the service fails or is compromised, the container should expose as little as possible and recover as predictably as possible.
+
+Running as a non-root user reduces the impact of application compromise. Keeping secrets out of images reduces the damage if an image is shared or leaked.
+
+Small runtime images reduce unnecessary tools and packages. This can reduce vulnerability surface and make image scanning easier to understand.
+
+Explicit configuration reduces surprises. The service should not depend on a developer's local files, hidden environment variables, or bind mounts that do not exist in deployment.
+
+Hardening is used during release preparation, security review, platform migration, and incident response. It gives teams concrete questions to ask before the service reaches users.
+
+The concept also improves debugging. When logs go to stdout, healthchecks are meaningful, and shutdown is graceful, operators can understand the service without entering the container.
+
+Good hardening is continuous. Base images age, dependencies change, threat models evolve, and deployment platforms impose new constraints. The review has to repeat.""",
+        2: """Production Docker behavior depends on many small technical choices. The base image determines available packages, default users, update cadence, and vulnerability surface.
+
+The build process determines what enters the final image. If test files, local secrets, virtual environments, or build tools are copied accidentally, the runtime image carries unnecessary risk.
+
+User permissions matter. A process running as root has more power inside the container than most web services need. A non-root user limits damage if the process is exploited.
+
+Signal handling matters too. Containers are stopped with signals. If the app or shell wrapper does not pass SIGTERM correctly, the platform may kill the service before it finishes in-flight work.
+
+Logging should usually go to stdout or stderr so the platform can collect it. Logs written only to files inside the container may disappear when the container is recreated.
+
+Health and readiness signals need to represent real service state. A container that is alive but cannot reach required dependencies should not receive user traffic.
+
+Secrets should be injected by the runtime environment, not baked into the Dockerfile or committed compose files. Baked secrets are hard to rotate and easy to leak.
+
+Edge cases include cached vulnerable layers, multi-stage builds that still copy build artifacts into runtime images, and environment drift between staging and production. Hardening is the discipline of finding these issues before an incident.""",
+        3: """A more production-minded Dockerfile might look like this:
+
+FROM python:3.12-slim AS runtime
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+WORKDIR /app
+RUN adduser --disabled-password --gecos "" appuser
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY . .
+USER appuser
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+The slim base limits unnecessary packages. PYTHONUNBUFFERED makes logs appear promptly in container output. The non-root user reduces privilege.
+
+Dependency installation happens before source copy to preserve build caching. USER appuser ensures the server runs without root privileges.
+
+The expected behavior is not merely that the API starts. The expected behavior is that it starts with clearer runtime assumptions, fewer privileges, and logs that the platform can collect. A release pipeline should also scan the final image and verify secrets are not copied into it.""",
+        4: """- Run the application as a non-root user unless there is a documented reason not to.
+- Keep secrets out of Dockerfiles, image layers, build logs, and committed compose files.
+- Use small runtime images and avoid copying build-only tools into production images.
+- Send logs to stdout or stderr so the deployment platform can collect them.
+- Add health and readiness checks that represent real service capability.
+- Verify the process handles shutdown signals within the platform's termination window.
+- Scan images and rebuild when base images or dependencies receive security fixes.
+- Check that the build context excludes .env files, local databases, virtual environments, and generated secrets.""",
+        8: """- Production readiness includes image contents, runtime configuration, process lifecycle, and operational signals.
+- Least privilege reduces blast radius when something fails or is compromised.
+- Secrets should be injected at runtime rather than baked into images.
+- Logs, healthchecks, and graceful shutdown are reliability features, not decoration.
+- Image scanning and rebuild discipline matter because dependencies age.
+- Production Docker quality comes from repeated review as the app, platform, and threat model change.""",
+    },
+}
+
+for lesson_id, step_updates in DOCKER_ARTICLE_REWRITE.items():
+    for step_index, content in step_updates.items():
+        LESSONS[lesson_id]["steps"][step_index]["content"] = content
 
 
 def get_lesson(lesson_id: str) -> dict | None:

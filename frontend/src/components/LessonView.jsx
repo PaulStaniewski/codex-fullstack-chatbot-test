@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import {
   getPracticeHistory,
-  streamLessonTutor,
   streamLessonStudyAssistant,
   streamPracticeFeedback,
 } from "../api.js";
@@ -14,7 +13,7 @@ const STUDY_ACTIONS = [
   { action: "example", label: "Give example" },
   { action: "ask_questions", label: "Ask me questions" },
 ];
-const TUTOR_QUICK_ACTIONS = ["Explain simply", "Give an example", "Why does this matter?"];
+
 const THEORY_STEP_TYPES = new Set([
   "intro",
   "concept",
@@ -30,18 +29,55 @@ function formatDifficulty(value) {
   return value ? value.charAt(0).toUpperCase() + value.slice(1) : "";
 }
 
+function isCodeParagraph(paragraph) {
+  const trimmed = paragraph.trim();
+  const codeSignals = [
+    "#!/bin/",
+    "FROM ",
+    "WORKDIR ",
+    "COPY ",
+    "RUN ",
+    "CMD ",
+    "ENV ",
+    "USER ",
+    "services:",
+    "volumes:",
+    "healthcheck:",
+    "test:",
+    "pg_isready ",
+    "until ",
+    "done",
+    "uvicorn ",
+    "docker ",
+    "alembic ",
+    "@app.",
+    "def ",
+    "set -e",
+  ];
+
+  return (
+    codeSignals.some((signal) => trimmed.includes(signal)) ||
+    /^\s{2,}\S/m.test(paragraph) ||
+    /^[A-Z_]+=.*/m.test(trimmed)
+  );
+}
+
 function formatLessonContent(content) {
-  const looksLikeCode =
-    content.includes("\n") ||
-    content.includes("@app.") ||
-    content.includes("docker ") ||
-    content.includes("def ");
+  const paragraphs = content.split(/\n\s*\n/).filter((paragraph) => paragraph.trim());
 
-  if (looksLikeCode) {
-    return <pre className="lesson-code">{content}</pre>;
-  }
-
-  return <p>{content}</p>;
+  return (
+    <div className="lesson-content">
+      {paragraphs.map((paragraph, index) =>
+        isCodeParagraph(paragraph) ? (
+          <pre className="lesson-code" key={`${index}-${paragraph.slice(0, 16)}`}>
+            {paragraph}
+          </pre>
+        ) : (
+          <p key={`${index}-${paragraph.slice(0, 16)}`}>{paragraph}</p>
+        ),
+      )}
+    </div>
+  );
 }
 
 export default function LessonView({
@@ -49,13 +85,10 @@ export default function LessonView({
   isLoading,
   isCompletingStep = false,
   token,
+  onPreviousStep,
   onNextStep,
   onMarkStepRead,
 }) {
-  const [tutorQuestion, setTutorQuestion] = useState("");
-  const [tutorAnswer, setTutorAnswer] = useState("");
-  const [tutorError, setTutorError] = useState("");
-  const [isTutorStreaming, setIsTutorStreaming] = useState(false);
   const [studyQuestion, setStudyQuestion] = useState("");
   const [studyAnswer, setStudyAnswer] = useState("");
   const [studyError, setStudyError] = useState("");
@@ -67,15 +100,11 @@ export default function LessonView({
   const [practiceHistory, setPracticeHistory] = useState([]);
   const [selectedAttemptId, setSelectedAttemptId] = useState(null);
   const [historyError, setHistoryError] = useState("");
-  const closeTutorStreamRef = useRef(null);
+  const [pendingReadStepIndex, setPendingReadStepIndex] = useState(null);
   const closeStudyStreamRef = useRef(null);
   const closePracticeStreamRef = useRef(null);
 
   useEffect(() => {
-    setTutorQuestion("");
-    setTutorAnswer("");
-    setTutorError("");
-    setIsTutorStreaming(false);
     setStudyQuestion("");
     setStudyAnswer("");
     setStudyError("");
@@ -87,8 +116,7 @@ export default function LessonView({
     setPracticeHistory([]);
     setSelectedAttemptId(null);
     setHistoryError("");
-    closeTutorStreamRef.current?.();
-    closeTutorStreamRef.current = null;
+    setPendingReadStepIndex(null);
     closeStudyStreamRef.current?.();
     closeStudyStreamRef.current = null;
     closePracticeStreamRef.current?.();
@@ -96,7 +124,7 @@ export default function LessonView({
   }, [lesson?.lesson_id, lesson?.current_step_index]);
 
   useEffect(() => {
-    if (!lesson || lesson.completed) {
+    if (!lesson) {
       return;
     }
 
@@ -106,11 +134,10 @@ export default function LessonView({
     }
 
     loadPracticeHistory();
-  }, [lesson?.lesson_id, lesson?.current_step_index, lesson?.completed]);
+  }, [lesson?.lesson_id, lesson?.current_step_index]);
 
   useEffect(() => {
     return () => {
-      closeTutorStreamRef.current?.();
       closeStudyStreamRef.current?.();
       closePracticeStreamRef.current?.();
     };
@@ -130,6 +157,9 @@ export default function LessonView({
   const lessonDifficultyLabel = formatDifficulty(lesson.difficulty);
   const stepDifficultyLabel = formatDifficulty(currentStep.difficulty);
   const isTheoryStep = THEORY_STEP_TYPES.has(currentStep.type);
+  const isFirstStep = lesson.current_step_index <= 0;
+  const isLastStep = lesson.current_step_index >= lesson.steps.length - 1;
+  const isCurrentStepMarkingRead = pendingReadStepIndex === lesson.current_step_index;
   const unreadTheoryStepsBeforePractice =
     currentStep.type === "practice" &&
     lesson.steps
@@ -188,41 +218,6 @@ export default function LessonView({
     });
   }
 
-  function handleTutorSubmit(event) {
-    event.preventDefault();
-    askTutor();
-  }
-
-  function askTutor(question = tutorQuestion) {
-    const cleanQuestion = question.trim();
-    if (!cleanQuestion || isTutorStreaming) {
-      return;
-    }
-
-    closeTutorStreamRef.current?.();
-    setTutorQuestion(cleanQuestion);
-    setTutorAnswer("");
-    setTutorError("");
-    setIsTutorStreaming(true);
-
-    closeTutorStreamRef.current = streamLessonTutor({
-      lessonId: lesson.lesson_id,
-      question: cleanQuestion,
-      stepIndex: lesson.current_step_index,
-      token,
-      onToken: (_chunk, fullAnswer) => {
-        setTutorAnswer(fullAnswer);
-      },
-      onError: (message) => {
-        setTutorError(message || "Unable to get tutor response.");
-      },
-      onDone: () => {
-        setIsTutorStreaming(false);
-        closeTutorStreamRef.current = null;
-      },
-    });
-  }
-
   function handleStudySubmit(event) {
     event.preventDefault();
     askStudyAssistant("custom_question", studyQuestion);
@@ -263,6 +258,19 @@ export default function LessonView({
     requestPracticeFeedback();
   }
 
+  async function handleMarkStepRead() {
+    if (currentStep.completed || isCompletingStep || isCurrentStepMarkingRead) {
+      return;
+    }
+
+    setPendingReadStepIndex(lesson.current_step_index);
+    try {
+      await onMarkStepRead?.(lesson.current_step_index);
+    } finally {
+      setPendingReadStepIndex(null);
+    }
+  }
+
   return (
     <section className="lesson-view">
       <div className="lesson-card">
@@ -284,59 +292,70 @@ export default function LessonView({
         </div>
 
         {lesson.completed ? (
-          <div className="lesson-complete-state">
-            <div className="empty-mark">✓</div>
-            <h3>Lesson completed</h3>
-            <p>You earned XP for finishing this lesson.</p>
+          <div className="lesson-complete-review-banner">
+            <strong>Lesson completed ✓</strong>
+            <span>You can still review the lesson content and practice again.</span>
           </div>
-        ) : (
-          <>
-            <div className="lesson-step">
-              <div className="lesson-step-meta">
-                <span>{currentStep.type}</span>
-                {currentStep.type === "practice" && currentStep.difficulty ? (
-                  <span className={`difficulty-badge difficulty-${currentStep.difficulty}`}>
-                    {stepDifficultyLabel}
-                  </span>
-                ) : null}
-              </div>
-              <h3>{currentStep.title}</h3>
-              <div className="lesson-step-content">
-                {formatLessonContent(currentStep.content)}
-              </div>
-              {isTheoryStep ? (
-                <div className="lesson-read-actions">
-                  <button
-                    className="secondary-button"
-                    type="button"
-                    onClick={() => onMarkStepRead?.(lesson.current_step_index)}
-                    disabled={currentStep.completed || isCompletingStep}
-                  >
-                    {currentStep.completed
-                      ? "Read ✓"
-                      : isCompletingStep
-                        ? "Marking..."
-                        : "Mark as read"}
-                  </button>
-                  {currentStep.completed ? (
-                    <span className="lesson-xp-badge">
-                      +{currentStep.xp_awarded || 0} XP earned
-                    </span>
-                  ) : null}
-                </div>
+        ) : null}
+
+        <div className="lesson-step">
+          <div className="lesson-step-meta">
+            <span>{currentStep.type}</span>
+            {currentStep.type === "practice" && currentStep.difficulty ? (
+              <span className={`difficulty-badge difficulty-${currentStep.difficulty}`}>
+                {stepDifficultyLabel}
+              </span>
+            ) : null}
+          </div>
+          <h3>{currentStep.title}</h3>
+          <div className="lesson-step-content">{formatLessonContent(currentStep.content)}</div>
+          {isTheoryStep ? (
+            <div className="lesson-read-actions">
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={handleMarkStepRead}
+                disabled={currentStep.completed || isCompletingStep || isCurrentStepMarkingRead}
+              >
+                {currentStep.completed
+                  ? "Read ✓"
+                  : isCompletingStep || isCurrentStepMarkingRead
+                    ? "Marking..."
+                    : "Mark as read"}
+              </button>
+              {currentStep.completed ? (
+                <span className="lesson-xp-badge">
+                  +{currentStep.xp_awarded || 0} XP earned
+                </span>
               ) : null}
             </div>
+          ) : null}
+        </div>
 
-            <button className="primary-button lesson-next-button" type="button" onClick={onNextStep}>
-              {lesson.current_step_index >= lesson.steps.length - 1
-                ? "Complete lesson"
-                : "Next step"}
+        <div className="lesson-step-navigation">
+          {lesson.completed ? (
+            <button
+              className="secondary-button"
+              type="button"
+              onClick={onPreviousStep}
+              disabled={isFirstStep}
+            >
+              Previous step
             </button>
-          </>
-        )}
+          ) : null}
+          {lesson.completed && isLastStep ? (
+            <button className="primary-button" type="button" disabled>
+              Lesson completed
+            </button>
+          ) : (
+            <button className="primary-button" type="button" onClick={onNextStep}>
+              {isLastStep ? "Complete lesson" : "Next step"}
+            </button>
+          )}
+        </div>
       </div>
 
-      {!lesson.completed && currentStep.type === "practice" ? (
+      {currentStep.type === "practice" ? (
         <div className="lesson-card lesson-practice-card">
           <div className="lesson-card-header">
             <div>
@@ -383,7 +402,7 @@ export default function LessonView({
             </div>
             {practiceHistory.length > 0 ? (
               <div className="practice-attempt-list">
-                {practiceHistory.map((attempt, index) => (
+                {practiceHistory.map((attempt) => (
                   <button
                     type="button"
                     key={attempt.id}
@@ -404,7 +423,9 @@ export default function LessonView({
                         <em>{attempt.score}/100</em>
                       ) : null}
                     </span>
-                    <time dateTime={attempt.created_at}>{formatAttemptTime(attempt.created_at)}</time>
+                    <time dateTime={attempt.created_at}>
+                      {formatAttemptTime(attempt.created_at)}
+                    </time>
                     <strong>{previewAnswer(attempt.answer)}</strong>
                   </button>
                 ))}
@@ -452,98 +473,49 @@ export default function LessonView({
         </div>
       ) : null}
 
-      {!lesson.completed ? (
-        <div className="lesson-card lesson-study-card">
-          <div className="lesson-card-header">
-            <div>
-              <p className="eyebrow">Study Assistant</p>
-              <h2>Study this lesson</h2>
-            </div>
-            {isStudyStreaming ? <span className="status-pill">Streaming</span> : null}
-          </div>
-
-          <div className="quick-actions">
-            {STUDY_ACTIONS.map((item) => (
-              <button
-                type="button"
-                key={item.action}
-                onClick={() => askStudyAssistant(item.action)}
-                disabled={isStudyStreaming}
-              >
-                {item.label}
-              </button>
-            ))}
-          </div>
-
-          <form className="lesson-tutor-form" onSubmit={handleStudySubmit}>
-            <textarea
-              value={studyQuestion}
-              onChange={(event) => setStudyQuestion(event.target.value)}
-              placeholder="Ask AI about this lesson..."
-              rows={3}
-              disabled={isStudyStreaming}
-            />
-            <button
-              className="primary-button"
-              type="submit"
-              disabled={!studyQuestion.trim() || isStudyStreaming}
-            >
-              {isStudyStreaming ? "Asking..." : "Ask AI"}
-            </button>
-          </form>
-
-          {studyError ? <p className="form-error">{studyError}</p> : null}
-          {studyAnswer ? (
-            <div className="lesson-tutor-answer">
-              <ReactMarkdown>{studyAnswer}</ReactMarkdown>
-            </div>
-          ) : null}
-        </div>
-      ) : null}
-
-      <div className="lesson-card lesson-tutor-card">
+      <div className="lesson-card lesson-study-card">
         <div className="lesson-card-header">
           <div>
-            <p className="eyebrow">AI Tutor</p>
-            <h2>Ask about this step</h2>
+            <p className="eyebrow">Study Assistant</p>
+            <h2>Study this lesson</h2>
           </div>
-          {isTutorStreaming ? <span className="status-pill">Streaming</span> : null}
+          {isStudyStreaming ? <span className="status-pill">Streaming</span> : null}
         </div>
 
         <div className="quick-actions">
-          {TUTOR_QUICK_ACTIONS.map((action) => (
+          {STUDY_ACTIONS.map((item) => (
             <button
               type="button"
-              key={action}
-              onClick={() => askTutor(action)}
-              disabled={isTutorStreaming}
+              key={item.action}
+              onClick={() => askStudyAssistant(item.action)}
+              disabled={isStudyStreaming}
             >
-              {action}
+              {item.label}
             </button>
           ))}
         </div>
 
-        <form className="lesson-tutor-form" onSubmit={handleTutorSubmit}>
+        <form className="lesson-tutor-form" onSubmit={handleStudySubmit}>
           <textarea
-            value={tutorQuestion}
-            onChange={(event) => setTutorQuestion(event.target.value)}
-            placeholder="Ask AI about this step..."
+            value={studyQuestion}
+            onChange={(event) => setStudyQuestion(event.target.value)}
+            placeholder="Ask AI about this lesson..."
             rows={3}
-            disabled={isTutorStreaming}
+            disabled={isStudyStreaming}
           />
           <button
             className="primary-button"
             type="submit"
-            disabled={!tutorQuestion.trim() || isTutorStreaming}
+            disabled={!studyQuestion.trim() || isStudyStreaming}
           >
-            {isTutorStreaming ? "Asking..." : "Ask AI"}
+            {isStudyStreaming ? "Asking..." : "Ask AI"}
           </button>
         </form>
 
-        {tutorError ? <p className="form-error">{tutorError}</p> : null}
-        {tutorAnswer ? (
+        {studyError ? <p className="form-error">{studyError}</p> : null}
+        {studyAnswer ? (
           <div className="lesson-tutor-answer">
-            <ReactMarkdown>{tutorAnswer}</ReactMarkdown>
+            <ReactMarkdown>{studyAnswer}</ReactMarkdown>
           </div>
         ) : null}
       </div>

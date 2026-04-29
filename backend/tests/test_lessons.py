@@ -32,14 +32,14 @@ def test_get_lesson_creates_progress(client):
     token = _register_and_login(client)
 
     response = client.get(
-        "/lessons/fastapi_intro",
+        "/lessons/docker_basics",
         headers={"Authorization": f"Bearer {token}"},
     )
 
     assert response.status_code == 200
     data = response.json()
-    assert data["lesson_id"] == "fastapi_intro"
-    assert data["course_id"] == "fastapi"
+    assert data["lesson_id"] == "docker_basics"
+    assert data["course_id"] == "docker"
     assert data["current_step_index"] == 0
     assert data["completed"] is False
     assert len(data["steps"]) > 0
@@ -47,10 +47,10 @@ def test_get_lesson_creates_progress(client):
 
 def test_next_lesson_step_increments(client):
     token = _register_and_login(client)
-    client.get("/lessons/fastapi_intro", headers={"Authorization": f"Bearer {token}"})
+    client.get("/lessons/docker_basics", headers={"Authorization": f"Bearer {token}"})
 
     response = client.post(
-        "/lessons/fastapi_intro/next",
+        "/lessons/docker_basics/next",
         headers={"Authorization": f"Bearer {token}"},
     )
 
@@ -63,14 +63,14 @@ def test_next_lesson_step_increments(client):
 def test_completing_lesson_marks_completed(client):
     token = _register_and_login(client)
     lesson = client.get(
-        "/lessons/fastapi_intro",
+        "/lessons/docker_basics",
         headers={"Authorization": f"Bearer {token}"},
     ).json()
 
     response = None
     for _ in lesson["steps"]:
         response = client.post(
-            "/lessons/fastapi_intro/next",
+            "/lessons/docker_basics/next",
             headers={"Authorization": f"Bearer {token}"},
         )
 
@@ -84,13 +84,13 @@ def test_completing_lesson_marks_completed(client):
 def test_completing_lesson_awards_xp_once(client):
     token = _register_and_login(client)
     lesson = client.get(
-        "/lessons/fastapi_intro",
+        "/lessons/docker_basics",
         headers={"Authorization": f"Bearer {token}"},
     ).json()
 
     for _ in lesson["steps"]:
         client.post(
-            "/lessons/fastapi_intro/next",
+            "/lessons/docker_basics/next",
             headers={"Authorization": f"Bearer {token}"},
         )
 
@@ -98,7 +98,7 @@ def test_completing_lesson_awards_xp_once(client):
         "progress"
     ]
     client.post(
-        "/lessons/fastapi_intro/next",
+        "/lessons/docker_basics/next",
         headers={"Authorization": f"Bearer {token}"},
     )
     second_progress = client.get("/progress", headers={"Authorization": f"Bearer {token}"}).json()[
@@ -124,7 +124,7 @@ def test_lesson_progress_endpoint_returns_user_only_progress(client):
     first_token = _register_and_login(client, "lesson-one@example.com")
     second_token = _register_and_login(client, "lesson-two@example.com")
 
-    client.get("/lessons/fastapi_intro", headers={"Authorization": f"Bearer {first_token}"})
+    client.get("/lessons/docker_basics", headers={"Authorization": f"Bearer {first_token}"})
     client.get("/lessons/docker_basics", headers={"Authorization": f"Bearer {second_token}"})
 
     response = client.get(
@@ -135,7 +135,7 @@ def test_lesson_progress_endpoint_returns_user_only_progress(client):
     assert response.status_code == 200
     data = response.json()
     assert len(data) == 1
-    assert data[0]["lesson_id"] == "fastapi_intro"
+    assert data[0]["lesson_id"] == "docker_basics"
 
 
 def test_lesson_progress_endpoint_excludes_other_user_completed_rows(client):
@@ -143,14 +143,14 @@ def test_lesson_progress_endpoint_excludes_other_user_completed_rows(client):
     second_token = _register_and_login(client, "complete-two@example.com")
 
     lesson = client.get(
-        "/lessons/fastapi_intro",
+        "/lessons/docker_basics",
         headers={"Authorization": f"Bearer {first_token}"},
     ).json()
     client.get("/lessons/docker_basics", headers={"Authorization": f"Bearer {second_token}"})
 
     for _ in lesson["steps"]:
         client.post(
-            "/lessons/fastapi_intro/next",
+            "/lessons/docker_basics/next",
             headers={"Authorization": f"Bearer {first_token}"},
         )
 
@@ -168,8 +168,8 @@ def test_lesson_progress_endpoint_excludes_other_user_completed_rows(client):
 
 def test_lesson_progress_unique_per_user_and_lesson(client):
     token = _register_and_login(client)
-    client.get("/lessons/fastapi_intro", headers={"Authorization": f"Bearer {token}"})
-    client.get("/lessons/fastapi_intro", headers={"Authorization": f"Bearer {token}"})
+    client.get("/lessons/docker_basics", headers={"Authorization": f"Bearer {token}"})
+    client.get("/lessons/docker_basics", headers={"Authorization": f"Bearer {token}"})
 
     from app.database import get_db
 
@@ -187,18 +187,18 @@ def test_lesson_completion_is_scoped_to_current_user(client):
     second_token = _register_and_login(client, "scoped-complete-two@example.com")
 
     lesson = client.get(
-        "/lessons/fastapi_intro",
+        "/lessons/docker_basics",
         headers={"Authorization": f"Bearer {first_token}"},
     ).json()
 
     for _ in lesson["steps"]:
         client.post(
-            "/lessons/fastapi_intro/next",
+            "/lessons/docker_basics/next",
             headers={"Authorization": f"Bearer {first_token}"},
         )
 
     second_user_lesson = client.get(
-        "/lessons/fastapi_intro",
+        "/lessons/docker_basics",
         headers={"Authorization": f"Bearer {second_token}"},
     )
     data = second_user_lesson.json()
@@ -213,14 +213,14 @@ def test_get_lesson_does_not_expose_other_user_progress(client):
     first_token = _register_and_login(client, "lesson-read-one@example.com")
     second_token = _register_and_login(client, "lesson-read-two@example.com")
 
-    client.get("/lessons/fastapi_routing", headers={"Authorization": f"Bearer {first_token}"})
+    client.get("/lessons/docker_compose_basics", headers={"Authorization": f"Bearer {first_token}"})
     client.post(
-        "/lessons/fastapi_routing/next",
+        "/lessons/docker_compose_basics/next",
         headers={"Authorization": f"Bearer {first_token}"},
     )
 
     response = client.get(
-        "/lessons/fastapi_routing",
+        "/lessons/docker_compose_basics",
         headers={"Authorization": f"Bearer {second_token}"},
     )
     data = response.json()
@@ -234,7 +234,7 @@ def test_completing_theory_step_awards_xp_once(client):
     token = _register_and_login(client, "theory-xp@example.com")
 
     first_response = client.post(
-        "/lessons/fastapi_intro/steps/0/complete",
+        "/lessons/docker_basics/steps/0/complete",
         headers={"Authorization": f"Bearer {token}"},
     )
     first_progress = client.get("/progress", headers={"Authorization": f"Bearer {token}"}).json()[
@@ -242,7 +242,7 @@ def test_completing_theory_step_awards_xp_once(client):
     ]
 
     second_response = client.post(
-        "/lessons/fastapi_intro/steps/0/complete",
+        "/lessons/docker_basics/steps/0/complete",
         headers={"Authorization": f"Bearer {token}"},
     )
     second_progress = client.get("/progress", headers={"Authorization": f"Bearer {token}"}).json()[
@@ -257,11 +257,96 @@ def test_completing_theory_step_awards_xp_once(client):
     assert second_progress["xp_points"] == first_progress["xp_points"]
 
 
+def test_completing_same_step_twice_does_not_create_duplicate_row(client):
+    token = _register_and_login(client, "theory-duplicate@example.com")
+
+    first_response = client.post(
+        "/lessons/docker_basics/steps/0/complete",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    second_response = client.post(
+        "/lessons/docker_basics/steps/0/complete",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    from app.database import get_db
+
+    db = next(client.app.dependency_overrides[get_db]())
+    try:
+        rows = (
+            db.query(models.LessonStepProgress)
+            .filter(
+                models.LessonStepProgress.lesson_id == "docker_basics",
+                models.LessonStepProgress.step_index == 0,
+            )
+            .all()
+        )
+    finally:
+        db.close()
+
+    assert first_response.status_code == 200
+    assert second_response.status_code == 200
+    assert len(rows) == 1
+
+
+def test_completed_step_returns_existing_state(client):
+    token = _register_and_login(client, "theory-existing@example.com")
+
+    first_response = client.post(
+        "/lessons/docker_basics/steps/1/complete",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    second_response = client.post(
+        "/lessons/docker_basics/steps/1/complete",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    first_step = first_response.json()["steps"][1]
+    second_step = second_response.json()["steps"][1]
+    progress = client.get("/progress", headers={"Authorization": f"Bearer {token}"}).json()[
+        "progress"
+    ]
+
+    assert first_step["completed"] is True
+    assert second_step["completed"] is True
+    assert second_step["completed_at"] == first_step["completed_at"]
+    assert second_step["xp_awarded"] == first_step["xp_awarded"]
+    assert progress["xp_points"] == 10
+
+
+def test_another_user_can_complete_same_step_independently(client):
+    first_token = _register_and_login(client, "theory-user-one@example.com")
+    second_token = _register_and_login(client, "theory-user-two@example.com")
+
+    first_response = client.post(
+        "/lessons/docker_basics/steps/0/complete",
+        headers={"Authorization": f"Bearer {first_token}"},
+    )
+    second_response = client.post(
+        "/lessons/docker_basics/steps/0/complete",
+        headers={"Authorization": f"Bearer {second_token}"},
+    )
+
+    first_progress = client.get(
+        "/progress",
+        headers={"Authorization": f"Bearer {first_token}"},
+    ).json()["progress"]
+    second_progress = client.get(
+        "/progress",
+        headers={"Authorization": f"Bearer {second_token}"},
+    ).json()["progress"]
+
+    assert first_response.status_code == 200
+    assert second_response.status_code == 200
+    assert first_progress["xp_points"] == 5
+    assert second_progress["xp_points"] == 5
+
+
 def test_completing_practice_step_does_not_award_reading_xp(client):
     token = _register_and_login(client, "practice-no-xp@example.com")
 
     response = client.post(
-        "/lessons/fastapi_routing/steps/2/complete",
+        "/lessons/docker_compose_basics/steps/5/complete",
         headers={"Authorization": f"Bearer {token}"},
     )
     progress = client.get("/progress", headers={"Authorization": f"Bearer {token}"}).json()[
@@ -269,8 +354,8 @@ def test_completing_practice_step_does_not_award_reading_xp(client):
     ]
 
     assert response.status_code == 200
-    assert response.json()["steps"][2]["completed"] is True
-    assert response.json()["steps"][2]["xp_awarded"] == 0
+    assert response.json()["steps"][5]["completed"] is True
+    assert response.json()["steps"][5]["xp_awarded"] == 0
     assert progress["xp_points"] == 0
 
 
@@ -289,7 +374,7 @@ def test_complete_step_invalid_index_returns_400(client):
     token = _register_and_login(client, "invalid-step@example.com")
 
     response = client.post(
-        "/lessons/fastapi_intro/steps/99/complete",
+        "/lessons/docker_basics/steps/99/complete",
         headers={"Authorization": f"Bearer {token}"},
     )
 
@@ -301,12 +386,12 @@ def test_step_completion_is_scoped_to_current_user(client):
     second_token = _register_and_login(client, "step-scope-two@example.com")
 
     client.post(
-        "/lessons/fastapi_intro/steps/0/complete",
+        "/lessons/docker_basics/steps/0/complete",
         headers={"Authorization": f"Bearer {first_token}"},
     )
 
     response = client.get(
-        "/lessons/fastapi_intro",
+        "/lessons/docker_basics",
         headers={"Authorization": f"Bearer {second_token}"},
     )
 
@@ -319,11 +404,11 @@ def test_get_lesson_returns_step_completed_state(client):
     token = _register_and_login(client, "step-state@example.com")
 
     client.post(
-        "/lessons/fastapi_intro/steps/1/complete",
+        "/lessons/docker_basics/steps/1/complete",
         headers={"Authorization": f"Bearer {token}"},
     )
     response = client.get(
-        "/lessons/fastapi_intro",
+        "/lessons/docker_basics",
         headers={"Authorization": f"Bearer {token}"},
     )
 
@@ -335,7 +420,7 @@ def test_get_lesson_returns_step_completed_state(client):
 
 def test_lesson_study_stream_requires_auth(client):
     response = client.get(
-        "/lessons/fastapi_intro/study-stream",
+        "/lessons/docker_basics/study-stream",
         params={"action": "summarize"},
     )
 
@@ -357,7 +442,7 @@ def test_lesson_study_stream_invalid_action_returns_400(client):
     token = _register_and_login(client, "study-action@example.com")
 
     response = client.get(
-        "/lessons/fastapi_intro/study-stream",
+        "/lessons/docker_basics/study-stream",
         params={"action": "invalid", "token": token},
     )
 
@@ -365,7 +450,7 @@ def test_lesson_study_stream_invalid_action_returns_400(client):
 
 
 def test_lesson_study_prompt_includes_material_action_and_question():
-    lesson = get_lesson("fastapi_intro")
+    lesson = get_lesson("docker_basics")
     reading_steps = get_reading_steps_for_study(lesson)
 
     prompt = build_lesson_study_prompt(
@@ -385,7 +470,7 @@ def test_lesson_study_prompt_includes_material_action_and_question():
 
 def test_lesson_tutor_stream_requires_auth(client):
     response = client.get(
-        "/lessons/fastapi_intro/tutor-stream",
+        "/lessons/docker_basics/tutor-stream",
         params={"question": "Explain this"},
     )
 
@@ -407,7 +492,7 @@ def test_lesson_tutor_stream_invalid_step_index_returns_400(client):
     token = _register_and_login(client)
 
     response = client.get(
-        "/lessons/fastapi_intro/tutor-stream",
+        "/lessons/docker_basics/tutor-stream",
         params={"question": "Explain this", "step_index": 99, "token": token},
     )
 
@@ -418,7 +503,7 @@ def test_lesson_tutor_stream_empty_question_rejected(client):
     token = _register_and_login(client)
 
     response = client.get(
-        "/lessons/fastapi_intro/tutor-stream",
+        "/lessons/docker_basics/tutor-stream",
         params={"question": "   ", "token": token},
     )
 
@@ -426,7 +511,7 @@ def test_lesson_tutor_stream_empty_question_rejected(client):
 
 
 def test_lesson_tutor_prompt_includes_lesson_step_and_question():
-    lesson = get_lesson("fastapi_intro")
+    lesson = get_lesson("docker_basics")
     step = lesson["steps"][0]
 
     prompt = build_lesson_tutor_prompt(lesson, step, "Why is this useful?")
@@ -440,8 +525,8 @@ def test_lesson_tutor_prompt_includes_lesson_step_and_question():
 
 def test_practice_feedback_stream_requires_auth(client):
     response = client.get(
-        "/lessons/fastapi_routing/practice-feedback-stream",
-        params={"step_index": 2, "answer": "I would add app.get."},
+        "/lessons/docker_compose_basics/practice-feedback-stream",
+        params={"step_index": 5, "answer": "I would add app.get."},
     )
 
     assert response.status_code == 401
@@ -462,7 +547,7 @@ def test_practice_feedback_stream_invalid_step_index_returns_400(client):
     token = _register_and_login(client)
 
     response = client.get(
-        "/lessons/fastapi_routing/practice-feedback-stream",
+        "/lessons/docker_compose_basics/practice-feedback-stream",
         params={"step_index": 99, "answer": "My answer", "token": token},
     )
 
@@ -473,7 +558,7 @@ def test_practice_feedback_stream_non_practice_step_rejected(client):
     token = _register_and_login(client)
 
     response = client.get(
-        "/lessons/fastapi_routing/practice-feedback-stream",
+        "/lessons/docker_compose_basics/practice-feedback-stream",
         params={"step_index": 0, "answer": "My answer", "token": token},
     )
 
@@ -484,16 +569,16 @@ def test_practice_feedback_stream_empty_answer_rejected(client):
     token = _register_and_login(client)
 
     response = client.get(
-        "/lessons/fastapi_routing/practice-feedback-stream",
-        params={"step_index": 2, "answer": "   ", "token": token},
+        "/lessons/docker_compose_basics/practice-feedback-stream",
+        params={"step_index": 5, "answer": "   ", "token": token},
     )
 
     assert response.status_code == 400
 
 
 def test_practice_feedback_prompt_includes_instruction_and_user_answer():
-    lesson = get_lesson("fastapi_routing")
-    step = lesson["steps"][2]
+    lesson = get_lesson("docker_compose_basics")
+    step = lesson["steps"][5]
 
     prompt = build_practice_feedback_prompt(lesson, step, "I would use @app.get('/health').")
     combined_content = "\n".join(item["content"] for item in prompt)
@@ -512,9 +597,9 @@ def test_practice_submission_saved_after_feedback(client, monkeypatch):
     token = _register_and_login(client)
 
     response = client.get(
-        "/lessons/fastapi_routing/practice-feedback-stream",
+        "/lessons/docker_compose_basics/practice-feedback-stream",
         params={
-            "step_index": 2,
+            "step_index": 5,
             "answer": "I would create a health function.",
             "token": token,
         },
@@ -524,7 +609,7 @@ def test_practice_submission_saved_after_feedback(client, monkeypatch):
     assert "Good start" in response.text
 
     history_response = client.get(
-        "/lessons/fastapi_routing/practice-history",
+        "/lessons/docker_compose_basics/practice-history",
         headers={"Authorization": f"Bearer {token}"},
     )
     history = history_response.json()
@@ -540,16 +625,16 @@ def test_practice_history_returns_user_only_submissions(client, monkeypatch):
     second_token = _register_and_login(client, "practice-two@example.com")
 
     client.get(
-        "/lessons/fastapi_routing/practice-feedback-stream",
-        params={"step_index": 2, "answer": "First user answer", "token": first_token},
+        "/lessons/docker_compose_basics/practice-feedback-stream",
+        params={"step_index": 5, "answer": "First user answer", "token": first_token},
     )
     client.get(
-        "/lessons/fastapi_routing/practice-feedback-stream",
-        params={"step_index": 2, "answer": "Second user answer", "token": second_token},
+        "/lessons/docker_compose_basics/practice-feedback-stream",
+        params={"step_index": 5, "answer": "Second user answer", "token": second_token},
     )
 
     response = client.get(
-        "/lessons/fastapi_routing/practice-history",
+        "/lessons/docker_compose_basics/practice-history",
         headers={"Authorization": f"Bearer {first_token}"},
     )
     history = response.json()
@@ -563,16 +648,16 @@ def test_practice_history_ordered_newest_first(client, monkeypatch):
     token = _register_and_login(client)
 
     client.get(
-        "/lessons/fastapi_routing/practice-feedback-stream",
-        params={"step_index": 2, "answer": "Older answer", "token": token},
+        "/lessons/docker_compose_basics/practice-feedback-stream",
+        params={"step_index": 5, "answer": "Older answer", "token": token},
     )
     client.get(
-        "/lessons/fastapi_routing/practice-feedback-stream",
-        params={"step_index": 2, "answer": "Newer answer", "token": token},
+        "/lessons/docker_compose_basics/practice-feedback-stream",
+        params={"step_index": 5, "answer": "Newer answer", "token": token},
     )
 
     response = client.get(
-        "/lessons/fastapi_routing/practice-history",
+        "/lessons/docker_compose_basics/practice-history",
         headers={"Authorization": f"Bearer {token}"},
     )
     history = response.json()
@@ -581,7 +666,7 @@ def test_practice_history_ordered_newest_first(client, monkeypatch):
 
 
 def test_practice_history_requires_auth(client):
-    response = client.get("/lessons/fastapi_routing/practice-history")
+    response = client.get("/lessons/docker_compose_basics/practice-history")
 
     assert response.status_code == 401
 
@@ -628,15 +713,15 @@ def test_practice_submission_saves_score_metadata(client, monkeypatch):
     token = _register_and_login(client)
 
     client.get(
-        "/lessons/fastapi_routing/practice-feedback-stream",
+        "/lessons/docker_compose_basics/practice-feedback-stream",
         params={
-            "step_index": 2,
+            "step_index": 5,
             "answer": "I would use a GET endpoint.",
             "token": token,
         },
     )
     history_response = client.get(
-        "/lessons/fastapi_routing/practice-history",
+        "/lessons/docker_compose_basics/practice-history",
         headers={"Authorization": f"Bearer {token}"},
     )
     submission = history_response.json()[0]
@@ -657,15 +742,15 @@ def test_practice_submission_parsing_failure_still_saves_feedback(client, monkey
     token = _register_and_login(client)
 
     client.get(
-        "/lessons/fastapi_routing/practice-feedback-stream",
+        "/lessons/docker_compose_basics/practice-feedback-stream",
         params={
-            "step_index": 2,
+            "step_index": 5,
             "answer": "I would create a health route.",
             "token": token,
         },
     )
     history_response = client.get(
-        "/lessons/fastapi_routing/practice-history",
+        "/lessons/docker_compose_basics/practice-history",
         headers={"Authorization": f"Bearer {token}"},
     )
     submission = history_response.json()[0]
@@ -681,11 +766,11 @@ def test_practice_submission_first_attempt_number_is_one(client, monkeypatch):
     token = _register_and_login(client)
 
     client.get(
-        "/lessons/fastapi_routing/practice-feedback-stream",
-        params={"step_index": 2, "answer": "First answer", "token": token},
+        "/lessons/docker_compose_basics/practice-feedback-stream",
+        params={"step_index": 5, "answer": "First answer", "token": token},
     )
     history_response = client.get(
-        "/lessons/fastapi_routing/practice-history",
+        "/lessons/docker_compose_basics/practice-history",
         headers={"Authorization": f"Bearer {token}"},
     )
 
@@ -697,15 +782,15 @@ def test_practice_submission_second_attempt_increments(client, monkeypatch):
     token = _register_and_login(client)
 
     client.get(
-        "/lessons/fastapi_routing/practice-feedback-stream",
-        params={"step_index": 2, "answer": "First answer", "token": token},
+        "/lessons/docker_compose_basics/practice-feedback-stream",
+        params={"step_index": 5, "answer": "First answer", "token": token},
     )
     client.get(
-        "/lessons/fastapi_routing/practice-feedback-stream",
-        params={"step_index": 2, "answer": "Second answer", "token": token},
+        "/lessons/docker_compose_basics/practice-feedback-stream",
+        params={"step_index": 5, "answer": "Second answer", "token": token},
     )
     history_response = client.get(
-        "/lessons/fastapi_routing/practice-history",
+        "/lessons/docker_compose_basics/practice-history",
         headers={"Authorization": f"Bearer {token}"},
     )
 
@@ -717,20 +802,20 @@ def test_practice_submission_numbering_scoped_to_step(client, monkeypatch):
     token = _register_and_login(client)
 
     client.get(
-        "/lessons/fastapi_routing/practice-feedback-stream",
-        params={"step_index": 2, "answer": "Routing practice", "token": token},
+        "/lessons/docker_compose_basics/practice-feedback-stream",
+        params={"step_index": 5, "answer": "Routing practice", "token": token},
     )
     client.get(
-        "/lessons/fastapi_dependency/practice-feedback-stream",
-        params={"step_index": 2, "answer": "Dependency practice", "token": token},
+        "/lessons/postgres_container_not_ready/practice-feedback-stream",
+        params={"step_index": 5, "answer": "Dependency practice", "token": token},
     )
 
     routing_history = client.get(
-        "/lessons/fastapi_routing/practice-history",
+        "/lessons/docker_compose_basics/practice-history",
         headers={"Authorization": f"Bearer {token}"},
     ).json()
     dependency_history = client.get(
-        "/lessons/fastapi_dependency/practice-history",
+        "/lessons/postgres_container_not_ready/practice-history",
         headers={"Authorization": f"Bearer {token}"},
     ).json()
 
@@ -744,20 +829,20 @@ def test_practice_submission_numbering_scoped_to_user(client, monkeypatch):
     second_token = _register_and_login(client, "attempt-two@example.com")
 
     client.get(
-        "/lessons/fastapi_routing/practice-feedback-stream",
-        params={"step_index": 2, "answer": "First user answer", "token": first_token},
+        "/lessons/docker_compose_basics/practice-feedback-stream",
+        params={"step_index": 5, "answer": "First user answer", "token": first_token},
     )
     client.get(
-        "/lessons/fastapi_routing/practice-feedback-stream",
-        params={"step_index": 2, "answer": "Second user answer", "token": second_token},
+        "/lessons/docker_compose_basics/practice-feedback-stream",
+        params={"step_index": 5, "answer": "Second user answer", "token": second_token},
     )
 
     first_history = client.get(
-        "/lessons/fastapi_routing/practice-history",
+        "/lessons/docker_compose_basics/practice-history",
         headers={"Authorization": f"Bearer {first_token}"},
     ).json()
     second_history = client.get(
-        "/lessons/fastapi_routing/practice-history",
+        "/lessons/docker_compose_basics/practice-history",
         headers={"Authorization": f"Bearer {second_token}"},
     ).json()
 

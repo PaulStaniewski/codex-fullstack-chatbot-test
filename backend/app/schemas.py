@@ -86,6 +86,10 @@ class UserProgressStats(BaseModel):
     time_spent_seconds: int
     xp_points: int
     level: int
+    total_xp: int
+    xp_into_level: int
+    xp_required_for_next_level: int
+    progress_percent: float
     current_streak_days: int
     last_streak_date: date | None
     last_activity_at: datetime | None

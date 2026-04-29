@@ -78,11 +78,11 @@ export default function ProgressPage({ token, theme, onToggleTheme, onAchievemen
   const accuracy = answeredCount
     ? Math.round(((progress?.correct_answers || 0) / answeredCount) * 100)
     : 0;
-  const xpPoints = progress?.xp_points || 0;
   const level = progress?.level || 1;
-  const currentLevelXp = xpPoints % 100;
-  const nextLevelTotalXp = level * 100;
-  const xpPercent = Math.min(100, Math.max(0, currentLevelXp));
+  const totalXp = progress?.total_xp ?? progress?.xp_points ?? 0;
+  const currentLevelXp = progress?.xp_into_level ?? 0;
+  const xpRequiredForNextLevel = progress?.xp_required_for_next_level ?? 1;
+  const xpPercent = Math.min(100, Math.max(0, progress?.progress_percent ?? 0));
 
   return (
     <main className="progress-shell">
@@ -110,10 +110,15 @@ export default function ProgressPage({ token, theme, onToggleTheme, onAchievemen
               </div>
               <div className="level-progress">
                 <div className="level-progress__meta">
-                  <span>{currentLevelXp} / 100 XP</span>
-                  <span>{nextLevelTotalXp} total XP for next level</span>
+                  <span>
+                    {currentLevelXp} / {xpRequiredForNextLevel} XP
+                  </span>
+                  <span>{totalXp} total XP</span>
                 </div>
-                <div className="level-progress__track" aria-label={`${currentLevelXp} of 100 XP`}>
+                <div
+                  className="level-progress__track"
+                  aria-label={`${currentLevelXp} of ${xpRequiredForNextLevel} XP`}
+                >
                   <div
                     className="level-progress__bar"
                     style={{ width: `${xpPercent}%` }}

@@ -10,6 +10,8 @@ XP_PER_MESSAGE = 10
 XP_PER_SESSION = 25
 XP_PER_ACHIEVEMENT = 50
 XP_PER_LESSON_COMPLETION = 40
+BASE_LEVEL_XP = 100
+LEVEL_GROWTH_FACTOR = 2
 
 DEFAULT_ACHIEVEMENTS = [
     {
@@ -132,8 +134,47 @@ def update_progress_activity(
     return progress
 
 
+def xp_required_for_level(level: int) -> int:
+    safe_level = max(1, level)
+    return BASE_LEVEL_XP * (LEVEL_GROWTH_FACTOR ** (safe_level - 1))
+
+
+def xp_required_for_current_level(level: int) -> int:
+    safe_level = max(1, level)
+    if safe_level == 1:
+        return 0
+    return xp_required_for_level(safe_level)
+
+
 def calculate_level(xp_points: int) -> int:
-    return max(1, (max(0, xp_points) // 100) + 1)
+    total_xp = max(0, xp_points)
+    level = 1
+
+    while total_xp >= xp_required_for_level(level + 1):
+        level += 1
+
+    return level
+
+
+def build_xp_progress(xp_points: int) -> dict[str, int | float]:
+    total_xp = max(0, xp_points)
+    level = calculate_level(total_xp)
+    current_level_start_xp = xp_required_for_current_level(level)
+    xp_required_for_next_level = xp_required_for_level(level)
+    xp_into_level = total_xp - current_level_start_xp
+    progress_percent = (
+        (xp_into_level / xp_required_for_next_level) * 100
+        if xp_required_for_next_level > 0
+        else 0
+    )
+
+    return {
+        "total_xp": total_xp,
+        "level": level,
+        "xp_into_level": xp_into_level,
+        "xp_required_for_next_level": xp_required_for_next_level,
+        "progress_percent": progress_percent,
+    }
 
 
 def recalculate_level(progress: models.UserProgress) -> None:

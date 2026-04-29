@@ -5,6 +5,7 @@ from app.progress import (
     XP_PER_ACHIEVEMENT,
     XP_PER_MESSAGE,
     XP_PER_SESSION,
+    build_xp_progress,
     calculate_level,
     evaluate_achievements,
     get_progress_condition_value,
@@ -78,7 +79,7 @@ def test_progress_tracks_sessions_messages_and_achievements(client, monkeypatch)
     assert data["progress"]["xp_points"] == (
         XP_PER_SESSION + XP_PER_MESSAGE + (2 * XP_PER_ACHIEVEMENT)
     )
-    assert data["progress"]["level"] == 2
+    assert data["progress"]["level"] == 1
     assert data["progress"]["current_streak_days"] == 1
     assert data["progress"]["last_streak_date"] is not None
     assert data["progress"]["last_activity_at"] is not None
@@ -143,7 +144,7 @@ def test_level_increases_after_xp_threshold(client):
     try:
         user = db.query(models.User).first()
         progress = update_progress_activity(db, user.id, messages_delta=1)
-        progress.xp_points = 90
+        progress.xp_points = 190
         db.flush()
 
         update_progress_activity(db, user.id, messages_delta=1)
@@ -152,7 +153,7 @@ def test_level_increases_after_xp_threshold(client):
     finally:
         db.close()
 
-    assert progress.xp_points >= 100
+    assert progress.xp_points >= 200
     assert progress.level == 2
 
 
@@ -180,9 +181,50 @@ def test_xp_accumulation_awards_achievement_bonus_once(client):
 def test_level_calculation_correct():
     assert calculate_level(0) == 1
     assert calculate_level(99) == 1
-    assert calculate_level(100) == 2
-    assert calculate_level(250) == 3
+    assert calculate_level(100) == 1
+    assert calculate_level(199) == 1
+    assert calculate_level(200) == 2
+    assert calculate_level(299) == 2
+    assert calculate_level(399) == 2
+    assert calculate_level(400) == 3
+    assert calculate_level(799) == 3
+    assert calculate_level(800) == 4
     assert calculate_level(-10) == 1
+
+
+def test_dynamic_xp_progress_metadata():
+    xp_progress = build_xp_progress(815)
+
+    assert xp_progress["level"] == 4
+    assert xp_progress["total_xp"] == 815
+    assert xp_progress["xp_into_level"] == 15
+    assert xp_progress["xp_required_for_next_level"] == 800
+    assert xp_progress["progress_percent"] == 1.875
+
+
+def test_progress_response_includes_dynamic_level_metadata(client):
+    token = _register_and_login(client, "dynamic-xp@example.com")
+
+    from app.database import get_db
+
+    db = next(client.app.dependency_overrides[get_db]())
+    try:
+        user = db.query(models.User).filter(models.User.email == "dynamic-xp@example.com").one()
+        progress = models.UserProgress(user_id=user.id, xp_points=815, level=4)
+        db.add(progress)
+        db.commit()
+    finally:
+        db.close()
+
+    response = client.get("/progress", headers={"Authorization": f"Bearer {token}"})
+    progress_data = response.json()["progress"]
+
+    assert response.status_code == 200
+    assert progress_data["level"] == 4
+    assert progress_data["total_xp"] == 815
+    assert progress_data["xp_into_level"] == 15
+    assert progress_data["xp_required_for_next_level"] == 800
+    assert progress_data["progress_percent"] == 1.875
 
 
 def test_update_time_spent_increments_under_threshold():

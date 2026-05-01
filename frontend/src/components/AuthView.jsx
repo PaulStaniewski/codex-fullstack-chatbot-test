@@ -1,6 +1,43 @@
 import { useState } from "react";
 import ThemeToggle from "./ThemeToggle.jsx";
 
+function getAuthErrorMessage(err, isLogin) {
+  const status = err?.status;
+  const detail = err?.detail;
+  const rawMessage = `${err?.message || ""}`.toLowerCase();
+
+  if (status === 429) {
+    return "Too many login attempts. Please try again later.";
+  }
+
+  if (isLogin && (status === 401 || status === 403 || rawMessage.includes("invalid credentials"))) {
+    return "Invalid email or password.";
+  }
+
+  if (!isLogin && (rawMessage.includes("email already registered") || rawMessage.includes("already registered"))) {
+    return "This email is already registered.";
+  }
+
+  if (!isLogin && status === 422) {
+    const detailText =
+      typeof detail === "string"
+        ? detail.toLowerCase()
+        : Array.isArray(detail)
+          ? JSON.stringify(detail).toLowerCase()
+          : "";
+
+    if (
+      detailText.includes("password") ||
+      detailText.includes("at least 8 characters") ||
+      detailText.includes("string_too_short")
+    ) {
+      return "Password must be at least 8 characters long.";
+    }
+  }
+
+  return "Something went wrong. Please try again.";
+}
+
 export default function AuthView({ onLogin, onRegister, onAuthError, theme, onToggleTheme }) {
   const [mode, setMode] = useState("login");
   const [email, setEmail] = useState("");
@@ -22,8 +59,9 @@ export default function AuthView({ onLogin, onRegister, onAuthError, theme, onTo
         await onRegister(email, password);
       }
     } catch (err) {
-      setError(err.message);
-      onAuthError(err.message);
+      const friendlyMessage = getAuthErrorMessage(err, isLogin);
+      setError(friendlyMessage);
+      onAuthError(friendlyMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -64,6 +102,7 @@ export default function AuthView({ onLogin, onRegister, onAuthError, theme, onTo
               required
             />
           </label>
+          {!isLogin ? <p className="auth-help">Use at least 8 characters.</p> : null}
 
           {error ? <p className="form-error" role="alert">{error}</p> : null}
 

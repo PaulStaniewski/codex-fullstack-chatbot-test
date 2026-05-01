@@ -1,7 +1,50 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
+let authRefreshConfig = null;
+let refreshInFlightPromise = null;
 
 export function getApiBaseUrl() {
   return API_BASE_URL.replace(/\/$/, "");
+}
+
+export function configureAuthRefresh(config) {
+  authRefreshConfig = config || null;
+}
+
+async function tryRefreshAccessToken() {
+  if (!authRefreshConfig) {
+    return null;
+  }
+
+  const refreshToken = authRefreshConfig.getRefreshToken?.();
+  if (!refreshToken) {
+    return null;
+  }
+
+  if (!refreshInFlightPromise) {
+    refreshInFlightPromise = (async () => {
+      try {
+        const data = await apiFetch("/refresh", {
+          method: "POST",
+          body: JSON.stringify({ refresh_token: refreshToken }),
+          skipAuthRefresh: true,
+        });
+        if (!data?.access_token) {
+          return null;
+        }
+        authRefreshConfig.onTokens?.({
+          accessToken: data.access_token,
+          refreshToken: data.refresh_token,
+        });
+        return data.access_token;
+      } catch {
+        return null;
+      } finally {
+        refreshInFlightPromise = null;
+      }
+    })();
+  }
+
+  return refreshInFlightPromise;
 }
 
 export function getStreamUrl(conversationId, message, token) {
@@ -136,7 +179,7 @@ export function streamPracticeFeedback({
   };
 }
 
-export async function apiFetch(path, { token, ...options } = {}) {
+export async function apiFetch(path, { token, skipAuthRefresh = false, ...options } = {}) {
   const headers = new Headers(options.headers || {});
 
   if (!headers.has("Content-Type") && options.body) {
@@ -163,6 +206,17 @@ export async function apiFetch(path, { token, ...options } = {}) {
   }
 
   if (!response.ok) {
+    if (!skipAuthRefresh && token && (response.status === 401 || response.status === 403)) {
+      const refreshedAccessToken = await tryRefreshAccessToken();
+      if (refreshedAccessToken) {
+        return apiFetch(path, {
+          ...options,
+          token: refreshedAccessToken,
+          skipAuthRefresh: true,
+        });
+      }
+    }
+
     const message = data?.detail || "Request failed";
     const error = new Error(message);
     error.status = response.status;

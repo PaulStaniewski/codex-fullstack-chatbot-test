@@ -14,6 +14,7 @@ from app.database import get_db
 
 DEFAULT_JWT_ALGORITHM = "HS256"
 DEFAULT_ACCESS_TOKEN_EXPIRE_MINUTES = 60
+DEFAULT_REFRESH_TOKEN_EXPIRE_MINUTES = 10080
 PRODUCTION_ENV_NAMES = {"prod", "production"}
 INSECURE_JWT_SECRET_VALUES = {
     "change-me-in-production",
@@ -24,13 +25,16 @@ INSECURE_JWT_SECRET_VALUES = {
 }
 
 
-def _resolve_auth_settings(environ: Mapping[str, str] | None = None) -> tuple[str, str, int]:
+def _resolve_auth_settings(environ: Mapping[str, str] | None = None) -> tuple[str, str, int, int]:
     env = environ or os.environ
     app_env = env.get("APP_ENV", "development").strip().lower()
     secret_key = (env.get("JWT_SECRET_KEY") or "").strip()
     algorithm = (env.get("JWT_ALGORITHM") or DEFAULT_JWT_ALGORITHM).strip()
     expire_minutes = int(
         (env.get("ACCESS_TOKEN_EXPIRE_MINUTES") or str(DEFAULT_ACCESS_TOKEN_EXPIRE_MINUTES)).strip()
+    )
+    refresh_expire_minutes = int(
+        (env.get("REFRESH_TOKEN_EXPIRE_MINUTES") or str(DEFAULT_REFRESH_TOKEN_EXPIRE_MINUTES)).strip()
     )
 
     if not secret_key:
@@ -39,10 +43,10 @@ def _resolve_auth_settings(environ: Mapping[str, str] | None = None) -> tuple[st
     if app_env in PRODUCTION_ENV_NAMES and secret_key in INSECURE_JWT_SECRET_VALUES:
         raise RuntimeError("JWT_SECRET_KEY is unsafe for production APP_ENV.")
 
-    return secret_key, algorithm, expire_minutes
+    return secret_key, algorithm, expire_minutes, refresh_expire_minutes
 
 
-SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES = _resolve_auth_settings()
+SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES, REFRESH_TOKEN_EXPIRE_MINUTES = _resolve_auth_settings()
 
 password_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login")
@@ -58,7 +62,13 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 def create_access_token(subject: str) -> str:
     expires_at = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    payload = {"sub": subject, "exp": expires_at}
+    payload = {"sub": subject, "exp": expires_at, "type": "access"}
+    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+
+
+def create_refresh_token(subject: str) -> str:
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=REFRESH_TOKEN_EXPIRE_MINUTES)
+    payload = {"sub": subject, "exp": expires_at, "type": "refresh"}
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
 
@@ -69,7 +79,7 @@ def authenticate_user(db: Session, email: str, password: str) -> models.User | N
     return user
 
 
-def get_user_from_token(db: Session, token: str) -> models.User:
+def get_subject_from_token(token: str, expected_type: str = "access") -> str:
     credentials_error = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -78,10 +88,23 @@ def get_user_from_token(db: Session, token: str) -> models.User:
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         subject = payload.get("sub")
-        if subject is None:
+        token_type = payload.get("type")
+        if subject is None or token_type != expected_type:
             raise credentials_error
-        user_id = int(subject)
-    except (JWTError, ValueError):
+    except JWTError:
+        raise credentials_error from None
+    return str(subject)
+
+
+def get_user_from_token(db: Session, token: str) -> models.User:
+    credentials_error = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        user_id = int(get_subject_from_token(token, expected_type="access"))
+    except ValueError:
         raise credentials_error from None
 
     user = db.get(models.User, user_id)

@@ -28,6 +28,44 @@ def test_login_user(client):
     body = response.json()
     assert body["token_type"] == "bearer"
     assert body["access_token"]
+    assert body["refresh_token"]
+
+
+def test_refresh_access_token(client):
+    client.post(
+        "/register",
+        json={"email": "refresh@example.com", "password": "password123"},
+    )
+    login_response = client.post(
+        "/login",
+        json={"email": "refresh@example.com", "password": "password123"},
+    )
+    refresh_token = login_response.json()["refresh_token"]
+
+    refresh_response = client.post("/refresh", json={"refresh_token": refresh_token})
+
+    assert refresh_response.status_code == 200
+    body = refresh_response.json()
+    assert body["access_token"]
+    assert body["token_type"] == "bearer"
+    assert body.get("refresh_token") is None
+
+
+def test_refresh_rejects_access_token(client):
+    client.post(
+        "/register",
+        json={"email": "refreshreject@example.com", "password": "password123"},
+    )
+    login_response = client.post(
+        "/login",
+        json={"email": "refreshreject@example.com", "password": "password123"},
+    )
+    access_token = login_response.json()["access_token"]
+
+    refresh_response = client.post("/refresh", json={"refresh_token": access_token})
+
+    assert refresh_response.status_code == 401
+    assert refresh_response.json()["detail"] == "Could not validate credentials"
 
 
 def test_read_current_user(client):

@@ -33,6 +33,11 @@ class LoginRequest(BaseModel):
 class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
+    refresh_token: str | None = None
+
+
+class RefreshRequest(BaseModel):
+    refresh_token: str
 
 
 class ConversationCreate(BaseModel):

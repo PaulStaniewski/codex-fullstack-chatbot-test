@@ -87,7 +87,16 @@ def login_user(
         _record_failed_login_attempt(client_ip)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
     _clear_failed_login_attempts(client_ip)
-    return schemas.Token(access_token=auth.create_access_token(str(user.id)))
+    return schemas.Token(
+        access_token=auth.create_access_token(str(user.id)),
+        refresh_token=auth.create_refresh_token(str(user.id)),
+    )
+
+
+@router.post("/refresh", response_model=schemas.Token)
+def refresh_access_token(refresh_in: schemas.RefreshRequest):
+    user_id = auth.get_subject_from_token(refresh_in.refresh_token, expected_type="refresh")
+    return schemas.Token(access_token=auth.create_access_token(user_id))
 
 
 @router.get("/me", response_model=schemas.UserRead)

@@ -95,6 +95,7 @@ cp .env.example .env
 | `JWT_SECRET_KEY` | Secret used to sign JWTs (required in all environments) | `dev-only-jwt-secret-change-this` |
 | `JWT_ALGORITHM` | JWT signing algorithm | `HS256` |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | Access token lifetime | `60` |
+| `REFRESH_TOKEN_EXPIRE_MINUTES` | Refresh token lifetime | `10080` |
 | `CORS_ALLOWED_ORIGINS` | Comma-separated allowed frontend origins for CORS | `http://localhost:5173,http://127.0.0.1:5173` |
 | `OPENAI_API_KEY` | OpenAI API key for real streaming responses | empty in example |
 | `OPENAI_MODEL` | Model used by the backend | `gpt-5.4-mini` |
@@ -181,7 +182,8 @@ npm run build
 | Method | Path | Description |
 | --- | --- | --- |
 | `POST` | `/register` | Create user account |
-| `POST` | `/login` | Return JWT access token |
+| `POST` | `/login` | Return JWT access + refresh tokens |
+| `POST` | `/refresh` | Exchange refresh token for a new access token |
 | `POST` | `/logout` | Validate current token and return success (stateless logout contract) |
 
 ### Conversations
@@ -213,11 +215,12 @@ Most endpoints use `Authorization: Bearer <token>`. The streaming endpoint accep
 ### Auth Flow
 
 1. User registers with email and password.
-2. User logs in and receives a JWT access token.
-3. Frontend stores the token in `localStorage`.
-4. Protected REST requests send `Authorization: Bearer <token>`.
-5. Frontend logout clears token, selected conversation, and local UI state.
-6. `POST /logout` validates the token and returns success, but does not revoke JWTs yet because auth is currently stateless access-token-only.
+2. User logs in and receives a JWT access token and refresh token.
+3. Frontend stores both tokens in `localStorage`.
+4. Protected REST requests send `Authorization: Bearer <access_token>`.
+5. If an access token expires, the frontend calls `/refresh` once and retries the original request.
+6. Frontend logout clears tokens, selected conversation, and local UI state.
+7. `POST /logout` validates the token and returns success, but does not revoke JWTs yet because auth is currently stateless access-token-only.
 
 ### SSE Streaming Flow
 

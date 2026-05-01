@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
   apiFetch,
+  configureAuthRefresh,
   completeLessonStep,
   getApiBaseUrl,
   getLesson,
@@ -24,6 +25,7 @@ import ThemeToggle from "./components/ThemeToggle.jsx";
 import ToastStack from "./components/ToastStack.jsx";
 
 const TOKEN_KEY = "chatbot_access_token";
+const REFRESH_TOKEN_KEY = "chatbot_refresh_token";
 const ACTIVE_CONVERSATION_KEY = "chatbot_active_conversation_id";
 const THEME_KEY = "chatbot_theme";
 const ACTIVITY_PING_SECONDS = 60;
@@ -39,6 +41,7 @@ function sortConversations(conversations) {
 
 export default function App() {
   const [token, setToken] = useState(() => localStorage.getItem(TOKEN_KEY) || "");
+  const [refreshToken, setRefreshToken] = useState(() => localStorage.getItem(REFRESH_TOKEN_KEY) || "");
   const [authStatus, setAuthStatus] = useState(() => (localStorage.getItem(TOKEN_KEY) ? "checking" : "anonymous"));
   const [theme, setTheme] = useState(() => localStorage.getItem(THEME_KEY) || "dark");
   const [conversations, setConversations] = useState([]);
@@ -65,6 +68,24 @@ export default function App() {
     document.documentElement.dataset.theme = theme;
     localStorage.setItem(THEME_KEY, theme);
   }, [theme]);
+
+  useEffect(() => {
+    configureAuthRefresh({
+      getRefreshToken: () => refreshToken || localStorage.getItem(REFRESH_TOKEN_KEY) || "",
+      onTokens: ({ accessToken, refreshToken: nextRefreshToken }) => {
+        if (accessToken) {
+          localStorage.setItem(TOKEN_KEY, accessToken);
+          setToken(accessToken);
+        }
+        if (nextRefreshToken) {
+          localStorage.setItem(REFRESH_TOKEN_KEY, nextRefreshToken);
+          setRefreshToken(nextRefreshToken);
+        }
+      },
+    });
+
+    return () => configureAuthRefresh(null);
+  }, [refreshToken]);
 
   useEffect(() => {
     let isCancelled = false;
@@ -161,7 +182,9 @@ export default function App() {
     });
     sessionExpiredHandledRef.current = false;
     localStorage.setItem(TOKEN_KEY, data.access_token);
+    localStorage.setItem(REFRESH_TOKEN_KEY, data.refresh_token || "");
     setToken(data.access_token);
+    setRefreshToken(data.refresh_token || "");
     setError("");
   }
 
@@ -176,8 +199,10 @@ export default function App() {
   function clearLocalAuthState() {
     eventSourceRef.current?.close();
     localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(REFRESH_TOKEN_KEY);
     localStorage.removeItem(ACTIVE_CONVERSATION_KEY);
     setToken("");
+    setRefreshToken("");
     setAuthStatus("anonymous");
     setConversations([]);
     setSelectedConversation(null);

@@ -35,28 +35,30 @@ def test_default_or_dev_secret_in_production_fails():
 
 
 def test_valid_secret_works_in_production():
-    secret, algorithm, expire_minutes = _resolve_auth_settings(
+    secret, algorithm, expire_minutes, refresh_expire_minutes = _resolve_auth_settings(
         {
             "APP_ENV": "production",
             "JWT_SECRET_KEY": "prod-secret-2026-very-long-and-unique",
             "JWT_ALGORITHM": "HS256",
             "ACCESS_TOKEN_EXPIRE_MINUTES": "45",
+            "REFRESH_TOKEN_EXPIRE_MINUTES": "10080",
         }
     )
 
     assert secret == "prod-secret-2026-very-long-and-unique"
     assert algorithm == "HS256"
     assert expire_minutes == 45
+    assert refresh_expire_minutes == 10080
 
 
 def test_test_and_dev_configs_remain_usable():
-    dev_secret, _, _ = _resolve_auth_settings(
+    dev_secret, _, _, _ = _resolve_auth_settings(
         {
             "APP_ENV": "development",
             "JWT_SECRET_KEY": "dev-only-jwt-secret-change-this",
         }
     )
-    test_secret, _, _ = _resolve_auth_settings(
+    test_secret, _, _, _ = _resolve_auth_settings(
         {
             "APP_ENV": "test",
             "JWT_SECRET_KEY": "test-secret-key",

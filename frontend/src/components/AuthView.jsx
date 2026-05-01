@@ -28,10 +28,11 @@ function getAuthErrorMessage(err, isLogin) {
 
     if (
       detailText.includes("password") ||
-      detailText.includes("at least 8 characters") ||
+      detailText.includes("at least 10 characters") ||
+      detailText.includes("letter and one number") ||
       detailText.includes("string_too_short")
     ) {
-      return "Password must be at least 8 characters long.";
+      return "Password must be at least 10 characters and include a letter and a number.";
     }
   }
 
@@ -98,11 +99,13 @@ export default function AuthView({ onLogin, onRegister, onAuthError, theme, onTo
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               autoComplete={isLogin ? "current-password" : "new-password"}
-              minLength={8}
+              minLength={10}
               required
             />
           </label>
-          {!isLogin ? <p className="auth-help">Use at least 8 characters.</p> : null}
+          {!isLogin ? (
+            <p className="auth-help">Use at least 10 characters, including a letter and a number.</p>
+          ) : null}
 
           {error ? <p className="form-error" role="alert">{error}</p> : null}
 

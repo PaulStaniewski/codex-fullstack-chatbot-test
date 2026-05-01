@@ -57,6 +57,39 @@ def test_protected_endpoint_requires_authentication(client):
     assert response.status_code == 401
 
 
+def test_register_rejects_password_shorter_than_ten_characters(client):
+    response = client.post(
+        "/register",
+        json={"email": "shortpass@example.com", "password": "abc12345"},
+    )
+
+    assert response.status_code == 422
+    detail_text = str(response.json().get("detail", "")).lower()
+    assert "at least 10 characters" in detail_text or "string_too_short" in detail_text
+
+
+def test_register_rejects_password_without_number(client):
+    response = client.post(
+        "/register",
+        json={"email": "nonumber@example.com", "password": "abcdefghij"},
+    )
+
+    assert response.status_code == 422
+    detail_text = str(response.json().get("detail", "")).lower()
+    assert "letter and one number" in detail_text
+
+
+def test_register_rejects_password_without_letter(client):
+    response = client.post(
+        "/register",
+        json={"email": "noletter@example.com", "password": "1234567890"},
+    )
+
+    assert response.status_code == 422
+    detail_text = str(response.json().get("detail", "")).lower()
+    assert "letter and one number" in detail_text
+
+
 def test_login_rate_limit_after_repeated_failed_attempts(client, monkeypatch):
     monkeypatch.setattr("app.routes.auth_routes._failed_login_buckets", {})
 

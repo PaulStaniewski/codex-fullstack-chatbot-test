@@ -1,11 +1,20 @@
 from datetime import date, datetime
+import re
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import field_validator
 
 
 class UserCreate(BaseModel):
     email: EmailStr
-    password: str = Field(min_length=8)
+    password: str = Field(min_length=10)
+
+    @field_validator("password")
+    @classmethod
+    def validate_password_strength(cls, value: str) -> str:
+        if not re.search(r"[A-Za-z]", value) or not re.search(r"\d", value):
+            raise ValueError("Password must include at least one letter and one number.")
+        return value
 
 
 class UserRead(BaseModel):

@@ -51,6 +51,29 @@ def test_read_current_user(client):
     assert "hashed_password" not in body
 
 
+def test_logout_user(client):
+    client.post(
+        "/register",
+        json={"email": "logout@example.com", "password": "password1234"},
+    )
+    login_response = client.post(
+        "/login",
+        json={"email": "logout@example.com", "password": "password1234"},
+    )
+    token = login_response.json()["access_token"]
+
+    response = client.post("/logout", headers={"Authorization": f"Bearer {token}"})
+
+    assert response.status_code == 200
+    assert response.json() == {"success": True}
+
+
+def test_logout_requires_authentication(client):
+    response = client.post("/logout")
+
+    assert response.status_code == 401
+
+
 def test_protected_endpoint_requires_authentication(client):
     response = client.get("/conversations")
 

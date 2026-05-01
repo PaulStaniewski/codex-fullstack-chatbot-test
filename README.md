@@ -182,6 +182,7 @@ npm run build
 | --- | --- | --- |
 | `POST` | `/register` | Create user account |
 | `POST` | `/login` | Return JWT access token |
+| `POST` | `/logout` | Validate current token and return success (stateless logout contract) |
 
 ### Conversations
 
@@ -215,7 +216,8 @@ Most endpoints use `Authorization: Bearer <token>`. The streaming endpoint accep
 2. User logs in and receives a JWT access token.
 3. Frontend stores the token in `localStorage`.
 4. Protected REST requests send `Authorization: Bearer <token>`.
-5. Logout clears token, selected conversation, and local UI state.
+5. Frontend logout clears token, selected conversation, and local UI state.
+6. `POST /logout` validates the token and returns success, but does not revoke JWTs yet because auth is currently stateless access-token-only.
 
 ### SSE Streaming Flow
 

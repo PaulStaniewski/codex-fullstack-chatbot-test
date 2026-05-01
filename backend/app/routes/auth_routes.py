@@ -93,3 +93,11 @@ def login_user(
 @router.get("/me", response_model=schemas.UserRead)
 def read_current_user(current_user: models.User = Depends(auth.get_current_user)):
     return current_user
+
+
+@router.post("/logout")
+def logout_user(current_user: models.User = Depends(auth.get_current_user)):
+    # Access-token-only JWT auth is currently stateless.
+    # This endpoint validates the token and provides a stable logout contract
+    # for auditability and future token/session revocation support.
+    return {"success": True}

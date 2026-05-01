@@ -48,6 +48,7 @@ FastAPI backend ---> OpenAI Responses API
 - Dark/light theme toggle with saved preference
 - Responsive modern chat UI
 - Basic in-memory per-user stream rate limiting
+- Basic in-memory per-IP failed login rate limiting
 - Message length guard for chat requests
 - Safe SSE error messages for OpenAI failures
 
@@ -234,6 +235,8 @@ The frontend stores the active `conversation_id` in `localStorage`. On reload, i
 `/chat-stream` has a simple in-memory per-user rate limit. It is designed for this benchmark and helps prevent accidental abuse during local demos. It is not distributed across multiple backend instances and should be replaced with Redis or another shared store for production deployments.
 
 The endpoint also rejects messages over 2000 characters before persistence or OpenAI calls.
+
+`/login` also has a simple in-memory per-IP failed-attempt rate limit. It protects against repeated brute-force attempts during local development/demo usage. Like chat rate limiting, this limiter is per-process and not shared across replicas, so it should be replaced with a shared store (for example Redis) in production multi-instance deployments.
 
 ## Known Limitations
 

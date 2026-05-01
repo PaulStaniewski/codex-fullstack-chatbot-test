@@ -1,3 +1,6 @@
+from app.routes import auth_routes
+
+
 def test_register_user(client):
     response = client.post(
         "/register",
@@ -52,3 +55,77 @@ def test_protected_endpoint_requires_authentication(client):
     response = client.get("/conversations")
 
     assert response.status_code == 401
+
+
+def test_login_rate_limit_after_repeated_failed_attempts(client, monkeypatch):
+    monkeypatch.setattr("app.routes.auth_routes._failed_login_buckets", {})
+
+    for _ in range(auth_routes.LOGIN_FAILED_ATTEMPT_LIMIT):
+        response = client.post(
+            "/login",
+            json={"email": "missing@example.com", "password": "wrong-password"},
+            headers={"X-Forwarded-For": "203.0.113.10"},
+        )
+        assert response.status_code == 401
+        assert response.json()["detail"] == "Invalid credentials"
+
+    limited_response = client.post(
+        "/login",
+        json={"email": "missing@example.com", "password": "wrong-password"},
+        headers={"X-Forwarded-For": "203.0.113.10"},
+    )
+
+    assert limited_response.status_code == 429
+    assert limited_response.json()["detail"] == auth_routes.LOGIN_RATE_LIMIT_ERROR
+
+
+def test_login_rate_limit_is_ip_scoped(client, monkeypatch):
+    monkeypatch.setattr("app.routes.auth_routes._failed_login_buckets", {})
+
+    for _ in range(auth_routes.LOGIN_FAILED_ATTEMPT_LIMIT):
+        client.post(
+            "/login",
+            json={"email": "missing@example.com", "password": "wrong-password"},
+            headers={"X-Forwarded-For": "203.0.113.11"},
+        )
+
+    response_other_ip = client.post(
+        "/login",
+        json={"email": "missing@example.com", "password": "wrong-password"},
+        headers={"X-Forwarded-For": "203.0.113.12"},
+    )
+
+    assert response_other_ip.status_code == 401
+    assert response_other_ip.json()["detail"] == "Invalid credentials"
+
+
+def test_successful_login_clears_failed_attempt_bucket(client, monkeypatch):
+    monkeypatch.setattr("app.routes.auth_routes._failed_login_buckets", {})
+
+    client.post(
+        "/register",
+        json={"email": "ratelimit@example.com", "password": "password123"},
+    )
+
+    limited_ip = "203.0.113.13"
+    for _ in range(auth_routes.LOGIN_FAILED_ATTEMPT_LIMIT - 1):
+        response = client.post(
+            "/login",
+            json={"email": "ratelimit@example.com", "password": "wrong-password"},
+            headers={"X-Forwarded-For": limited_ip},
+        )
+        assert response.status_code == 401
+
+    success_response = client.post(
+        "/login",
+        json={"email": "ratelimit@example.com", "password": "password123"},
+        headers={"X-Forwarded-For": limited_ip},
+    )
+    assert success_response.status_code == 200
+
+    first_failed_after_success = client.post(
+        "/login",
+        json={"email": "ratelimit@example.com", "password": "wrong-password"},
+        headers={"X-Forwarded-For": limited_ip},
+    )
+    assert first_failed_after_success.status_code == 401

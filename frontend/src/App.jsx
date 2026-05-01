@@ -38,6 +38,7 @@ function sortConversations(conversations) {
 
 export default function App() {
   const [token, setToken] = useState(() => localStorage.getItem(TOKEN_KEY) || "");
+  const [authStatus, setAuthStatus] = useState(() => (localStorage.getItem(TOKEN_KEY) ? "checking" : "anonymous"));
   const [theme, setTheme] = useState(() => localStorage.getItem(THEME_KEY) || "dark");
   const [conversations, setConversations] = useState([]);
   const [selectedConversation, setSelectedConversation] = useState(null);
@@ -64,6 +65,59 @@ export default function App() {
   }, [theme]);
 
   useEffect(() => {
+    let isCancelled = false;
+
+    async function bootstrapAuth() {
+      if (!token) {
+        if (!isCancelled) {
+          setAuthStatus("anonymous");
+        }
+        return;
+      }
+
+      if (!isCancelled) {
+        setAuthStatus("checking");
+      }
+
+      try {
+        await apiFetch("/me", { token });
+        if (!isCancelled) {
+          setAuthStatus("authenticated");
+        }
+      } catch (err) {
+        if (isCancelled) {
+          return;
+        }
+
+        if (
+          err?.status === 401 ||
+          err?.status === 403 ||
+          err?.message?.includes("Could not validate credentials")
+        ) {
+          logout();
+          setAuthStatus("anonymous");
+          return;
+        }
+
+        logout();
+        setAuthStatus("anonymous");
+      }
+    }
+
+    bootstrapAuth();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [token]);
+
+  useEffect(() => {
+    if (authStatus !== "authenticated") {
+      return () => {
+        eventSourceRef.current?.close();
+      };
+    }
+
     if (token) {
       loadConversations();
       loadLessonProgress();
@@ -72,10 +126,10 @@ export default function App() {
     return () => {
       eventSourceRef.current?.close();
     };
-  }, [token]);
+  }, [authStatus, token]);
 
   useEffect(() => {
-    if (!token) {
+    if (!token || authStatus !== "authenticated") {
       return undefined;
     }
 
@@ -96,7 +150,7 @@ export default function App() {
     }, ACTIVITY_PING_SECONDS * 1000);
 
     return () => window.clearInterval(intervalId);
-  }, [token]);
+  }, [authStatus, token]);
 
   async function login(email, password) {
     const data = await apiFetch("/login", {
@@ -121,6 +175,7 @@ export default function App() {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(ACTIVE_CONVERSATION_KEY);
     setToken("");
+    setAuthStatus("anonymous");
     setConversations([]);
     setSelectedConversation(null);
     setMessages([]);
@@ -664,7 +719,7 @@ export default function App() {
   }
 
   function handleRequestError(err) {
-    if (err.message.includes("Could not validate credentials")) {
+    if (err?.status === 401 || err?.status === 403 || err.message.includes("Could not validate credentials")) {
       logout();
       return;
     }
@@ -680,7 +735,17 @@ export default function App() {
     return clean.length > 48 ? `${clean.slice(0, 45)}...` : clean || "New conversation";
   }
 
-  if (!token) {
+  if (authStatus === "checking") {
+    return (
+      <main className="auth-shell">
+        <section className="auth-panel">
+          <p className="center-note">Checking session...</p>
+        </section>
+      </main>
+    );
+  }
+
+  if (!token || authStatus !== "authenticated") {
     return (
       <AuthView
         onLogin={login}

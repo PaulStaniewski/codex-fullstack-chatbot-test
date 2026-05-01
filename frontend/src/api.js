@@ -164,7 +164,10 @@ export async function apiFetch(path, { token, ...options } = {}) {
 
   if (!response.ok) {
     const message = data?.detail || "Request failed";
-    throw new Error(message);
+    const error = new Error(message);
+    error.status = response.status;
+    error.detail = data?.detail;
+    throw error;
   }
 
   return data;

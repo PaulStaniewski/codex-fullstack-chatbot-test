@@ -58,6 +58,7 @@ export default function App() {
   const [isLessonLoading, setIsLessonLoading] = useState(false);
   const [isCompletingLessonStep, setIsCompletingLessonStep] = useState(false);
   const eventSourceRef = useRef(null);
+  const sessionExpiredHandledRef = useRef(false);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -157,6 +158,7 @@ export default function App() {
       method: "POST",
       body: JSON.stringify({ email, password }),
     });
+    sessionExpiredHandledRef.current = false;
     localStorage.setItem(TOKEN_KEY, data.access_token);
     setToken(data.access_token);
     setError("");
@@ -186,6 +188,17 @@ export default function App() {
     setLessonContext(null);
     setActiveLesson(null);
     setLessonProgress([]);
+  }
+
+  function handleSessionExpired() {
+    if (sessionExpiredHandledRef.current) {
+      return true;
+    }
+
+    sessionExpiredHandledRef.current = true;
+    logout();
+    showToast("error", "Your session expired. Please log in again.");
+    return true;
   }
 
   function toggleTheme() {
@@ -318,8 +331,10 @@ export default function App() {
       setActiveLesson(data.completed ? { ...data, current_step_index: 0 } : data);
       await loadLessonProgress();
     } catch (err) {
-      handleRequestError(err);
-      showToast("error", "Unable to load lesson.");
+      const wasHandled = handleRequestError(err);
+      if (!wasHandled) {
+        showToast("error", "Unable to load lesson.");
+      }
     } finally {
       setIsLessonLoading(false);
     }
@@ -358,8 +373,10 @@ export default function App() {
         showToast("success", `Lesson completed: ${nextLesson.title}`);
       }
     } catch (err) {
-      handleRequestError(err);
-      showToast("error", "Unable to update lesson.");
+      const wasHandled = handleRequestError(err);
+      if (!wasHandled) {
+        showToast("error", "Unable to update lesson.");
+      }
     } finally {
       setIsLessonLoading(false);
     }
@@ -398,8 +415,10 @@ export default function App() {
         showToast("success", `Reading complete: +${completedStep.xp_awarded} XP`);
       }
     } catch (err) {
-      handleRequestError(err);
-      showToast("error", "Unable to mark step as read.");
+      const wasHandled = handleRequestError(err);
+      if (!wasHandled) {
+        showToast("error", "Unable to mark step as read.");
+      }
     } finally {
       setIsCompletingLessonStep(false);
     }
@@ -460,8 +479,10 @@ export default function App() {
       }
       showToast("success", "Conversation renamed.");
     } catch (err) {
-      handleRequestError(err);
-      showToast("error", "Unable to rename conversation.");
+      const wasHandled = handleRequestError(err);
+      if (!wasHandled) {
+        showToast("error", "Unable to rename conversation.");
+      }
       throw err;
     }
   }
@@ -486,8 +507,10 @@ export default function App() {
       }
       showToast("success", "Conversation deleted.");
     } catch (err) {
-      handleRequestError(err);
-      showToast("error", "Unable to delete conversation.");
+      const wasHandled = handleRequestError(err);
+      if (!wasHandled) {
+        showToast("error", "Unable to delete conversation.");
+      }
       throw err;
     }
   }
@@ -560,8 +583,10 @@ export default function App() {
       URL.revokeObjectURL(url);
       showToast("success", "Conversation exported.");
     } catch (err) {
-      handleRequestError(err);
-      showToast("error", "Unable to export conversation.");
+      const wasHandled = handleRequestError(err);
+      if (!wasHandled) {
+        showToast("error", "Unable to export conversation.");
+      }
     } finally {
       setIsExporting(false);
     }
@@ -592,8 +617,10 @@ export default function App() {
         updatedConversation.is_pinned ? "Conversation pinned." : "Conversation unpinned.",
       );
     } catch (err) {
-      handleRequestError(err);
-      showToast("error", "Unable to update pin.");
+      const wasHandled = handleRequestError(err);
+      if (!wasHandled) {
+        showToast("error", "Unable to update pin.");
+      }
     }
   }
 
@@ -706,8 +733,10 @@ export default function App() {
     } catch (err) {
       setIsStreaming(false);
       setFailedMessage(content);
-      handleRequestError(err);
-      showToast("error", "Streaming failed. Please try again.");
+      const wasHandled = handleRequestError(err);
+      if (!wasHandled) {
+        showToast("error", "Streaming failed. Please try again.");
+      }
     }
   }
 
@@ -720,10 +749,10 @@ export default function App() {
 
   function handleRequestError(err) {
     if (err?.status === 401 || err?.status === 403 || err.message.includes("Could not validate credentials")) {
-      logout();
-      return;
+      return handleSessionExpired();
     }
     setError(err.message);
+    return false;
   }
 
   function handleAuthError(message) {

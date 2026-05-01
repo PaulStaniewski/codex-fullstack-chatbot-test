@@ -40,6 +40,7 @@ def test_progress_defaults(client):
     data = response.json()
     assert data["progress"]["sessions_count"] == 0
     assert data["progress"]["messages_count"] == 0
+    assert data["progress"]["lessons_completed"] == 0
     assert data["progress"]["correct_answers"] == 0
     assert data["progress"]["incorrect_answers"] == 0
     assert data["progress"]["time_spent_seconds"] == 0
@@ -48,6 +49,13 @@ def test_progress_defaults(client):
     assert data["progress"]["current_streak_days"] == 0
     assert data["progress"]["last_streak_date"] is None
     assert data["achievements"] == []
+    assert len(data["badges"]) >= 2
+    assert {badge["title"] for badge in data["badges"]} >= {
+        "First Session",
+        "Conversation Starter",
+        "Lesson Finisher",
+    }
+    assert all(badge["earned"] is False for badge in data["badges"])
     assert data["new_achievements"] == []
 
 
@@ -87,6 +95,59 @@ def test_progress_tracks_sessions_messages_and_achievements(client, monkeypatch)
     assert "Conversation Starter" in achievement_names
     assert "First Session" in new_achievement_names
     assert "Conversation Starter" in new_achievement_names
+    badges_by_title = {badge["title"]: badge for badge in data["badges"]}
+    assert badges_by_title["First Session"]["earned"] is True
+    assert badges_by_title["First Session"]["earned_at"] is not None
+    assert badges_by_title["Conversation Starter"]["earned"] is True
+    assert badges_by_title["Practice Streak"]["earned"] is False
+
+
+def test_progress_activity_increments_time_spent(client):
+    token = _register_and_login(client, "activity@example.com")
+
+    response = client.post(
+        "/progress/activity",
+        json={"active_seconds": 90},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["time_spent_seconds"] == 90
+    assert data["last_activity_at"] is not None
+
+
+def test_progress_activity_caps_large_increments(client):
+    token = _register_and_login(client, "activity-cap@example.com")
+
+    response = client.post(
+        "/progress/activity",
+        json={"active_seconds": 999},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 422
+
+
+def test_lesson_completion_updates_lesson_finisher_badge(client):
+    token = _register_and_login(client, "lesson-finisher@example.com")
+    lesson = client.get(
+        "/lessons/docker_basics",
+        headers={"Authorization": f"Bearer {token}"},
+    ).json()
+
+    for _ in lesson["steps"]:
+        client.post(
+            "/lessons/docker_basics/next",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+    response = client.get("/progress", headers={"Authorization": f"Bearer {token}"})
+    progress = response.json()["progress"]
+    badges_by_title = {badge["title"]: badge for badge in response.json()["badges"]}
+
+    assert progress["lessons_completed"] == 1
+    assert badges_by_title["Lesson Finisher"]["earned"] is True
 
     second_response = client.get("/progress", headers={"Authorization": f"Bearer {token}"})
     assert second_response.status_code == 200

@@ -198,3 +198,11 @@ export function getLessonProgress(token) {
 export function getPracticeHistory(lessonId, token) {
   return apiFetch(`/lessons/${encodeURIComponent(lessonId)}/practice-history`, { token });
 }
+
+export function recordProgressActivity(activeSeconds, token) {
+  return apiFetch("/progress/activity", {
+    method: "POST",
+    token,
+    body: JSON.stringify({ active_seconds: activeSeconds }),
+  });
+}

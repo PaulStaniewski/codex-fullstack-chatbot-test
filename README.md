@@ -89,8 +89,9 @@ cp .env.example .env
 
 | Variable | Purpose | Example |
 | --- | --- | --- |
+| `APP_ENV` | Runtime environment (`development`, `test`, `production`) | `development` |
 | `DATABASE_URL` | Backend database URL for local development | `postgresql+psycopg://chatbot:chatbot@localhost:5432/chatbot` |
-| `JWT_SECRET_KEY` | Secret used to sign JWTs | `change-me-in-production` |
+| `JWT_SECRET_KEY` | Secret used to sign JWTs (required in all environments) | `dev-only-jwt-secret-change-this` |
 | `JWT_ALGORITHM` | JWT signing algorithm | `HS256` |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | Access token lifetime | `60` |
 | `OPENAI_API_KEY` | OpenAI API key for real streaming responses | empty in example |
@@ -100,6 +101,7 @@ cp .env.example .env
 | `POSTGRES_PASSWORD` | Docker Postgres password | `chatbot` |
 
 Do not commit real secrets. Keep local credentials in `.env`.
+In `production`, the backend now fails fast if `JWT_SECRET_KEY` is missing or set to a known insecure default value.
 
 ## Docker Usage
 

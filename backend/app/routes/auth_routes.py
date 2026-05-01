@@ -30,3 +30,8 @@ def login_user(login_in: schemas.LoginRequest, db: Session = Depends(get_db)):
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
     return schemas.Token(access_token=auth.create_access_token(str(user.id)))
+
+
+@router.get("/me", response_model=schemas.UserRead)
+def read_current_user(current_user: models.User = Depends(auth.get_current_user)):
+    return current_user

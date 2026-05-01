@@ -361,7 +361,7 @@ input:focus,
 
 .sidebar {
   display: grid;
-  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+  grid-template-rows: auto minmax(0, 1fr) auto;
   gap: 14px;
   overflow-y: auto;
   padding: 16px;
@@ -471,11 +471,47 @@ input:focus,
   display: flex;
   min-height: 0;
   flex-direction: column;
-  gap: 16px;
+  gap: 18px;
   overflow-y: auto;
   padding: 2px 2px 4px 0;
   scrollbar-width: thin;
   scrollbar-color: var(--surface-3) transparent;
+}
+
+.sidebar-block {
+  display: grid;
+  gap: 10px;
+}
+
+.sidebar-block--workspace {
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+}
+
+.sidebar-block-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  font-weight: 950;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.sidebar-block-heading::after {
+  height: 1px;
+  flex: 1 1 auto;
+  background: var(--border);
+  content: "";
+}
+
+.sidebar-subheading {
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  font-weight: 950;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
 }
 
 .conversation-search {
@@ -1403,6 +1439,10 @@ input:focus,
   overflow: hidden;
 }
 
+.dashboard-shell,
+.achievements-shell,
+.profile-shell,
+.settings-shell,
 .progress-shell {
   position: relative;
   display: grid;
@@ -1415,6 +1455,316 @@ input:focus,
   background: var(--panel);
   box-shadow: var(--shadow-soft);
   backdrop-filter: blur(14px);
+}
+
+.dashboard-content {
+  display: grid;
+  min-height: 0;
+  align-content: start;
+  gap: 18px;
+  overflow-y: auto;
+  padding: 30px;
+}
+
+.dashboard-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 22px;
+  align-items: end;
+  max-width: 1040px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 26px;
+  background: var(--surface);
+  box-shadow: var(--shadow-soft);
+}
+
+.dashboard-hero h2 {
+  max-width: 680px;
+  color: var(--text);
+  font-size: clamp(1.5rem, 2vw, 2.1rem);
+  line-height: 1.12;
+}
+
+.dashboard-hero p:not(.eyebrow) {
+  max-width: 680px;
+  margin-top: 10px;
+  color: var(--text-muted);
+  line-height: 1.65;
+}
+
+.dashboard-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.dashboard-actions button {
+  min-height: 42px;
+  padding: 0 14px;
+}
+
+.dashboard-grid {
+  display: grid;
+  max-width: 1040px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.dashboard-card {
+  display: grid;
+  min-width: 0;
+  gap: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 18px;
+  background: var(--surface);
+  box-shadow: var(--shadow-soft);
+}
+
+.dashboard-card--wide {
+  grid-column: span 4;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 18px;
+}
+
+.dashboard-card span {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 850;
+}
+
+.dashboard-card strong {
+  color: var(--text);
+  font-size: 1.55rem;
+  line-height: 1;
+}
+
+.dashboard-card h2 {
+  color: var(--text);
+  font-size: 1.08rem;
+  line-height: 1.25;
+}
+
+.dashboard-card p {
+  color: var(--text-muted);
+  line-height: 1.55;
+}
+
+.dashboard-card button {
+  min-height: 40px;
+  padding: 0 14px;
+}
+
+.profile-content {
+  display: grid;
+  min-height: 0;
+  align-content: start;
+  gap: 18px;
+  overflow-y: auto;
+  padding: 30px;
+}
+
+.profile-card {
+  display: grid;
+  min-width: 0;
+  gap: 8px;
+  max-width: 1040px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 18px;
+  background: var(--surface);
+  box-shadow: var(--shadow-soft);
+}
+
+.profile-card--identity {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 18px;
+  border-radius: var(--radius-lg);
+  padding: 24px;
+}
+
+.profile-avatar {
+  display: grid;
+  width: 68px;
+  height: 68px;
+  place-items: center;
+  border: 1px solid var(--border-strong);
+  border-radius: 20px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 1.25rem;
+  font-weight: 950;
+}
+
+.profile-card h2 {
+  color: var(--text);
+  font-size: 1.12rem;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.profile-card p,
+.profile-card span {
+  color: var(--text-muted);
+  line-height: 1.55;
+}
+
+.profile-card span {
+  font-size: 0.78rem;
+  font-weight: 850;
+}
+
+.profile-card strong {
+  color: var(--text);
+  font-size: 1.55rem;
+  line-height: 1;
+}
+
+.profile-grid {
+  display: grid;
+  max-width: 1040px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.profile-card--actions {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 18px;
+}
+
+.profile-card--actions button {
+  min-height: 40px;
+  padding: 0 14px;
+}
+
+.settings-content {
+  display: grid;
+  min-height: 0;
+  align-content: start;
+  gap: 18px;
+  overflow-y: auto;
+  padding: 30px;
+}
+
+.settings-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 18px;
+  max-width: 860px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 20px;
+  background: var(--surface);
+  box-shadow: var(--shadow-soft);
+}
+
+.settings-card--muted {
+  grid-template-columns: 1fr;
+  background: var(--surface-soft);
+}
+
+.settings-card h2 {
+  color: var(--text);
+  font-size: 1.12rem;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.settings-card p {
+  color: var(--text-muted);
+  line-height: 1.55;
+}
+
+.settings-card button {
+  min-height: 40px;
+  padding: 0 14px;
+}
+
+.achievements-content {
+  display: grid;
+  min-height: 0;
+  align-content: start;
+  gap: 18px;
+  overflow-y: auto;
+  padding: 30px;
+}
+
+.achievements-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 18px;
+  align-items: end;
+  max-width: 1040px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  background: var(--surface);
+  box-shadow: var(--shadow-soft);
+}
+
+.achievements-summary h2 {
+  color: var(--text);
+  font-size: 1.35rem;
+  line-height: 1.2;
+}
+
+.achievements-summary p:not(.eyebrow) {
+  max-width: 660px;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.achievement-filters {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.achievement-filters button {
+  min-height: 36px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0 12px;
+  background: transparent;
+  color: var(--text-muted);
+  font-weight: 850;
+}
+
+.achievement-filters button:hover,
+.achievement-filters button.active {
+  border-color: var(--border-strong);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.badge-preview-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.badge-preview-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 14px;
+  background: var(--surface-soft);
+}
+
+.progress-link-button {
+  justify-self: start;
+  min-height: 40px;
+  padding: 0 14px;
 }
 
 .chat-header {
@@ -1701,6 +2051,50 @@ input:focus,
   border-radius: var(--radius-md);
   padding: 14px;
   background: var(--surface-soft);
+  transition:
+    border-color 140ms ease,
+    opacity 140ms ease,
+    transform 140ms ease;
+}
+
+.achievement-card--earned {
+  border-color: color-mix(in srgb, var(--accent) 38%, var(--border));
+  background: linear-gradient(180deg, var(--surface), var(--surface-soft));
+}
+
+.achievement-card--locked {
+  opacity: 0.58;
+  filter: grayscale(0.85);
+}
+
+.achievement-card--locked .achievement-icon {
+  background: var(--input-bg);
+  color: var(--text-muted);
+}
+
+.achievement-card__title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.badge-status {
+  display: inline-flex;
+  flex: 0 0 auto;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 3px 7px;
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.badge-status.earned {
+  border-color: color-mix(in srgb, var(--accent) 36%, var(--border));
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 
 .achievement-icon {
@@ -1725,9 +2119,18 @@ input:focus,
 }
 
 .achievement-card p,
+.achievement-card time,
+.badge-preview-card p,
 .topic-placeholder {
   color: var(--text-muted);
   line-height: 1.5;
+}
+
+.achievement-card time {
+  display: inline-block;
+  margin-top: 8px;
+  font-size: 0.76rem;
+  font-weight: 850;
 }
 
 .progress-empty {
@@ -2403,7 +2806,7 @@ input:focus,
   }
 
   .sidebar {
-    grid-template-rows: auto auto auto auto auto;
+    grid-template-rows: auto auto auto;
     min-height: auto;
     padding: 14px;
   }
@@ -2416,6 +2819,10 @@ input:focus,
   .chat-header,
   .message-list,
   .lesson-view,
+  .achievements-content,
+  .dashboard-content,
+  .profile-content,
+  .settings-content,
   .progress-content,
   .composer {
     padding-left: 18px;
@@ -2424,6 +2831,47 @@ input:focus,
 
   .progress-stats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dashboard-hero,
+  .dashboard-card--wide {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-actions {
+    justify-content: flex-start;
+  }
+
+  .dashboard-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dashboard-card--wide {
+    grid-column: span 2;
+  }
+
+  .profile-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .profile-card--actions {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-card {
+    grid-template-columns: 1fr;
+  }
+
+  .achievements-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .achievement-filters {
+    justify-content: flex-start;
+  }
+
+  .badge-preview-list {
+    grid-template-columns: 1fr;
   }
 
   .message-bubble {
@@ -2461,17 +2909,18 @@ input:focus,
   }
 
   .conversation-list {
-    flex-direction: row;
-    overflow-x: auto;
-    overflow-y: hidden;
+    max-height: 260px;
+    flex-direction: column;
+    overflow-x: hidden;
+    overflow-y: auto;
   }
 
   .conversation-section {
-    min-width: max-content;
+    min-width: 0;
   }
 
   .conversation-section-list {
-    display: flex;
+    display: grid;
     gap: 8px;
   }
 
@@ -2480,11 +2929,11 @@ input:focus,
   }
 
   .conversation-item {
-    min-width: 190px;
+    min-width: 0;
   }
 
   .conversation-row {
-    min-width: 250px;
+    min-width: 0;
   }
 
   .conversation-actions {
@@ -2505,6 +2954,50 @@ input:focus,
 
   .lesson-card {
     padding: 18px;
+  }
+
+  .dashboard-content {
+    padding-top: 18px;
+    padding-bottom: 18px;
+  }
+
+  .profile-content {
+    padding-top: 18px;
+    padding-bottom: 18px;
+  }
+
+  .achievements-content {
+    padding-top: 18px;
+    padding-bottom: 18px;
+  }
+
+  .settings-content {
+    padding-top: 18px;
+    padding-bottom: 18px;
+  }
+
+  .dashboard-hero,
+  .achievements-summary,
+  .dashboard-card,
+  .profile-card,
+  .settings-card {
+    padding: 18px;
+  }
+
+  .profile-card--identity {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .profile-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-card--wide {
+    grid-column: span 1;
   }
 
   .lesson-card-header {

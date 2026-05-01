@@ -1,5 +1,6 @@
 import os
 from datetime import datetime, timedelta, timezone
+from typing import Mapping
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
@@ -11,9 +12,37 @@ from app import models
 from app.database import get_db
 
 
-SECRET_KEY = os.getenv("JWT_SECRET_KEY", "change-me-in-production")
-ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
+DEFAULT_JWT_ALGORITHM = "HS256"
+DEFAULT_ACCESS_TOKEN_EXPIRE_MINUTES = 60
+PRODUCTION_ENV_NAMES = {"prod", "production"}
+INSECURE_JWT_SECRET_VALUES = {
+    "change-me-in-production",
+    "dev-secret-key",
+    "test-secret-key",
+    "development-secret",
+    "dev-only-jwt-secret-change-this",
+}
+
+
+def _resolve_auth_settings(environ: Mapping[str, str] | None = None) -> tuple[str, str, int]:
+    env = environ or os.environ
+    app_env = env.get("APP_ENV", "development").strip().lower()
+    secret_key = (env.get("JWT_SECRET_KEY") or "").strip()
+    algorithm = (env.get("JWT_ALGORITHM") or DEFAULT_JWT_ALGORITHM).strip()
+    expire_minutes = int(
+        (env.get("ACCESS_TOKEN_EXPIRE_MINUTES") or str(DEFAULT_ACCESS_TOKEN_EXPIRE_MINUTES)).strip()
+    )
+
+    if not secret_key:
+        raise RuntimeError("JWT_SECRET_KEY must be set in the environment.")
+
+    if app_env in PRODUCTION_ENV_NAMES and secret_key in INSECURE_JWT_SECRET_VALUES:
+        raise RuntimeError("JWT_SECRET_KEY is unsafe for production APP_ENV.")
+
+    return secret_key, algorithm, expire_minutes
+
+
+SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES = _resolve_auth_settings()
 
 password_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login")

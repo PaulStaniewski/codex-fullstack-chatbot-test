@@ -105,7 +105,7 @@ def test_completing_lesson_awards_xp_once(client):
         "progress"
     ]
 
-    assert first_progress["xp_points"] == XP_PER_LESSON_COMPLETION
+    assert first_progress["xp_points"] == XP_PER_LESSON_COMPLETION + 50
     assert second_progress["xp_points"] == first_progress["xp_points"]
 
 

@@ -78,9 +78,22 @@ class AchievementRead(BaseModel):
     earned_at: datetime | None = None
 
 
+class BadgeRead(BaseModel):
+    id: int
+    key: str
+    title: str
+    description: str
+    icon: str
+    condition_type: str
+    condition_value: int
+    earned: bool
+    earned_at: datetime | None = None
+
+
 class UserProgressStats(BaseModel):
     sessions_count: int
     messages_count: int
+    lessons_completed: int
     correct_answers: int
     incorrect_answers: int
     time_spent_seconds: int
@@ -102,7 +115,12 @@ class UserProgressRead(UserProgressStats):
 class ProgressResponse(BaseModel):
     progress: UserProgressStats
     achievements: list[AchievementRead]
+    badges: list[BadgeRead]
     new_achievements: list[AchievementRead]
+
+
+class ProgressActivityRequest(BaseModel):
+    active_seconds: int = Field(ge=1, le=300)
 
 
 class LessonStepRead(BaseModel):

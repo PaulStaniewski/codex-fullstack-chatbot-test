@@ -6,6 +6,7 @@ from app import models
 
 
 ACTIVE_TIME_THRESHOLD_SECONDS = 10 * 60
+MAX_ACTIVE_TIME_INCREMENT_SECONDS = 5 * 60
 XP_PER_MESSAGE = 10
 XP_PER_SESSION = 25
 XP_PER_ACHIEVEMENT = 50
@@ -85,6 +86,14 @@ DEFAULT_ACHIEVEMENTS = [
         "icon": "map",
         "condition_type": "sessions_count",
         "condition_value": 5,
+    },
+    {
+        "id": 10,
+        "name": "Lesson Finisher",
+        "description": "Complete your first lesson.",
+        "icon": "check",
+        "condition_type": "lessons_completed",
+        "condition_value": 1,
     },
 ]
 
@@ -183,8 +192,21 @@ def recalculate_level(progress: models.UserProgress) -> None:
 
 def award_lesson_completion_xp(db: Session, user_id: int) -> models.UserProgress:
     progress = get_or_create_progress(db, user_id)
+    progress.lessons_completed += 1
     progress.xp_points += XP_PER_LESSON_COMPLETION
     recalculate_level(progress)
+    evaluate_achievements(progress, db)
+    return progress
+
+
+def record_active_time(db: Session, user_id: int, active_seconds: int) -> models.UserProgress:
+    progress = get_or_create_progress(db, user_id)
+    if active_seconds > 0:
+        progress.time_spent_seconds += min(active_seconds, MAX_ACTIVE_TIME_INCREMENT_SECONDS)
+
+    current_time = datetime.now(timezone.utc)
+    progress.last_activity_at = current_time
+    update_learning_streak(progress, current_time)
     evaluate_achievements(progress, db)
     return progress
 
@@ -243,6 +265,8 @@ def get_progress_condition_value(progress: models.UserProgress, condition_type: 
         return progress.messages_count
     if condition_type == "sessions_count":
         return progress.sessions_count
+    if condition_type == "lessons_completed":
+        return progress.lessons_completed
     return 0
 
 

@@ -7,12 +7,17 @@ import {
   getLessonProgress,
   getStreamUrl,
   nextLessonStep,
+  recordProgressActivity,
 } from "./api.js";
+import AchievementsPage from "./components/AchievementsPage.jsx";
 import AchievementToast from "./components/AchievementToast.jsx";
 import AuthView from "./components/AuthView.jsx";
 import ChatWindow from "./components/ChatWindow.jsx";
+import DashboardPage from "./components/DashboardPage.jsx";
 import LessonView from "./components/LessonView.jsx";
+import ProfilePage from "./components/ProfilePage.jsx";
 import ProgressPage from "./components/ProgressPage.jsx";
+import SettingsPage from "./components/SettingsPage.jsx";
 import Sidebar from "./components/Sidebar.jsx";
 import ThemeToggle from "./components/ThemeToggle.jsx";
 import ToastStack from "./components/ToastStack.jsx";
@@ -20,6 +25,7 @@ import ToastStack from "./components/ToastStack.jsx";
 const TOKEN_KEY = "chatbot_access_token";
 const ACTIVE_CONVERSATION_KEY = "chatbot_active_conversation_id";
 const THEME_KEY = "chatbot_theme";
+const ACTIVITY_PING_SECONDS = 60;
 
 function sortConversations(conversations) {
   return [...conversations].sort((a, b) => {
@@ -43,7 +49,7 @@ export default function App() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [failedMessage, setFailedMessage] = useState(null);
-  const [activeView, setActiveView] = useState("chat");
+  const [activeView, setActiveView] = useState("dashboard");
   const [achievementToast, setAchievementToast] = useState(null);
   const [lessonContext, setLessonContext] = useState(null);
   const [activeLesson, setActiveLesson] = useState(null);
@@ -66,6 +72,30 @@ export default function App() {
     return () => {
       eventSourceRef.current?.close();
     };
+  }, [token]);
+
+  useEffect(() => {
+    if (!token) {
+      return undefined;
+    }
+
+    const intervalId = window.setInterval(() => {
+      if (document.visibilityState !== "visible") {
+        return;
+      }
+
+      recordProgressActivity(ACTIVITY_PING_SECONDS, token)
+        .then((progress) => {
+          if (progress?.time_spent_seconds >= 3600) {
+            checkProgressAchievements();
+          }
+        })
+        .catch(() => {
+          // Activity pings are best-effort and should never interrupt learning.
+        });
+    }, ACTIVITY_PING_SECONDS * 1000);
+
+    return () => window.clearInterval(intervalId);
   }, [token]);
 
   async function login(email, password) {
@@ -96,7 +126,7 @@ export default function App() {
     setMessages([]);
     setError("");
     setIsStreaming(false);
-    setActiveView("chat");
+    setActiveView("dashboard");
     setAchievementToast(null);
     setLessonContext(null);
     setActiveLesson(null);
@@ -322,6 +352,30 @@ export default function App() {
 
   function showProgress() {
     setActiveView("progress");
+  }
+
+  function showAchievements() {
+    setActiveView("achievements");
+    setLessonContext(null);
+    setActiveLesson(null);
+  }
+
+  function showDashboard() {
+    setActiveView("dashboard");
+    setLessonContext(null);
+    setActiveLesson(null);
+  }
+
+  function showProfile() {
+    setActiveView("profile");
+    setLessonContext(null);
+    setActiveLesson(null);
+  }
+
+  function showSettings() {
+    setActiveView("settings");
+    setLessonContext(null);
+    setActiveLesson(null);
   }
 
   async function renameConversation(conversation, title) {
@@ -649,22 +703,64 @@ export default function App() {
         onDeleteConversation={deleteConversation}
         onTogglePin={toggleConversationPin}
         onSelectLesson={(lesson) => selectLesson(lesson).catch(handleRequestError)}
+        onShowAchievements={showAchievements}
+        onShowDashboard={showDashboard}
+        onShowProfile={showProfile}
         onShowProgress={showProgress}
+        onShowSettings={showSettings}
         onLogout={logout}
         selectedLessonId={lessonContext?.lesson_id}
         lessonProgress={lessonProgress}
+        isAchievementsActive={activeView === "achievements"}
+        isDashboardActive={activeView === "dashboard"}
+        isProfileActive={activeView === "profile"}
         isProgressActive={activeView === "progress"}
+        isSettingsActive={activeView === "settings"}
         isLoading={isConversationsLoading}
         isMessagesLoading={isMessagesLoading}
         isStreaming={isStreaming}
       />
 
-      {activeView === "progress" ? (
+      {activeView === "dashboard" ? (
+        <DashboardPage
+          token={token}
+          theme={theme}
+          onToggleTheme={toggleTheme}
+          lessonProgress={lessonProgress}
+          onSelectLesson={(lesson) => selectLesson(lesson).catch(handleRequestError)}
+          onShowProgress={showProgress}
+          onCreateConversation={() => startNewConversation().catch(handleRequestError)}
+          onAchievementUnlocked={showAchievementToast}
+        />
+      ) : activeView === "progress" ? (
         <ProgressPage
           token={token}
           theme={theme}
           onToggleTheme={toggleTheme}
           onAchievementUnlocked={showAchievementToast}
+          onShowAchievements={showAchievements}
+        />
+      ) : activeView === "achievements" ? (
+        <AchievementsPage
+          token={token}
+          theme={theme}
+          onToggleTheme={toggleTheme}
+          onAchievementUnlocked={showAchievementToast}
+        />
+      ) : activeView === "profile" ? (
+        <ProfilePage
+          token={token}
+          theme={theme}
+          onToggleTheme={toggleTheme}
+          onLogout={logout}
+          onAchievementUnlocked={showAchievementToast}
+        />
+      ) : activeView === "settings" ? (
+        <SettingsPage
+          token={token}
+          theme={theme}
+          onToggleTheme={toggleTheme}
+          onLogout={logout}
         />
       ) : lessonContext ? (
         <main className="chat-shell">

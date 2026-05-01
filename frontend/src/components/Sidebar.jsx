@@ -22,11 +22,19 @@ export default function Sidebar({
   onDeleteConversation,
   onTogglePin,
   onSelectLesson,
+  onShowAchievements,
+  onShowDashboard,
+  onShowProfile,
   onShowProgress,
+  onShowSettings,
   onLogout,
   selectedLessonId,
   lessonProgress = [],
+  isAchievementsActive,
+  isDashboardActive,
+  isProfileActive,
   isProgressActive,
+  isSettingsActive,
   isLoading,
   isMessagesLoading,
   isStreaming,
@@ -393,94 +401,120 @@ export default function Sidebar({
     <aside className="sidebar">
       <div className="sidebar-header">
         <div>
-          <p className="eyebrow">Learning</p>
-          <h2>Courses</h2>
+          <p className="eyebrow">Learning Platform</p>
+          <h2>Study Hub</h2>
         </div>
-        <button
-          className="icon-button"
-          type="button"
-          onClick={onCreateConversation}
-          aria-label="New chat"
-          disabled={isLoading || isStreaming}
-        >
-          +
-        </button>
       </div>
 
-      <div className="sidebar-controls">
-        <button
-          className="new-chat-button"
-          type="button"
-          onClick={onCreateConversation}
-          disabled={isLoading || isStreaming}
-        >
-          <span>New chat</span>
-          <span aria-hidden="true">+</span>
-        </button>
-        <button
-          className={isProgressActive ? "sidebar-nav-button active" : "sidebar-nav-button"}
-          type="button"
-          onClick={onShowProgress}
-        >
-          <span aria-hidden="true">📘</span>
-          <span>Progress</span>
-        </button>
-      </div>
-
-      <div className="conversation-search">
-        <input
-          type="search"
-          value={searchQuery}
-          onChange={(event) => setSearchQuery(event.target.value)}
-          placeholder="Search conversations"
-          aria-label="Search conversations"
-          disabled={isLoading}
-        />
-      </div>
-
-      <nav className="conversation-list" aria-label="Learning">
-        <div className="learning-nav">
-          {learningStructure.map(renderLearningSection)}
-        </div>
-
-        <div className="conversation-history-heading">
-          <span>Conversation history</span>
-        </div>
-
-        {isLoading ? <p className="sidebar-note">Loading conversations...</p> : null}
-        {!isLoading && conversations.length === 0 ? (
-          <div className="sidebar-empty">
-            <p>No conversations yet.</p>
-            <button type="button" onClick={onCreateConversation} disabled={isLoading || isStreaming}>
-              Start one
-            </button>
+      <nav className="conversation-list" aria-label="Main navigation">
+        <div className="sidebar-block">
+          <div className="sidebar-block-heading">
+            <span>Learning</span>
           </div>
-        ) : null}
-        {!isLoading && conversations.length > 0 && filteredConversations.length === 0 ? (
-          <div className="sidebar-empty">
-            <p>No matching conversations.</p>
-            <button type="button" onClick={() => setSearchQuery("")}>
-              Clear search
-            </button>
+          <button
+            className={isDashboardActive ? "sidebar-nav-button active" : "sidebar-nav-button"}
+            type="button"
+            onClick={onShowDashboard}
+          >
+            <span>Dashboard</span>
+          </button>
+          <div className="sidebar-subheading">Courses</div>
+          <div className="learning-nav" aria-label="Courses">
+            {learningStructure.map(renderLearningSection)}
           </div>
-        ) : null}
+          <button
+            className={isProgressActive ? "sidebar-nav-button active" : "sidebar-nav-button"}
+            type="button"
+            onClick={onShowProgress}
+          >
+            <span>Progress</span>
+          </button>
+          <button
+            className={isAchievementsActive ? "sidebar-nav-button active" : "sidebar-nav-button"}
+            type="button"
+            onClick={onShowAchievements}
+          >
+            <span>Achievements</span>
+          </button>
+        </div>
 
-        {!isLoading && pinnedConversations.length > 0 ? (
-          renderSection("Pinned", "pinned", pinnedConversations)
-        ) : null}
+        <div className="sidebar-block sidebar-block--workspace">
+          <div className="sidebar-block-heading">
+            <span>AI Workspace</span>
+          </div>
+          <button
+            className="new-chat-button"
+            type="button"
+            onClick={onCreateConversation}
+            disabled={isLoading || isStreaming}
+          >
+            <span>New chat</span>
+            <span aria-hidden="true">+</span>
+          </button>
 
-        {!isLoading
-          ? groupedRecentConversations.map((group) =>
-              renderSection(group.label, getSectionId(group.label), group.conversations),
-            )
-          : null}
+          <div className="conversation-history-heading">
+            <span>Conversations</span>
+          </div>
+
+          <div className="conversation-search">
+            <input
+              type="search"
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="Search conversations"
+              aria-label="Search conversations"
+              disabled={isLoading}
+            />
+          </div>
+
+          {isLoading ? <p className="sidebar-note">Loading conversations...</p> : null}
+          {!isLoading && conversations.length === 0 ? (
+            <div className="sidebar-empty">
+              <p>No conversations yet.</p>
+              <button type="button" onClick={onCreateConversation} disabled={isLoading || isStreaming}>
+                Start one
+              </button>
+            </div>
+          ) : null}
+          {!isLoading && conversations.length > 0 && filteredConversations.length === 0 ? (
+            <div className="sidebar-empty">
+              <p>No matching conversations.</p>
+              <button type="button" onClick={() => setSearchQuery("")}>
+                Clear search
+              </button>
+            </div>
+          ) : null}
+
+          {!isLoading && pinnedConversations.length > 0 ? (
+            renderSection("Pinned", "pinned", pinnedConversations)
+          ) : null}
+
+          {!isLoading
+            ? groupedRecentConversations.map((group) =>
+                renderSection(group.label, getSectionId(group.label), group.conversations),
+              )
+            : null}
+        </div>
       </nav>
 
       <div className="sidebar-footer">
-        <div className="sidebar-session">
-          <span>Session</span>
-          <strong>Signed in</strong>
+        <div className="sidebar-block-heading">
+          <span>Account</span>
         </div>
+        <button
+          className={isProfileActive ? "sidebar-nav-button active" : "sidebar-nav-button"}
+          type="button"
+          onClick={onShowProfile}
+        >
+          <span>Profile</span>
+        </button>
+        <button
+          className={isSettingsActive ? "sidebar-nav-button active" : "sidebar-nav-button"}
+          type="button"
+          onClick={onShowSettings}
+        >
+          <span>Settings</span>
+        </button>
         <button className="secondary-button" type="button" onClick={onLogout}>
           Log out
         </button>

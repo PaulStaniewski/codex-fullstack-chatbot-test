@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
+import re
 
 from app import auth, models, progress as progress_service, schemas
 from app.database import get_db
@@ -20,11 +21,34 @@ def serialize_achievement(item: models.UserAchievement) -> schemas.AchievementRe
     )
 
 
+def make_badge_key(name: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "_", name.lower()).strip("_")
+
+
+def serialize_badge(
+    achievement: models.Achievement,
+    earned_by_achievement_id: dict[int, models.UserAchievement],
+) -> schemas.BadgeRead:
+    earned_item = earned_by_achievement_id.get(achievement.id)
+    return schemas.BadgeRead(
+        id=achievement.id,
+        key=make_badge_key(achievement.name),
+        title=achievement.name,
+        description=achievement.description,
+        icon=achievement.icon,
+        condition_type=achievement.condition_type,
+        condition_value=achievement.condition_value,
+        earned=earned_item is not None,
+        earned_at=earned_item.earned_at if earned_item else None,
+    )
+
+
 def serialize_progress(progress: models.UserProgress) -> schemas.UserProgressStats:
     xp_progress = progress_service.build_xp_progress(progress.xp_points)
     return schemas.UserProgressStats(
         sessions_count=progress.sessions_count,
         messages_count=progress.messages_count,
+        lessons_completed=progress.lessons_completed,
         correct_answers=progress.correct_answers,
         incorrect_answers=progress.incorrect_answers,
         time_spent_seconds=progress.time_spent_seconds,
@@ -55,8 +79,14 @@ def get_progress(
         .filter(models.UserAchievement.user_id == current_user.id)
         .all()
     )
+    earned_by_achievement_id = {item.achievement_id: item for item in earned}
+    all_achievements = db.query(models.Achievement).order_by(models.Achievement.id).all()
     new_items = [item for item in earned if not item.notified]
     achievements = [serialize_achievement(item) for item in earned]
+    badges = [
+        serialize_badge(achievement, earned_by_achievement_id)
+        for achievement in all_achievements
+    ]
     new_achievements = [serialize_achievement(item) for item in new_items]
 
     for item in new_items:
@@ -67,5 +97,22 @@ def get_progress(
     return schemas.ProgressResponse(
         progress=serialize_progress(progress),
         achievements=achievements,
+        badges=badges,
         new_achievements=new_achievements,
     )
+
+
+@router.post("/activity", response_model=schemas.UserProgressStats)
+def record_activity(
+    activity: schemas.ProgressActivityRequest,
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db),
+):
+    progress = progress_service.record_active_time(
+        db,
+        current_user.id,
+        activity.active_seconds,
+    )
+    db.commit()
+    db.refresh(progress)
+    return serialize_progress(progress)

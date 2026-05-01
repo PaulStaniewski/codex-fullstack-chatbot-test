@@ -20,6 +20,7 @@ function normalizeProgressResponse(data) {
     return {
       ...data.progress,
       achievements: data.achievements || [],
+      badges: data.badges || data.achievements || [],
     };
   }
 
@@ -39,7 +40,13 @@ function getLevelTitle(level) {
   return "Starter";
 }
 
-export default function ProgressPage({ token, theme, onToggleTheme, onAchievementUnlocked }) {
+export default function ProgressPage({
+  token,
+  theme,
+  onToggleTheme,
+  onAchievementUnlocked,
+  onShowAchievements,
+}) {
   const [progress, setProgress] = useState(null);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
@@ -83,6 +90,9 @@ export default function ProgressPage({ token, theme, onToggleTheme, onAchievemen
   const currentLevelXp = progress?.xp_into_level ?? 0;
   const xpRequiredForNextLevel = progress?.xp_required_for_next_level ?? 1;
   const xpPercent = Math.min(100, Math.max(0, progress?.progress_percent ?? 0));
+  const badges = progress?.badges || [];
+  const earnedBadges = badges.filter((badge) => badge.earned);
+  const badgePreview = earnedBadges.length > 0 ? earnedBadges.slice(0, 3) : badges.slice(0, 3);
 
   return (
     <main className="progress-shell">
@@ -134,7 +144,7 @@ export default function ProgressPage({ token, theme, onToggleTheme, onAchievemen
               </div>
               <div className="progress-stats">
                 <div className="progress-stat">
-                  <span>Sessions</span>
+                  <span>Learning sessions</span>
                   <strong>{progress.sessions_count}</strong>
                 </div>
                 <div className="progress-stat">
@@ -155,25 +165,46 @@ export default function ProgressPage({ token, theme, onToggleTheme, onAchievemen
             <section className="progress-section">
               <div>
                 <p className="eyebrow">Achievements</p>
-                <h2>Earned badges</h2>
+                <h2>Badge preview</h2>
               </div>
-              {progress.achievements.length > 0 ? (
-                <div className="achievement-list">
-                  {progress.achievements.map((achievement) => (
-                    <article className="achievement-card" key={achievement.id}>
-                      <div className="achievement-icon">{achievement.icon}</div>
-                      <div>
-                        <h3>{achievement.name}</h3>
-                        <p>{achievement.description}</p>
-                      </div>
-                    </article>
-                  ))}
-                </div>
+              {badges.length > 0 ? (
+                <>
+                  <div className="badge-preview-list">
+                    {badgePreview.map((badge) => (
+                      <article
+                        className={
+                          badge.earned
+                            ? "badge-preview-card achievement-card--earned"
+                            : "badge-preview-card achievement-card--locked"
+                        }
+                        key={badge.key || badge.id}
+                      >
+                        <div className="achievement-icon">{badge.icon}</div>
+                        <div>
+                          <div className="achievement-card__title-row">
+                            <h3>{badge.title || badge.name}</h3>
+                            <span className={badge.earned ? "badge-status earned" : "badge-status"}>
+                              {badge.earned ? "Unlocked" : "Locked"}
+                            </span>
+                          </div>
+                          <p>{badge.description}</p>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    className="secondary-button progress-link-button"
+                    onClick={onShowAchievements}
+                  >
+                    View all achievements
+                  </button>
+                </>
               ) : (
                 <div className="empty-state progress-empty">
                   <div className="empty-mark">0</div>
-                  <h2>No achievements yet</h2>
-                  <p>Start a chat and send a message to earn your first badges.</p>
+                  <h2>No badges available</h2>
+                  <p>Badges will appear here as learning milestones are configured.</p>
                 </div>
               )}
             </section>

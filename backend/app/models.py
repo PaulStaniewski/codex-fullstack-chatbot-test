@@ -83,6 +83,7 @@ class UserProgress(Base):
     )
     sessions_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     messages_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    lessons_completed: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     correct_answers: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     incorrect_answers: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     time_spent_seconds: Mapped[int] = mapped_column(Integer, default=0, nullable=False)

@@ -1,5 +1,7 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import ThemeToggle from "./ThemeToggle.jsx";
+
+const REMEMBERED_EMAIL_KEY = "chatbot_remembered_email";
 
 function getAuthErrorMessage(err, isLogin) {
   const status = err?.status;
@@ -40,13 +42,22 @@ function getAuthErrorMessage(err, isLogin) {
 }
 
 export default function AuthView({ onLogin, onRegister, onAuthError, theme, onToggleTheme }) {
+  const rememberedEmail = useMemo(() => localStorage.getItem(REMEMBERED_EMAIL_KEY) || "", []);
   const [mode, setMode] = useState("login");
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(rememberedEmail);
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [rememberEmail, setRememberEmail] = useState(Boolean(rememberedEmail));
 
   const isLogin = mode === "login";
+
+  useEffect(() => {
+    if (isLogin) {
+      return;
+    }
+    setRememberEmail(false);
+  }, [isLogin]);
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -56,6 +67,11 @@ export default function AuthView({ onLogin, onRegister, onAuthError, theme, onTo
     try {
       if (isLogin) {
         await onLogin(email, password);
+        if (rememberEmail && email.trim()) {
+          localStorage.setItem(REMEMBERED_EMAIL_KEY, email.trim());
+        } else {
+          localStorage.removeItem(REMEMBERED_EMAIL_KEY);
+        }
       } else {
         await onRegister(email, password);
       }
@@ -73,60 +89,111 @@ export default function AuthView({ onLogin, onRegister, onAuthError, theme, onTo
       <div className="auth-theme">
         <ThemeToggle theme={theme} onToggleTheme={onToggleTheme} />
       </div>
-      <section className="auth-panel" aria-labelledby="auth-title">
-        <div className="auth-brand">
-          <div className="brand-mark">AI</div>
-          <p className="eyebrow">Fullstack Chatbot</p>
-          <h1 id="auth-title">{isLogin ? "Welcome back" : "Create your account"}</h1>
-        </div>
+      <section className="auth-layout" aria-labelledby="auth-title">
+        <aside className="auth-hero" aria-label="Platform overview">
+          <p className="eyebrow">Learning Platform</p>
+          <h1 id="auth-title">Learn engineering by building real systems.</h1>
+          <p className="auth-hero-copy">
+            Build practical confidence across backend services, infrastructure, and AI workflows.
+          </p>
+          <ul className="auth-hero-points">
+            <li>Real-world backend, Docker, database, and AI scenarios</li>
+            <li>Practice tasks with feedback</li>
+            <li>Progress, XP, and achievements</li>
+          </ul>
+          <p className="auth-status-line">Production-style learning workspace</p>
+        </aside>
 
-        <form className="auth-form" onSubmit={handleSubmit}>
-          <label>
-            Email
-            <input
-              type="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              autoComplete="email"
-              required
-            />
-          </label>
+        <section className="auth-panel auth-card" aria-label="Authentication form">
+          <div className="auth-mode-tabs" role="tablist" aria-label="Authentication mode">
+            <button
+              type="button"
+              className={isLogin ? "auth-mode-tab active" : "auth-mode-tab"}
+              role="tab"
+              aria-selected={isLogin}
+              aria-controls="auth-form-stage"
+              onClick={() => {
+                setMode("login");
+                setError("");
+              }}
+            >
+              Log in
+            </button>
+            <button
+              type="button"
+              className={!isLogin ? "auth-mode-tab active" : "auth-mode-tab"}
+              role="tab"
+              aria-selected={!isLogin}
+              aria-controls="auth-form-stage"
+              onClick={() => {
+                setMode("register");
+                setError("");
+              }}
+            >
+              Register
+            </button>
+          </div>
 
-          <label>
-            Password
-            <input
-              type="password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              autoComplete={isLogin ? "current-password" : "new-password"}
-              minLength={10}
-              required
-            />
-          </label>
-          {!isLogin ? (
-            <p className="auth-help">Use at least 10 characters, including a letter and a number.</p>
-          ) : null}
+          <div className="auth-brand auth-card-header">
+            <p className="eyebrow">{isLogin ? "Welcome back" : "Create your account"}</p>
+            <h2>{isLogin ? "Continue your learning streak" : "Start your learning workspace"}</h2>
+            <p className="auth-helper-copy">
+              {isLogin
+                ? "Log in to resume lessons, conversations, and progress."
+                : "Create an account to track progress and unlock achievements."}
+            </p>
+          </div>
 
-          {error ? <p className="form-error" role="alert">{error}</p> : null}
-
-          <button className="primary-button" type="submit" disabled={isSubmitting}>
-            {isSubmitting ? "Please wait..." : isLogin ? "Log in" : "Register"}
-          </button>
-        </form>
-
-        <div className="auth-switch">
-          <span>{isLogin ? "Need an account?" : "Already have an account?"}</span>
-          <button
-            className="link-button"
-            type="button"
-            onClick={() => {
-              setMode(isLogin ? "register" : "login");
-              setError("");
-            }}
+          <div
+            id="auth-form-stage"
+            className={isLogin ? "auth-form-stage mode-login" : "auth-form-stage mode-register"}
           >
-            {isLogin ? "Register" : "Log in"}
-          </button>
-        </div>
+            <form className="auth-form" onSubmit={handleSubmit}>
+              <label>
+                Email
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  autoComplete="email"
+                  required
+                />
+              </label>
+
+              <label>
+                Password
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  autoComplete={isLogin ? "current-password" : "new-password"}
+                  minLength={10}
+                  required
+                />
+              </label>
+
+              {isLogin ? (
+                <label className="auth-remember-row">
+                  <input
+                    className="auth-remember-checkbox"
+                    type="checkbox"
+                    checked={rememberEmail}
+                    onChange={(event) => setRememberEmail(event.target.checked)}
+                  />
+                  <span>Remember email on this device</span>
+                </label>
+              ) : (
+                <p className="auth-help">Use at least 10 characters, including a letter and a number.</p>
+              )}
+
+              {error ? <p className="form-error" role="alert">{error}</p> : null}
+
+              <button className="primary-button" type="submit" disabled={isSubmitting}>
+                {isSubmitting ? "Please wait..." : isLogin ? "Log in" : "Create account"}
+              </button>
+            </form>
+          </div>
+        </section>
       </section>
     </main>
   );

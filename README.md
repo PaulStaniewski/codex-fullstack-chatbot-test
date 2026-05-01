@@ -95,6 +95,7 @@ cp .env.example .env
 | `JWT_SECRET_KEY` | Secret used to sign JWTs (required in all environments) | `dev-only-jwt-secret-change-this` |
 | `JWT_ALGORITHM` | JWT signing algorithm | `HS256` |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | Access token lifetime | `60` |
+| `CORS_ALLOWED_ORIGINS` | Comma-separated allowed frontend origins for CORS | `http://localhost:5173,http://127.0.0.1:5173` |
 | `OPENAI_API_KEY` | OpenAI API key for real streaming responses | empty in example |
 | `OPENAI_MODEL` | Model used by the backend | `gpt-5.4-mini` |
 | `POSTGRES_DB` | Docker Postgres database name | `chatbot` |
@@ -103,6 +104,7 @@ cp .env.example .env
 
 Do not commit real secrets. Keep local credentials in `.env`.
 In `production`, the backend now fails fast if `JWT_SECRET_KEY` is missing or set to a known insecure default value.
+The backend also configures CORS from `CORS_ALLOWED_ORIGINS` and expects explicit origins when credentials are enabled.
 
 ## Docker Usage
 

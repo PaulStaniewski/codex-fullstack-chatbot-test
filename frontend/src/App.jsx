@@ -6,6 +6,7 @@ import {
   getLesson,
   getLessonProgress,
   getStreamUrl,
+  logoutUser,
   nextLessonStep,
   recordProgressActivity,
 } from "./api.js";
@@ -172,7 +173,7 @@ export default function App() {
     await login(email, password);
   }
 
-  function logout() {
+  function clearLocalAuthState() {
     eventSourceRef.current?.close();
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(ACTIVE_CONVERSATION_KEY);
@@ -190,13 +191,26 @@ export default function App() {
     setLessonProgress([]);
   }
 
+  async function logout() {
+    const tokenToLogout = token;
+    try {
+      if (tokenToLogout) {
+        await logoutUser(tokenToLogout);
+      }
+    } catch {
+      // Logout requests are best-effort. Local logout must always succeed.
+    } finally {
+      clearLocalAuthState();
+    }
+  }
+
   function handleSessionExpired() {
     if (sessionExpiredHandledRef.current) {
       return true;
     }
 
     sessionExpiredHandledRef.current = true;
-    logout();
+    clearLocalAuthState();
     showToast("error", "Your session expired. Please log in again.");
     return true;
   }

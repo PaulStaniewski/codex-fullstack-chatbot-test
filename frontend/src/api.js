@@ -209,3 +209,10 @@ export function recordProgressActivity(activeSeconds, token) {
     body: JSON.stringify({ active_seconds: activeSeconds }),
   });
 }
+
+export function logoutUser(token) {
+  return apiFetch("/logout", {
+    method: "POST",
+    token,
+  });
+}

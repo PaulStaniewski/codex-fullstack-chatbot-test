@@ -1,5 +1,7 @@
 import json
 import logging
+import os
+import time
 from collections.abc import Awaitable, Callable
 
 from fastapi import HTTPException, status
@@ -15,6 +17,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app import models
+from app.observability import get_request_id, reset_request_id, set_request_id
 from app.services import chat_service
 
 
@@ -295,40 +298,161 @@ async def stream_lesson_ai_response(
     stream_name: str,
     is_disconnected: DisconnectCallable,
     stream_text: chat_service.StreamTextCallable = chat_service.stream_openai_text,
+    request_id: str | None = None,
 ):
+    started_at = time.perf_counter()
+    model = os.getenv("OPENAI_MODEL", chat_service.OPENAI_MODEL)
+    outcome = "success"
+    request_id = request_id or get_request_id()
+    request_id_token = set_request_id(request_id)
+    logger.info(
+        "lesson_stream.start",
+        extra={
+            "request_id": request_id,
+            "lesson_id": lesson_id,
+            "user_id": user_id,
+            "model": model,
+            "stream_name": stream_name,
+        },
+    )
     try:
         try:
             async for chunk in stream_text(openai_input):
                 if await is_disconnected():
+                    outcome = "disconnected"
                     logger.info(
-                        f"Client disconnected from lesson {stream_name} stream",
-                        extra={"lesson_id": lesson_id, "user_id": user_id},
+                        "lesson_stream.disconnected",
+                        extra={
+                            "request_id": request_id,
+                            "lesson_id": lesson_id,
+                            "user_id": user_id,
+                            "model": model,
+                            "stream_name": stream_name,
+                            "stream_outcome": outcome,
+                        },
                     )
                     return
                 if chunk:
                     yield chat_service.format_sse_data(chunk)
         except AuthenticationError:
-            logger.exception(f"OpenAI authentication failed during lesson {stream_name} stream")
+            outcome = "error"
+            logger.exception(
+                "lesson_stream.error",
+                extra={
+                    "request_id": request_id,
+                    "lesson_id": lesson_id,
+                    "user_id": user_id,
+                    "model": model,
+                    "stream_name": stream_name,
+                    "stream_outcome": outcome,
+                    "reason": "openai_authentication_failed",
+                },
+            )
             yield chat_service.format_sse_data(chat_service.SAFE_STREAM_ERROR)
         except APITimeoutError:
-            logger.exception(f"OpenAI request timed out during lesson {stream_name} stream")
+            outcome = "error"
+            logger.exception(
+                "lesson_stream.error",
+                extra={
+                    "request_id": request_id,
+                    "lesson_id": lesson_id,
+                    "user_id": user_id,
+                    "model": model,
+                    "stream_name": stream_name,
+                    "stream_outcome": outcome,
+                    "reason": "openai_timeout",
+                },
+            )
             yield chat_service.format_sse_data(chat_service.SAFE_STREAM_ERROR)
         except APIConnectionError:
-            logger.exception(f"OpenAI network connection failed during lesson {stream_name} stream")
+            outcome = "error"
+            logger.exception(
+                "lesson_stream.error",
+                extra={
+                    "request_id": request_id,
+                    "lesson_id": lesson_id,
+                    "user_id": user_id,
+                    "model": model,
+                    "stream_name": stream_name,
+                    "stream_outcome": outcome,
+                    "reason": "openai_connection_failed",
+                },
+            )
             yield chat_service.format_sse_data(chat_service.SAFE_STREAM_ERROR)
         except APIStatusError:
-            logger.exception(f"OpenAI API returned an error status during lesson {stream_name} stream")
+            outcome = "error"
+            logger.exception(
+                "lesson_stream.error",
+                extra={
+                    "request_id": request_id,
+                    "lesson_id": lesson_id,
+                    "user_id": user_id,
+                    "model": model,
+                    "stream_name": stream_name,
+                    "stream_outcome": outcome,
+                    "reason": "openai_status_error",
+                },
+            )
             yield chat_service.format_sse_data(chat_service.SAFE_STREAM_ERROR)
         except APIError:
-            logger.exception(f"OpenAI API error during lesson {stream_name} stream")
+            outcome = "error"
+            logger.exception(
+                "lesson_stream.error",
+                extra={
+                    "request_id": request_id,
+                    "lesson_id": lesson_id,
+                    "user_id": user_id,
+                    "model": model,
+                    "stream_name": stream_name,
+                    "stream_outcome": outcome,
+                    "reason": "openai_api_error",
+                },
+            )
             yield chat_service.format_sse_data(chat_service.SAFE_STREAM_ERROR)
         except OpenAIError:
-            logger.exception(f"OpenAI error during lesson {stream_name} stream")
+            outcome = "error"
+            logger.exception(
+                "lesson_stream.error",
+                extra={
+                    "request_id": request_id,
+                    "lesson_id": lesson_id,
+                    "user_id": user_id,
+                    "model": model,
+                    "stream_name": stream_name,
+                    "stream_outcome": outcome,
+                    "reason": "openai_error",
+                },
+            )
             yield chat_service.format_sse_data(chat_service.SAFE_STREAM_ERROR)
         except Exception:
-            logger.exception(f"Unexpected error during lesson {stream_name} stream")
+            outcome = "error"
+            logger.exception(
+                "lesson_stream.error",
+                extra={
+                    "request_id": request_id,
+                    "lesson_id": lesson_id,
+                    "user_id": user_id,
+                    "model": model,
+                    "stream_name": stream_name,
+                    "stream_outcome": outcome,
+                    "reason": "unexpected_error",
+                },
+            )
             yield chat_service.format_sse_data(chat_service.SAFE_STREAM_ERROR)
     finally:
+        logger.info(
+            "lesson_stream.end",
+            extra={
+                "request_id": request_id,
+                "lesson_id": lesson_id,
+                "user_id": user_id,
+                "model": model,
+                "stream_name": stream_name,
+                "stream_outcome": outcome,
+                "duration_ms": round((time.perf_counter() - started_at) * 1000, 2),
+            },
+        )
+        reset_request_id(request_id_token)
         db.close()
 
 
@@ -342,46 +466,154 @@ async def stream_practice_feedback_response(
     clean_answer: str,
     is_disconnected: DisconnectCallable,
     stream_text: chat_service.StreamTextCallable = chat_service.stream_openai_text,
+    request_id: str | None = None,
 ):
     chunks: list[str] = []
     lesson_id = lesson["lesson_id"]
+    started_at = time.perf_counter()
+    model = os.getenv("OPENAI_MODEL", chat_service.OPENAI_MODEL)
+    outcome = "empty"
+    request_id = request_id or get_request_id()
+    request_id_token = set_request_id(request_id)
+    logger.info(
+        "practice_stream.start",
+        extra={
+            "request_id": request_id,
+            "lesson_id": lesson_id,
+            "user_id": user_id,
+            "model": model,
+            "step_index": step_index,
+        },
+    )
     try:
         try:
             async for chunk in stream_text(openai_input):
                 if await is_disconnected():
+                    outcome = "disconnected"
                     logger.info(
-                        "Client disconnected from lesson practice feedback stream",
-                        extra={"lesson_id": lesson_id, "user_id": user_id},
+                        "practice_stream.disconnected",
+                        extra={
+                            "request_id": request_id,
+                            "lesson_id": lesson_id,
+                            "user_id": user_id,
+                            "model": model,
+                            "step_index": step_index,
+                            "stream_outcome": outcome,
+                        },
                     )
                     return
                 if chunk:
                     chunks.append(chunk)
         except AuthenticationError:
-            logger.exception("OpenAI authentication failed during practice feedback stream")
+            outcome = "error"
+            logger.exception(
+                "practice_stream.error",
+                extra={
+                    "request_id": request_id,
+                    "lesson_id": lesson_id,
+                    "user_id": user_id,
+                    "model": model,
+                    "step_index": step_index,
+                    "stream_outcome": outcome,
+                    "reason": "openai_authentication_failed",
+                },
+            )
             yield chat_service.format_sse_data(chat_service.SAFE_STREAM_ERROR)
             return
         except APITimeoutError:
-            logger.exception("OpenAI request timed out during practice feedback stream")
+            outcome = "error"
+            logger.exception(
+                "practice_stream.error",
+                extra={
+                    "request_id": request_id,
+                    "lesson_id": lesson_id,
+                    "user_id": user_id,
+                    "model": model,
+                    "step_index": step_index,
+                    "stream_outcome": outcome,
+                    "reason": "openai_timeout",
+                },
+            )
             yield chat_service.format_sse_data(chat_service.SAFE_STREAM_ERROR)
             return
         except APIConnectionError:
-            logger.exception("OpenAI network connection failed during practice feedback stream")
+            outcome = "error"
+            logger.exception(
+                "practice_stream.error",
+                extra={
+                    "request_id": request_id,
+                    "lesson_id": lesson_id,
+                    "user_id": user_id,
+                    "model": model,
+                    "step_index": step_index,
+                    "stream_outcome": outcome,
+                    "reason": "openai_connection_failed",
+                },
+            )
             yield chat_service.format_sse_data(chat_service.SAFE_STREAM_ERROR)
             return
         except APIStatusError:
-            logger.exception("OpenAI API returned an error status during practice feedback stream")
+            outcome = "error"
+            logger.exception(
+                "practice_stream.error",
+                extra={
+                    "request_id": request_id,
+                    "lesson_id": lesson_id,
+                    "user_id": user_id,
+                    "model": model,
+                    "step_index": step_index,
+                    "stream_outcome": outcome,
+                    "reason": "openai_status_error",
+                },
+            )
             yield chat_service.format_sse_data(chat_service.SAFE_STREAM_ERROR)
             return
         except APIError:
-            logger.exception("OpenAI API error during practice feedback stream")
+            outcome = "error"
+            logger.exception(
+                "practice_stream.error",
+                extra={
+                    "request_id": request_id,
+                    "lesson_id": lesson_id,
+                    "user_id": user_id,
+                    "model": model,
+                    "step_index": step_index,
+                    "stream_outcome": outcome,
+                    "reason": "openai_api_error",
+                },
+            )
             yield chat_service.format_sse_data(chat_service.SAFE_STREAM_ERROR)
             return
         except OpenAIError:
-            logger.exception("OpenAI error during practice feedback stream")
+            outcome = "error"
+            logger.exception(
+                "practice_stream.error",
+                extra={
+                    "request_id": request_id,
+                    "lesson_id": lesson_id,
+                    "user_id": user_id,
+                    "model": model,
+                    "step_index": step_index,
+                    "stream_outcome": outcome,
+                    "reason": "openai_error",
+                },
+            )
             yield chat_service.format_sse_data(chat_service.SAFE_STREAM_ERROR)
             return
         except Exception:
-            logger.exception("Unexpected error during practice feedback stream")
+            outcome = "error"
+            logger.exception(
+                "practice_stream.error",
+                extra={
+                    "request_id": request_id,
+                    "lesson_id": lesson_id,
+                    "user_id": user_id,
+                    "model": model,
+                    "step_index": step_index,
+                    "stream_outcome": outcome,
+                    "reason": "unexpected_error",
+                },
+            )
             yield chat_service.format_sse_data(chat_service.SAFE_STREAM_ERROR)
             return
 
@@ -410,6 +642,20 @@ async def stream_practice_feedback_response(
                 improvements=metadata["improvements"],
             )
         )
+        outcome = "success"
         db.commit()
     finally:
+        logger.info(
+            "practice_stream.end",
+            extra={
+                "request_id": request_id,
+                "lesson_id": lesson_id,
+                "user_id": user_id,
+                "model": model,
+                "step_index": step_index,
+                "stream_outcome": outcome,
+                "duration_ms": round((time.perf_counter() - started_at) * 1000, 2),
+            },
+        )
+        reset_request_id(request_id_token)
         db.close()

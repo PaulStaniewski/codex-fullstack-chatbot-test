@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app import auth, lessons, models, progress as progress_service, schemas
 from app.database import get_db
+from app.observability import get_request_id
 from app.services import chat_service, lesson_ai_service
 
 
@@ -315,6 +316,7 @@ async def lesson_tutor_stream(
             stream_name="tutor",
             is_disconnected=request.is_disconnected,
             stream_text=_stream_openai_text,
+            request_id=get_request_id(),
         ),
         media_type="text/event-stream",
     )
@@ -359,6 +361,7 @@ async def lesson_study_stream(
             stream_name="study",
             is_disconnected=request.is_disconnected,
             stream_text=_stream_openai_text,
+            request_id=get_request_id(),
         ),
         media_type="text/event-stream",
     )
@@ -401,6 +404,7 @@ async def lesson_practice_feedback_stream(
             clean_answer=clean_answer,
             is_disconnected=request.is_disconnected,
             stream_text=_stream_openai_text,
+            request_id=get_request_id(),
         ),
         media_type="text/event-stream",
     )

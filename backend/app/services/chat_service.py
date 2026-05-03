@@ -1,5 +1,6 @@
 import logging
 import os
+import time
 from collections.abc import AsyncIterator, Awaitable, Callable
 
 from openai import (
@@ -14,6 +15,7 @@ from openai import (
 from sqlalchemy.orm import Session
 
 from app import models, progress as progress_service
+from app.observability import get_request_id, reset_request_id, set_request_id
 
 
 logger = logging.getLogger(__name__)
@@ -135,11 +137,22 @@ async def stream_openai_text(openai_input: list[dict[str, str]]):
     if not os.getenv("OPENAI_API_KEY"):
         raise RuntimeError("OPENAI_API_KEY is not configured")
 
+    request_id = get_request_id()
+    model = os.getenv("OPENAI_MODEL", OPENAI_MODEL)
     client = AsyncOpenAI()
+    started_at = time.perf_counter()
     stream = await client.responses.create(
-        model=os.getenv("OPENAI_MODEL", OPENAI_MODEL),
+        model=model,
         input=openai_input,
         stream=True,
+    )
+    logger.info(
+        "openai.call.ready",
+        extra={
+            "request_id": request_id,
+            "model": model,
+            "duration_ms": round((time.perf_counter() - started_at) * 1000, 2),
+        },
     )
 
     async for event in stream:
@@ -227,15 +240,36 @@ async def stream_chat_response(
     should_generate_title: bool,
     is_disconnected: DisconnectCallable,
     stream_text: StreamTextCallable = stream_openai_text,
+    request_id: str | None = None,
 ):
     chunks: list[str] = []
+    started_at = time.perf_counter()
+    model = os.getenv("OPENAI_MODEL", OPENAI_MODEL)
+    outcome = "empty"
+    request_id = request_id or get_request_id()
+    request_id_token = set_request_id(request_id)
+    logger.info(
+        "chat_stream.start",
+        extra={
+            "request_id": request_id,
+            "user_id": user_id,
+            "conversation_id": conversation_id,
+            "model": model,
+        },
+    )
     try:
         try:
             async for chunk in stream_text(openai_input):
                 if await is_disconnected():
+                    outcome = "disconnected"
                     logger.info(
-                        "Client disconnected from chat stream",
-                        extra={"conversation_id": conversation_id, "user_id": user_id},
+                        "chat_stream.disconnected",
+                        extra={
+                            "request_id": request_id,
+                            "conversation_id": conversation_id,
+                            "user_id": user_id,
+                            "stream_outcome": outcome,
+                        },
                     )
                     return
                 if not chunk:
@@ -244,31 +278,108 @@ async def stream_chat_response(
                 chunks.append(chunk)
                 yield format_sse_data(chunk)
         except AuthenticationError:
-            logger.exception("OpenAI authentication failed")
+            outcome = "error"
+            logger.exception(
+                "chat_stream.error",
+                extra={
+                    "request_id": request_id,
+                    "conversation_id": conversation_id,
+                    "user_id": user_id,
+                    "model": model,
+                    "stream_outcome": outcome,
+                    "reason": "openai_authentication_failed",
+                },
+            )
             yield format_sse_data(SAFE_STREAM_ERROR)
             return
         except APITimeoutError:
-            logger.exception("OpenAI request timed out")
+            outcome = "error"
+            logger.exception(
+                "chat_stream.error",
+                extra={
+                    "request_id": request_id,
+                    "conversation_id": conversation_id,
+                    "user_id": user_id,
+                    "model": model,
+                    "stream_outcome": outcome,
+                    "reason": "openai_timeout",
+                },
+            )
             yield format_sse_data(SAFE_STREAM_ERROR)
             return
         except APIConnectionError:
-            logger.exception("OpenAI network connection failed")
+            outcome = "error"
+            logger.exception(
+                "chat_stream.error",
+                extra={
+                    "request_id": request_id,
+                    "conversation_id": conversation_id,
+                    "user_id": user_id,
+                    "model": model,
+                    "stream_outcome": outcome,
+                    "reason": "openai_connection_failed",
+                },
+            )
             yield format_sse_data(SAFE_STREAM_ERROR)
             return
         except APIStatusError:
-            logger.exception("OpenAI API returned an error status")
+            outcome = "error"
+            logger.exception(
+                "chat_stream.error",
+                extra={
+                    "request_id": request_id,
+                    "conversation_id": conversation_id,
+                    "user_id": user_id,
+                    "model": model,
+                    "stream_outcome": outcome,
+                    "reason": "openai_status_error",
+                },
+            )
             yield format_sse_data(SAFE_STREAM_ERROR)
             return
         except APIError:
-            logger.exception("OpenAI API error while streaming")
+            outcome = "error"
+            logger.exception(
+                "chat_stream.error",
+                extra={
+                    "request_id": request_id,
+                    "conversation_id": conversation_id,
+                    "user_id": user_id,
+                    "model": model,
+                    "stream_outcome": outcome,
+                    "reason": "openai_api_error",
+                },
+            )
             yield format_sse_data(SAFE_STREAM_ERROR)
             return
         except OpenAIError:
-            logger.exception("OpenAI error while streaming")
+            outcome = "error"
+            logger.exception(
+                "chat_stream.error",
+                extra={
+                    "request_id": request_id,
+                    "conversation_id": conversation_id,
+                    "user_id": user_id,
+                    "model": model,
+                    "stream_outcome": outcome,
+                    "reason": "openai_error",
+                },
+            )
             yield format_sse_data(SAFE_STREAM_ERROR)
             return
         except Exception:
-            logger.exception("Unexpected error while streaming chat response")
+            outcome = "error"
+            logger.exception(
+                "chat_stream.error",
+                extra={
+                    "request_id": request_id,
+                    "conversation_id": conversation_id,
+                    "user_id": user_id,
+                    "model": model,
+                    "stream_outcome": outcome,
+                    "reason": "unexpected_error",
+                },
+            )
             yield format_sse_data(SAFE_STREAM_ERROR)
             return
 
@@ -276,6 +387,7 @@ async def stream_chat_response(
         if not assistant_content:
             return
 
+        outcome = "success"
         persist_assistant_message(
             db,
             conversation_id=conversation_id,
@@ -285,4 +397,16 @@ async def stream_chat_response(
             title_source=clean_message,
         )
     finally:
+        logger.info(
+            "chat_stream.end",
+            extra={
+                "request_id": request_id,
+                "conversation_id": conversation_id,
+                "user_id": user_id,
+                "model": model,
+                "stream_outcome": outcome,
+                "duration_ms": round((time.perf_counter() - started_at) * 1000, 2),
+            },
+        )
+        reset_request_id(request_id_token)
         db.close()

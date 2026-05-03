@@ -1,14 +1,17 @@
 import os
 import time
+import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app import auth, models, schemas
 from app.database import get_db
+from app.observability import get_request_id
 
 
 router = APIRouter(tags=["auth"])
+logger = logging.getLogger(__name__)
 LOGIN_RATE_LIMIT_ERROR = "Too many login attempts. Please try again later."
 LOGIN_FAILED_ATTEMPT_LIMIT = int(os.getenv("LOGIN_FAILED_ATTEMPT_LIMIT", "5"))
 LOGIN_FAILED_ATTEMPT_WINDOW_SECONDS = int(os.getenv("LOGIN_FAILED_ATTEMPT_WINDOW_SECONDS", "300"))
@@ -80,11 +83,19 @@ def login_user(
     )
 
     if _is_login_rate_limited(client_ip):
+        logger.info(
+            "auth.failure",
+            extra={"request_id": get_request_id(), "reason": "login_rate_limited"},
+        )
         raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=LOGIN_RATE_LIMIT_ERROR)
 
     user = auth.authenticate_user(db, login_in.email, login_in.password)
     if not user:
         _record_failed_login_attempt(client_ip)
+        logger.info(
+            "auth.failure",
+            extra={"request_id": get_request_id(), "reason": "invalid_credentials"},
+        )
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
     _clear_failed_login_attempts(client_ip)
     return schemas.Token(

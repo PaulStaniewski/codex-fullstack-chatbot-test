@@ -1,4 +1,5 @@
 import os
+import logging
 from datetime import datetime, timedelta, timezone
 from typing import Mapping
 
@@ -10,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from app import models
 from app.database import get_db
+from app.observability import get_request_id
 
 
 DEFAULT_JWT_ALGORITHM = "HS256"
@@ -23,6 +25,7 @@ INSECURE_JWT_SECRET_VALUES = {
     "development-secret",
     "dev-only-jwt-secret-change-this",
 }
+logger = logging.getLogger(__name__)
 
 
 def _resolve_auth_settings(environ: Mapping[str, str] | None = None) -> tuple[str, str, int, int]:
@@ -90,8 +93,24 @@ def get_subject_from_token(token: str, expected_type: str = "access") -> str:
         subject = payload.get("sub")
         token_type = payload.get("type")
         if subject is None or token_type != expected_type:
+            logger.info(
+                "auth.failure",
+                extra={
+                    "request_id": get_request_id(),
+                    "reason": "invalid_token_subject_or_type",
+                    "expected_token_type": expected_type,
+                },
+            )
             raise credentials_error
     except JWTError:
+        logger.info(
+            "auth.failure",
+            extra={
+                "request_id": get_request_id(),
+                "reason": "jwt_decode_failed",
+                "expected_token_type": expected_type,
+            },
+        )
         raise credentials_error from None
     return str(subject)
 
@@ -105,10 +124,18 @@ def get_user_from_token(db: Session, token: str) -> models.User:
     try:
         user_id = int(get_subject_from_token(token, expected_type="access"))
     except ValueError:
+        logger.info(
+            "auth.failure",
+            extra={"request_id": get_request_id(), "reason": "non_integer_subject"},
+        )
         raise credentials_error from None
 
     user = db.get(models.User, user_id)
     if user is None:
+        logger.info(
+            "auth.failure",
+            extra={"request_id": get_request_id(), "reason": "user_not_found", "user_id": user_id},
+        )
         raise credentials_error
     return user
 

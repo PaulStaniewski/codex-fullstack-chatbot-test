@@ -3,6 +3,7 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.observability import request_id_middleware
 from app.routes import (
     auth_routes,
     chat_routes,
@@ -14,6 +15,7 @@ from app.routes import (
 
 
 app = FastAPI(title="Fullstack Chatbot API")
+app.middleware("http")(request_id_middleware)
 
 
 def _get_allowed_origins() -> list[str]:
@@ -29,7 +31,8 @@ app.add_middleware(
     allow_origins=_get_allowed_origins(),
     allow_credentials=True,
     allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type"],
+    allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
+    expose_headers=["X-Request-ID"],
 )
 
 app.include_router(auth_routes.router)

@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app import auth, models
 from app.database import get_db
+from app.observability import get_request_id
 from app.services import chat_service
 
 
@@ -82,8 +83,14 @@ async def chat_stream(
 
     if len(clean_message) > MAX_CHAT_MESSAGE_LENGTH:
         logger.info(
-            "Rejected chat stream message over length limit",
-            extra={"conversation_id": conversation_id, "user_id": user_id},
+            "chat_stream.error",
+            extra={
+                "request_id": get_request_id(),
+                "conversation_id": conversation_id,
+                "user_id": user_id,
+                "stream_outcome": "rejected",
+                "reason": "message_too_long",
+            },
         )
         return StreamingResponse(
             iter([_format_sse_data(MESSAGE_TOO_LONG_ERROR)]),
@@ -92,8 +99,14 @@ async def chat_stream(
 
     if _is_rate_limited(user_id):
         logger.info(
-            "Rejected chat stream request due to rate limit",
-            extra={"conversation_id": conversation_id, "user_id": user_id},
+            "chat_stream.error",
+            extra={
+                "request_id": get_request_id(),
+                "conversation_id": conversation_id,
+                "user_id": user_id,
+                "stream_outcome": "rejected",
+                "reason": "rate_limited",
+            },
         )
         return StreamingResponse(
             iter([_format_sse_data(RATE_LIMIT_ERROR)]),
@@ -117,6 +130,7 @@ async def chat_stream(
             should_generate_title=should_generate_title,
             is_disconnected=request.is_disconnected,
             stream_text=_stream_openai_text,
+            request_id=get_request_id(),
         ),
         media_type="text/event-stream",
     )

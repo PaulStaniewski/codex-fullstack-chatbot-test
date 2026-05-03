@@ -7,70 +7,73 @@ LESSONS = {
         "steps": [
             {
                 "type": "intro",
-                "title": "Why Docker matters",
+                "title": "What Docker is",
                 "content": (
-                    "Docker helps teams run an app in a repeatable environment. Instead of asking "
-                    "every developer to install the same Python, Node, system packages, and startup "
-                    "tools by hand, the project can describe the runtime in a Dockerfile. This makes "
-                    "local setup, demos, CI, and production-like practice more predictable. Docker "
-                    "does not replace understanding your app, but it makes the runtime boundary "
-                    "clearer."
+                    "Docker is a tool for packaging an application with the files, dependencies, and "
+                    "startup command it needs. It runs that package as a container, which is an isolated "
+                    "app process with its own filesystem and environment."
                 ),
             },
             {
                 "type": "concept",
                 "title": "Images and containers",
                 "content": (
-                    "An image is a reusable template. It contains the files, dependencies, and default "
-                    "command needed to start the app. A container is a running instance of that image. "
-                    "This separation is useful because the team can rebuild the image when dependencies "
-                    "change, then run containers from the same template. Build-time setup belongs in the "
-                    "image. Runtime configuration, such as database URLs and secrets, should usually be "
-                    "passed in when the container starts."
+                    "An image is the built template for your app. It includes things like the base "
+                    "runtime, installed packages, copied source files, and default command. A container "
+                    "is what you get when you run that image. The image is like a saved recipe; the "
+                    "container is the running meal. Docker solves the classic works on my machine problem "
+                    "by making the runtime repeatable. Instead of relying on each laptop to have the same "
+                    "Python version and packages, the project builds one image and runs containers from it."
                 ),
             },
             {
                 "type": "example",
                 "title": "A small backend Dockerfile",
                 "content": (
-                    "A simple FastAPI image might use python:3.12-slim, set WORKDIR /app, copy "
-                    "requirements.txt, install dependencies, copy the app source, and run Uvicorn. "
-                    "Copying requirements first helps Docker cache dependency installation when only "
-                    "application code changes. The server should bind to 0.0.0.0 so traffic can reach it "
-                    "from outside the container. A production image should also consider non-root users, "
-                    "smaller images, secrets, and healthchecks."
+                    "A simple Dockerfile can look like this:\n\n"
+                    "FROM python:3.12-slim\n"
+                    "WORKDIR /app\n"
+                    "COPY requirements.txt .\n"
+                    "RUN pip install --no-cache-dir -r requirements.txt\n"
+                    "COPY . .\n"
+                    "CMD [\"uvicorn\", \"app.main:app\", \"--host\", \"0.0.0.0\", \"--port\", \"8000\"]\n\n"
+                    "FROM chooses the Python base image. WORKDIR sets the app folder. COPY and RUN add "
+                    "dependencies and source code to the image. CMD is the command used when a container "
+                    "starts from the image. Binding to 0.0.0.0 lets traffic reach the app from outside "
+                    "the container."
                 ),
             },
             {
                 "type": "checklist",
                 "title": "Docker basics checklist",
                 "content": (
-                    "- Know whether you are debugging image build or container startup.\n"
-                    "- Keep dependency installation separate from source copy when possible.\n"
-                    "- Pass environment-specific values at runtime.\n"
-                    "- Use volumes only for data that must survive container recreation.\n"
-                    "- Bind web apps to 0.0.0.0 inside the container.\n"
-                    "- Read container logs before rebuilding."
+                    "- Build creates an image; run starts a container from that image.\n"
+                    "- Put installed dependencies and app files in the image.\n"
+                    "- Pass config like DATABASE_URL when the container runs.\n"
+                    "- Rebuild the image after Dockerfile or dependency changes.\n"
+                    "- Check container logs when startup fails.\n"
+                    "- Remember localhost inside a container means that container."
                 ),
             },
             {
                 "type": "practice",
-                "title": "Practice - Explain the runtime boundary",
+                "title": "Practice - Debug a teammate setup",
                 "difficulty": "easy",
                 "content": (
-                    "Explain to a teammate what Docker makes repeatable for a backend app and what it "
-                    "does not automatically solve."
+                    "A teammate can run the backend locally, but CI fails because Python packages are "
+                    "missing. Explain how a Docker image and container would make this setup more "
+                    "repeatable."
                 ),
             },
             {
                 "type": "summary",
                 "title": "Summary",
                 "content": (
-                    "- Images are templates; containers are running instances.\n"
-                    "- Docker makes runtime setup easier to share.\n"
-                    "- Runtime config should usually stay outside the image.\n"
-                    "- Container files are disposable unless stored in a volume.\n"
-                    "- Docker helps reproducibility, not application design by itself."
+                    "- An image is the built template for an app.\n"
+                    "- A container is a running instance of an image.\n"
+                    "- Docker improves reproducibility across machines.\n"
+                    "- Build-time setup belongs in the image.\n"
+                    "- Runtime config should be passed when the container starts."
                 ),
             },
         ],

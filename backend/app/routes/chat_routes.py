@@ -1,36 +1,31 @@
 import logging
-import os
 import time
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import StreamingResponse
-from openai import (
-    APIConnectionError,
-    APIError,
-    APIStatusError,
-    APITimeoutError,
-    AuthenticationError,
-    AsyncOpenAI,
-    OpenAIError,
-)
 from sqlalchemy.orm import Session
 
-from app import auth, models, progress as progress_service
+from app import auth, models
 from app.database import get_db
+from app.services import chat_service
 
 
 router = APIRouter(tags=["chat"])
 logger = logging.getLogger(__name__)
 
-OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-5.4-mini")
-SAFE_STREAM_ERROR = "Error: Unable to generate response."
-MESSAGE_TOO_LONG_ERROR = "Error: Message is too long. Please keep it under 2000 characters."
-RATE_LIMIT_ERROR = "Error: Too many requests. Please wait a moment."
-MAX_CHAT_MESSAGE_LENGTH = 2000
-MAX_GENERATED_TITLE_LENGTH = 60
-CHAT_STREAM_RATE_LIMIT = 10
-CHAT_STREAM_RATE_WINDOW_SECONDS = 60
+SAFE_STREAM_ERROR = chat_service.SAFE_STREAM_ERROR
+MESSAGE_TOO_LONG_ERROR = chat_service.MESSAGE_TOO_LONG_ERROR
+RATE_LIMIT_ERROR = chat_service.RATE_LIMIT_ERROR
+MAX_CHAT_MESSAGE_LENGTH = chat_service.MAX_CHAT_MESSAGE_LENGTH
+CHAT_STREAM_RATE_LIMIT = chat_service.CHAT_STREAM_RATE_LIMIT
+CHAT_STREAM_RATE_WINDOW_SECONDS = chat_service.CHAT_STREAM_RATE_WINDOW_SECONDS
 _rate_limit_buckets: dict[int, list[float]] = {}
+
+_format_sse_data = chat_service.format_sse_data
+build_system_prompt = chat_service.build_system_prompt
+generate_conversation_title = chat_service.generate_conversation_title
+_build_openai_input = chat_service.build_openai_input
+_stream_openai_text = chat_service.stream_openai_text
 
 
 def _get_owned_conversation(db: Session, conversation_id: int, user_id: int) -> models.Conversation:
@@ -45,69 +40,6 @@ def _get_owned_conversation(db: Session, conversation_id: int, user_id: int) -> 
     if not conversation:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found")
     return conversation
-
-
-def _format_sse_data(value: str) -> str:
-    lines = value.replace("\r\n", "\n").replace("\r", "\n").split("\n")
-    return "".join(f"data: {line}\n" for line in lines) + "\n"
-
-
-def build_system_prompt(mode: str) -> str:
-    if mode == "learn":
-        return (
-            "You are an AI tutor.\n"
-            "Teach the user step by step.\n"
-            "Ask one question at a time.\n"
-            "Wait for the user's answer.\n"
-            "Give feedback.\n"
-            "Guide the user forward.\n"
-            "Do not give full solutions immediately."
-        )
-    if mode == "interview":
-        return (
-            "You are a technical interviewer.\n"
-            "Run a realistic interview simulation.\n"
-            "Ask one question at a time.\n"
-            "Wait for the candidate's answer before giving feedback.\n"
-            "Evaluate answers clearly but constructively.\n"
-            "Ask follow-up questions when useful.\n"
-            "Do not reveal ideal answers before the candidate attempts to answer.\n"
-            "Focus on practical engineering reasoning.\n"
-            "If the user does not specify a topic, ask what role or topic they want to practice, "
-            "such as Python, FastAPI, React, Docker, PostgreSQL, AI / RAG, system design, "
-            "or backend engineering."
-        )
-    return "You are a helpful AI assistant."
-
-
-def generate_conversation_title(text: str) -> str:
-    title = " ".join(text.strip().split())
-    title = title.rstrip(".,!?;:-")
-    if len(title) > MAX_GENERATED_TITLE_LENGTH:
-        title = title[:MAX_GENERATED_TITLE_LENGTH].rstrip()
-        title = title.rstrip(".,!?;:-")
-    if not title:
-        return "New conversation"
-    return title[0].upper() + title[1:]
-
-
-def _build_openai_input(
-    db: Session, conversation_id: int, current_message: str, mode: str
-) -> list[dict[str, str]]:
-    previous_messages = (
-        db.query(models.Message)
-        .filter(models.Message.conversation_id == conversation_id)
-        .order_by(models.Message.created_at.asc())
-        .all()
-    )
-    openai_input = [{"role": "system", "content": build_system_prompt(mode)}]
-    openai_input.extend([
-        {"role": message.role, "content": message.content}
-        for message in previous_messages
-        if message.role in {"user", "assistant"} and message.content
-    ])
-    openai_input.append({"role": "user", "content": current_message})
-    return openai_input
 
 
 def _is_rate_limited(user_id: int) -> bool:
@@ -126,22 +58,6 @@ def _is_rate_limited(user_id: int) -> bool:
     timestamps.append(now)
     _rate_limit_buckets[user_id] = timestamps
     return False
-
-
-async def _stream_openai_text(openai_input: list[dict[str, str]]):
-    if not os.getenv("OPENAI_API_KEY"):
-        raise RuntimeError("OPENAI_API_KEY is not configured")
-
-    client = AsyncOpenAI()
-    stream = await client.responses.create(
-        model=os.getenv("OPENAI_MODEL", OPENAI_MODEL),
-        input=openai_input,
-        stream=True,
-    )
-
-    async for event in stream:
-        if event.type == "response.output_text.delta":
-            yield event.delta
 
 
 @router.get("/chat-stream")
@@ -184,85 +100,23 @@ async def chat_stream(
             media_type="text/event-stream",
         )
 
-    openai_input = _build_openai_input(db, conversation_id, clean_message, conversation.mode)
-
-    user_message = models.Message(
-        conversation_id=conversation_id,
+    openai_input = chat_service.prepare_chat_stream(
+        db,
+        conversation=conversation,
         user_id=user_id,
-        role="user",
-        content=clean_message,
+        clean_message=clean_message,
     )
-    db.add(user_message)
-    progress_service.update_progress_activity(db, user_id, messages_delta=1)
-    db.commit()
 
-    async def event_generator():
-        chunks: list[str] = []
-        try:
-            try:
-                async for chunk in _stream_openai_text(openai_input):
-                    if await request.is_disconnected():
-                        logger.info(
-                            "Client disconnected from chat stream",
-                            extra={"conversation_id": conversation_id, "user_id": user_id},
-                        )
-                        return
-                    if not chunk:
-                        continue
-
-                    chunks.append(chunk)
-                    yield _format_sse_data(chunk)
-            except AuthenticationError:
-                logger.exception("OpenAI authentication failed")
-                yield _format_sse_data(SAFE_STREAM_ERROR)
-                return
-            except APITimeoutError:
-                logger.exception("OpenAI request timed out")
-                yield _format_sse_data(SAFE_STREAM_ERROR)
-                return
-            except APIConnectionError:
-                logger.exception("OpenAI network connection failed")
-                yield _format_sse_data(SAFE_STREAM_ERROR)
-                return
-            except APIStatusError:
-                logger.exception("OpenAI API returned an error status")
-                yield _format_sse_data(SAFE_STREAM_ERROR)
-                return
-            except APIError:
-                logger.exception("OpenAI API error while streaming")
-                yield _format_sse_data(SAFE_STREAM_ERROR)
-                return
-            except OpenAIError:
-                logger.exception("OpenAI error while streaming")
-                yield _format_sse_data(SAFE_STREAM_ERROR)
-                return
-            except Exception:
-                logger.exception("Unexpected error while streaming chat response")
-                yield _format_sse_data(SAFE_STREAM_ERROR)
-                return
-
-            assistant_content = "".join(chunks).strip()
-            if not assistant_content:
-                return
-
-            assistant_message = models.Message(
-                conversation_id=conversation_id,
-                user_id=user_id,
-                role="assistant",
-                content=assistant_content,
-            )
-            db.add(assistant_message)
-            if should_generate_title:
-                (
-                    db.query(models.Conversation)
-                    .filter(
-                        models.Conversation.id == conversation_id,
-                        models.Conversation.user_id == user_id,
-                    )
-                    .update({"title": generate_conversation_title(clean_message)})
-                )
-            db.commit()
-        finally:
-            db.close()
-
-    return StreamingResponse(event_generator(), media_type="text/event-stream")
+    return StreamingResponse(
+        chat_service.stream_chat_response(
+            db,
+            openai_input=openai_input,
+            conversation_id=conversation_id,
+            user_id=user_id,
+            clean_message=clean_message,
+            should_generate_title=should_generate_title,
+            is_disconnected=request.is_disconnected,
+            stream_text=_stream_openai_text,
+        ),
+        media_type="text/event-stream",
+    )

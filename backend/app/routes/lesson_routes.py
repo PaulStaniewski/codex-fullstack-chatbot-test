@@ -1,28 +1,16 @@
-import logging
-import re
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import StreamingResponse
-from openai import (
-    APIConnectionError,
-    APIError,
-    APIStatusError,
-    APITimeoutError,
-    AuthenticationError,
-    OpenAIError,
-)
-from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app import auth, lessons, models, progress as progress_service, schemas
 from app.database import get_db
-from app.routes.chat_routes import SAFE_STREAM_ERROR, _format_sse_data, _stream_openai_text
+from app.services import chat_service, lesson_ai_service
 
 
 router = APIRouter(prefix="/lessons", tags=["lessons"])
-logger = logging.getLogger(__name__)
 
 THEORY_STEP_XP = {
     "intro": 5,
@@ -36,14 +24,22 @@ THEORY_STEP_XP = {
 }
 
 READING_STEP_TYPES = set(THEORY_STEP_XP)
-STUDY_ACTIONS = {
-    "summarize": "Summarize the lesson material in a concise, beginner-friendly way.",
-    "explain": "Explain the lesson material simply, using plain language.",
-    "example": "Give a practical example based on the lesson material.",
-    "key_points": "List the key points the learner should remember.",
-    "ask_questions": "Ask the learner a few short study questions about the material.",
-    "custom_question": "Answer the learner's custom question.",
-}
+STUDY_ACTIONS = lesson_ai_service.STUDY_ACTIONS
+
+build_lesson_tutor_prompt = lesson_ai_service.build_lesson_tutor_prompt
+build_lesson_study_prompt = lesson_ai_service.build_lesson_study_prompt
+build_practice_feedback_prompt = lesson_ai_service.build_practice_feedback_prompt
+parse_practice_feedback_metadata = lesson_ai_service.parse_practice_feedback_metadata
+get_next_practice_attempt_number = lesson_ai_service.get_next_practice_attempt_number
+_stream_openai_text = chat_service.stream_openai_text
+
+
+def get_reading_steps_for_study(lesson: dict, step_index: int | None = None) -> list[dict]:
+    return lesson_ai_service.get_reading_steps_for_study(
+        lesson,
+        READING_STEP_TYPES,
+        step_index,
+    )
 
 
 def get_lesson_or_404(lesson_id: str) -> dict:
@@ -182,183 +178,6 @@ def get_or_create_lesson_step_progress(
     return step_progress
 
 
-def build_lesson_tutor_prompt(
-    lesson: dict,
-    step: dict,
-    question: str,
-) -> list[dict[str, str]]:
-    return [
-        {
-            "role": "system",
-            "content": (
-                "You are an AI programming tutor inside a learning platform.\n"
-                "You help the user understand the current lesson step.\n"
-                "Use the provided lesson context as the source of truth.\n"
-                "If the user asks about something outside this lesson, answer briefly and connect "
-                "it back to the lesson when possible.\n"
-                "Do not give unrelated long explanations.\n"
-                "Be friendly, clear, concise, and use simple examples."
-            ),
-        },
-        {
-            "role": "user",
-            "content": (
-                f"Lesson title: {lesson['title']}\n"
-                f"Course ID: {lesson['course_id']}\n"
-                f"Current step title: {step['title']}\n"
-                f"Current step type: {step['type']}\n"
-                f"Current step content:\n{step['content']}\n\n"
-                f"User question: {question}"
-            ),
-        },
-    ]
-
-
-def get_reading_steps_for_study(lesson: dict, step_index: int | None = None) -> list[dict]:
-    if step_index is not None:
-        step = resolve_lesson_step(lesson, None, step_index)
-        if step["type"] not in READING_STEP_TYPES:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Study assistant can focus only on reading steps",
-            )
-        return [step]
-
-    return [step for step in lesson["steps"] if step["type"] in READING_STEP_TYPES]
-
-
-def build_lesson_study_prompt(
-    lesson: dict,
-    reading_steps: list[dict],
-    action: str,
-    question: str | None = None,
-) -> list[dict[str, str]]:
-    action_instruction = STUDY_ACTIONS[action]
-    lesson_material = "\n\n".join(
-        f"{index + 1}. {step['title']} ({step['type']}):\n{step['content']}"
-        for index, step in enumerate(reading_steps)
-    )
-    custom_question = (question or "").strip()
-
-    return [
-        {
-            "role": "system",
-            "content": (
-                "You are an AI study assistant inside a programming learning platform.\n"
-                "Use the provided lesson material as the source of truth.\n"
-                "Keep answers focused on the lesson.\n"
-                "If the user asks about something outside the lesson, answer briefly and connect "
-                "it back to the lesson when possible.\n"
-                "Be clear, practical, and concise."
-            ),
-        },
-        {
-            "role": "user",
-            "content": (
-                f"Lesson title: {lesson['title']}\n"
-                f"Course ID: {lesson['course_id']}\n"
-                f"Action: {action}\n"
-                f"Instruction: {action_instruction}\n\n"
-                f"Lesson material:\n{lesson_material}\n\n"
-                f"User question: {custom_question if custom_question else 'No custom question provided.'}"
-            ),
-        },
-    ]
-
-
-def build_practice_feedback_prompt(
-    lesson: dict,
-    step: dict,
-    answer: str,
-) -> list[dict[str, str]]:
-    return [
-        {
-            "role": "system",
-            "content": (
-                "You are an AI programming tutor reviewing a learner's practice answer.\n"
-                "Use the provided lesson and practice instruction as the source of truth.\n"
-                "Give concise feedback.\n"
-                "Mention what is correct.\n"
-                "Mention what is missing or unclear.\n"
-                "Suggest one improved answer.\n"
-                "Be supportive and not harsh.\n"
-                "Do not invent requirements outside the lesson.\n"
-                "End with this compact structured section exactly:\n"
-                "Score: <0-100>\n"
-                "Strengths:\n"
-                "- ...\n"
-                "Improvements:\n"
-                "- ..."
-            ),
-        },
-        {
-            "role": "user",
-            "content": (
-                f"Lesson title: {lesson['title']}\n"
-                f"Course ID: {lesson['course_id']}\n"
-                f"Practice step title: {step['title']}\n"
-                f"Practice instruction:\n{step['content']}\n\n"
-                f"User answer:\n{answer}"
-            ),
-        },
-    ]
-
-
-def _parse_bullets(section_text: str) -> list[str] | None:
-    items = [
-        line.strip().lstrip("-*").strip()
-        for line in section_text.splitlines()
-        if line.strip().startswith(("-", "*"))
-    ]
-    clean_items = [item for item in items if item]
-    return clean_items or None
-
-
-def parse_practice_feedback_metadata(feedback: str) -> dict[str, int | list[str] | None]:
-    metadata: dict[str, int | list[str] | None] = {
-        "score": None,
-        "strengths": None,
-        "improvements": None,
-    }
-
-    score_match = re.search(r"(?im)^\s*Score:\s*(\d{1,3})\s*$", feedback)
-    if score_match:
-        score = int(score_match.group(1))
-        if 0 <= score <= 100:
-            metadata["score"] = score
-
-    strengths_match = re.search(
-        r"(?ims)^\s*Strengths:\s*(.*?)(?=^\s*Improvements:|\Z)",
-        feedback,
-    )
-    if strengths_match:
-        metadata["strengths"] = _parse_bullets(strengths_match.group(1))
-
-    improvements_match = re.search(r"(?ims)^\s*Improvements:\s*(.*)\Z", feedback)
-    if improvements_match:
-        metadata["improvements"] = _parse_bullets(improvements_match.group(1))
-
-    return metadata
-
-
-def get_next_practice_attempt_number(
-    db: Session,
-    user_id: int,
-    lesson_id: str,
-    step_index: int,
-) -> int:
-    max_attempt_number = (
-        db.query(func.max(models.PracticeSubmission.attempt_number))
-        .filter(
-            models.PracticeSubmission.user_id == user_id,
-            models.PracticeSubmission.lesson_id == lesson_id,
-            models.PracticeSubmission.step_index == step_index,
-        )
-        .scalar()
-    )
-    return (max_attempt_number or 0) + 1
-
-
 @router.get("/progress", response_model=list[schemas.LessonProgressRead])
 def list_lesson_progress(
     current_user: models.User = Depends(auth.get_current_user),
@@ -484,43 +303,18 @@ async def lesson_tutor_stream(
     step = resolve_lesson_step(lesson, lesson_progress, step_index)
     openai_input = build_lesson_tutor_prompt(lesson, step, clean_question)
 
-    async def event_generator():
-        try:
-            try:
-                async for chunk in _stream_openai_text(openai_input):
-                    if await request.is_disconnected():
-                        logger.info(
-                            "Client disconnected from lesson tutor stream",
-                            extra={"lesson_id": lesson_id, "user_id": current_user.id},
-                        )
-                        return
-                    if chunk:
-                        yield _format_sse_data(chunk)
-            except AuthenticationError:
-                logger.exception("OpenAI authentication failed during lesson tutor stream")
-                yield _format_sse_data(SAFE_STREAM_ERROR)
-            except APITimeoutError:
-                logger.exception("OpenAI request timed out during lesson tutor stream")
-                yield _format_sse_data(SAFE_STREAM_ERROR)
-            except APIConnectionError:
-                logger.exception("OpenAI network connection failed during lesson tutor stream")
-                yield _format_sse_data(SAFE_STREAM_ERROR)
-            except APIStatusError:
-                logger.exception("OpenAI API returned an error status during lesson tutor stream")
-                yield _format_sse_data(SAFE_STREAM_ERROR)
-            except APIError:
-                logger.exception("OpenAI API error during lesson tutor stream")
-                yield _format_sse_data(SAFE_STREAM_ERROR)
-            except OpenAIError:
-                logger.exception("OpenAI error during lesson tutor stream")
-                yield _format_sse_data(SAFE_STREAM_ERROR)
-            except Exception:
-                logger.exception("Unexpected error during lesson tutor stream")
-                yield _format_sse_data(SAFE_STREAM_ERROR)
-        finally:
-            db.close()
-
-    return StreamingResponse(event_generator(), media_type="text/event-stream")
+    return StreamingResponse(
+        lesson_ai_service.stream_lesson_ai_response(
+            db,
+            openai_input=openai_input,
+            lesson_id=lesson_id,
+            user_id=current_user.id,
+            stream_name="tutor",
+            is_disconnected=request.is_disconnected,
+            stream_text=_stream_openai_text,
+        ),
+        media_type="text/event-stream",
+    )
 
 
 @router.get("/{lesson_id}/study-stream")
@@ -553,43 +347,18 @@ async def lesson_study_stream(
         clean_question,
     )
 
-    async def event_generator():
-        try:
-            try:
-                async for chunk in _stream_openai_text(openai_input):
-                    if await request.is_disconnected():
-                        logger.info(
-                            "Client disconnected from lesson study stream",
-                            extra={"lesson_id": lesson_id, "user_id": current_user.id},
-                        )
-                        return
-                    if chunk:
-                        yield _format_sse_data(chunk)
-            except AuthenticationError:
-                logger.exception("OpenAI authentication failed during lesson study stream")
-                yield _format_sse_data(SAFE_STREAM_ERROR)
-            except APITimeoutError:
-                logger.exception("OpenAI request timed out during lesson study stream")
-                yield _format_sse_data(SAFE_STREAM_ERROR)
-            except APIConnectionError:
-                logger.exception("OpenAI network connection failed during lesson study stream")
-                yield _format_sse_data(SAFE_STREAM_ERROR)
-            except APIStatusError:
-                logger.exception("OpenAI API returned an error status during lesson study stream")
-                yield _format_sse_data(SAFE_STREAM_ERROR)
-            except APIError:
-                logger.exception("OpenAI API error during lesson study stream")
-                yield _format_sse_data(SAFE_STREAM_ERROR)
-            except OpenAIError:
-                logger.exception("OpenAI error during lesson study stream")
-                yield _format_sse_data(SAFE_STREAM_ERROR)
-            except Exception:
-                logger.exception("Unexpected error during lesson study stream")
-                yield _format_sse_data(SAFE_STREAM_ERROR)
-        finally:
-            db.close()
-
-    return StreamingResponse(event_generator(), media_type="text/event-stream")
+    return StreamingResponse(
+        lesson_ai_service.stream_lesson_ai_response(
+            db,
+            openai_input=openai_input,
+            lesson_id=lesson_id,
+            user_id=current_user.id,
+            stream_name="study",
+            is_disconnected=request.is_disconnected,
+            stream_text=_stream_openai_text,
+        ),
+        media_type="text/event-stream",
+    )
 
 
 @router.get("/{lesson_id}/practice-feedback-stream")
@@ -619,77 +388,19 @@ async def lesson_practice_feedback_stream(
 
     openai_input = build_practice_feedback_prompt(lesson, step, clean_answer)
 
-    async def event_generator():
-        chunks: list[str] = []
-        try:
-            try:
-                async for chunk in _stream_openai_text(openai_input):
-                    if await request.is_disconnected():
-                        logger.info(
-                            "Client disconnected from lesson practice feedback stream",
-                            extra={"lesson_id": lesson_id, "user_id": current_user.id},
-                        )
-                        return
-                    if chunk:
-                        chunks.append(chunk)
-                        yield _format_sse_data(chunk)
-            except AuthenticationError:
-                logger.exception("OpenAI authentication failed during practice feedback stream")
-                yield _format_sse_data(SAFE_STREAM_ERROR)
-                return
-            except APITimeoutError:
-                logger.exception("OpenAI request timed out during practice feedback stream")
-                yield _format_sse_data(SAFE_STREAM_ERROR)
-                return
-            except APIConnectionError:
-                logger.exception("OpenAI network connection failed during practice feedback stream")
-                yield _format_sse_data(SAFE_STREAM_ERROR)
-                return
-            except APIStatusError:
-                logger.exception("OpenAI API returned an error status during practice feedback stream")
-                yield _format_sse_data(SAFE_STREAM_ERROR)
-                return
-            except APIError:
-                logger.exception("OpenAI API error during practice feedback stream")
-                yield _format_sse_data(SAFE_STREAM_ERROR)
-                return
-            except OpenAIError:
-                logger.exception("OpenAI error during practice feedback stream")
-                yield _format_sse_data(SAFE_STREAM_ERROR)
-                return
-            except Exception:
-                logger.exception("Unexpected error during practice feedback stream")
-                yield _format_sse_data(SAFE_STREAM_ERROR)
-                return
-
-            feedback = "".join(chunks).strip()
-            if not feedback:
-                return
-            metadata = parse_practice_feedback_metadata(feedback)
-
-            db.add(
-                models.PracticeSubmission(
-                    user_id=current_user.id,
-                    lesson_id=lesson["lesson_id"],
-                    step_index=step_index,
-                    attempt_number=get_next_practice_attempt_number(
-                        db,
-                        current_user.id,
-                        lesson["lesson_id"],
-                        step_index,
-                    ),
-                    answer=clean_answer,
-                    feedback=feedback,
-                    score=metadata["score"],
-                    strengths=metadata["strengths"],
-                    improvements=metadata["improvements"],
-                )
-            )
-            db.commit()
-        finally:
-            db.close()
-
-    return StreamingResponse(event_generator(), media_type="text/event-stream")
+    return StreamingResponse(
+        lesson_ai_service.stream_practice_feedback_response(
+            db,
+            openai_input=openai_input,
+            lesson=lesson,
+            step_index=step_index,
+            user_id=current_user.id,
+            clean_answer=clean_answer,
+            is_disconnected=request.is_disconnected,
+            stream_text=_stream_openai_text,
+        ),
+        media_type="text/event-stream",
+    )
 
 
 @router.get("/{lesson_id}/practice-history", response_model=list[schemas.PracticeSubmissionRead])

@@ -60,12 +60,12 @@ LESSONS = {
             },
             {
                 "type": "practice",
-                "title": "Practice - Debug database connection",
+                "title": "Practice - Explain build and run",
                 "difficulty": "easy",
                 "content": (
-                    "Your FastAPI container starts but logs Connection refused localhost:5432 when it "
-                    "tries to reach Postgres. Explain what localhost means inside the container and what "
-                    "you would check next."
+                    "A developer changes requirements.txt, rebuilds the Docker image, then starts a new "
+                    "container with DATABASE_URL set at runtime. Explain what happened during build, what "
+                    "happens during run, and why the image and container are different."
                 ),
             },
             {

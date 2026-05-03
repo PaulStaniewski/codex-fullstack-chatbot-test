@@ -1,8 +1,7 @@
-import { useEffect, useRef, useState } from "react";
-import ReactMarkdown from "react-markdown";
-import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
-import { oneDark, oneLight } from "react-syntax-highlighter/dist/esm/styles/prism";
+import { Suspense, lazy, useEffect, useRef, useState } from "react";
 import ThemeToggle from "./ThemeToggle.jsx";
+
+const MarkdownContent = lazy(() => import("./MarkdownContent.jsx"));
 
 export default function ChatWindow({
   conversation,
@@ -114,53 +113,9 @@ export default function ChatWindow({
 
     return (
       <div className="markdown-content">
-        <ReactMarkdown
-          components={{
-            a({ children, ...props }) {
-              return (
-                <a {...props} target="_blank" rel="noreferrer">
-                  {children}
-                </a>
-              );
-            },
-            code({ children, className, ...props }) {
-              const match = /language-(\w+)/.exec(className || "");
-              const code = String(children).replace(/\n$/, "");
-
-              if (!match) {
-                return (
-                  <code className="markdown-inline-code" {...props}>
-                    {children}
-                  </code>
-                );
-              }
-
-              return (
-                <SyntaxHighlighter
-                  PreTag="div"
-                  language={match[1]}
-                  style={theme === "light" ? oneLight : oneDark}
-                  customStyle={{
-                    margin: 0,
-                    borderRadius: "10px",
-                    background: "var(--input-bg)",
-                    fontSize: "0.86rem",
-                  }}
-                  codeTagProps={{
-                    style: {
-                      fontFamily:
-                        'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace',
-                    },
-                  }}
-                >
-                  {code}
-                </SyntaxHighlighter>
-              );
-            },
-          }}
-        >
-          {message.content}
-        </ReactMarkdown>
+        <Suspense fallback={<p className="plain-message">{message.content}</p>}>
+          <MarkdownContent theme={theme}>{message.content}</MarkdownContent>
+        </Suspense>
       </div>
     );
   }

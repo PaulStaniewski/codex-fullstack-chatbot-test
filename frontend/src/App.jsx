@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { Suspense, lazy, useEffect, useRef, useState } from "react";
 import {
   apiFetch,
   configureAuthRefresh,
@@ -11,24 +11,33 @@ import {
   nextLessonStep,
   recordProgressActivity,
 } from "./api.js";
-import AchievementsPage from "./components/AchievementsPage.jsx";
 import AchievementToast from "./components/AchievementToast.jsx";
 import AuthView from "./components/AuthView.jsx";
 import ChatWindow from "./components/ChatWindow.jsx";
-import DashboardPage from "./components/DashboardPage.jsx";
-import LessonView from "./components/LessonView.jsx";
-import ProfilePage from "./components/ProfilePage.jsx";
-import ProgressPage from "./components/ProgressPage.jsx";
-import SettingsPage from "./components/SettingsPage.jsx";
 import Sidebar from "./components/Sidebar.jsx";
 import ThemeToggle from "./components/ThemeToggle.jsx";
 import ToastStack from "./components/ToastStack.jsx";
+
+const AchievementsPage = lazy(() => import("./components/AchievementsPage.jsx"));
+const DashboardPage = lazy(() => import("./components/DashboardPage.jsx"));
+const LessonView = lazy(() => import("./components/LessonView.jsx"));
+const ProfilePage = lazy(() => import("./components/ProfilePage.jsx"));
+const ProgressPage = lazy(() => import("./components/ProgressPage.jsx"));
+const SettingsPage = lazy(() => import("./components/SettingsPage.jsx"));
 
 const TOKEN_KEY = "chatbot_access_token";
 const REFRESH_TOKEN_KEY = "chatbot_refresh_token";
 const ACTIVE_CONVERSATION_KEY = "chatbot_active_conversation_id";
 const THEME_KEY = "chatbot_theme";
 const ACTIVITY_PING_SECONDS = 60;
+
+function ViewFallback() {
+  return (
+    <main className="chat-shell">
+      <p className="center-note">Loading...</p>
+    </main>
+  );
+}
 
 function sortConversations(conversations) {
   return [...conversations].sort((a, b) => {
@@ -854,84 +863,86 @@ export default function App() {
         isStreaming={isStreaming}
       />
 
-      {activeView === "dashboard" ? (
-        <DashboardPage
-          token={token}
-          theme={theme}
-          onToggleTheme={toggleTheme}
-          lessonProgress={lessonProgress}
-          onSelectLesson={(lesson) => selectLesson(lesson).catch(handleRequestError)}
-          onShowProgress={showProgress}
-          onCreateConversation={() => startNewConversation().catch(handleRequestError)}
-          onAchievementUnlocked={showAchievementToast}
-        />
-      ) : activeView === "progress" ? (
-        <ProgressPage
-          token={token}
-          theme={theme}
-          onToggleTheme={toggleTheme}
-          onAchievementUnlocked={showAchievementToast}
-          onShowAchievements={showAchievements}
-        />
-      ) : activeView === "achievements" ? (
-        <AchievementsPage
-          token={token}
-          theme={theme}
-          onToggleTheme={toggleTheme}
-          onAchievementUnlocked={showAchievementToast}
-        />
-      ) : activeView === "profile" ? (
-        <ProfilePage
-          token={token}
-          theme={theme}
-          onToggleTheme={toggleTheme}
-          onLogout={logout}
-          onAchievementUnlocked={showAchievementToast}
-        />
-      ) : activeView === "settings" ? (
-        <SettingsPage
-          token={token}
-          theme={theme}
-          onToggleTheme={toggleTheme}
-          onLogout={logout}
-        />
-      ) : lessonContext ? (
-        <main className="chat-shell">
-          <header className="chat-header">
-            <div className="chat-title">
-              <p className="eyebrow">{lessonContext.course_title}</p>
-              <h1>{lessonContext.lesson_title}</h1>
-            </div>
-            <div className="chat-actions">
-              <ThemeToggle theme={theme} onToggleTheme={toggleTheme} />
-            </div>
-          </header>
-          <LessonView
-            lesson={activeLesson}
-            isLoading={isLessonLoading}
-            isCompletingStep={isCompletingLessonStep}
+      <Suspense fallback={<ViewFallback />}>
+        {activeView === "dashboard" ? (
+          <DashboardPage
             token={token}
-            onPreviousStep={previousLessonStep}
-            onNextStep={advanceLesson}
-            onMarkStepRead={markLessonStepRead}
+            theme={theme}
+            onToggleTheme={toggleTheme}
+            lessonProgress={lessonProgress}
+            onSelectLesson={(lesson) => selectLesson(lesson).catch(handleRequestError)}
+            onShowProgress={showProgress}
+            onCreateConversation={() => startNewConversation().catch(handleRequestError)}
+            onAchievementUnlocked={showAchievementToast}
           />
-        </main>
-      ) : (
-        <ChatWindow
-          conversation={selectedConversation}
-          lessonContext={lessonContext}
-          messages={messages}
-          onSendMessage={sendMessage}
-          onRetryMessage={retryMessage}
-          onUpdateMode={updateConversationMode}
-          onExportConversation={exportConversation}
-          isStreaming={isStreaming}
-          isLoading={isMessagesLoading}
-          isExporting={isExporting}
-          theme={theme}
-          onToggleTheme={toggleTheme}
-        />
-      )}
+        ) : activeView === "progress" ? (
+          <ProgressPage
+            token={token}
+            theme={theme}
+            onToggleTheme={toggleTheme}
+            onAchievementUnlocked={showAchievementToast}
+            onShowAchievements={showAchievements}
+          />
+        ) : activeView === "achievements" ? (
+          <AchievementsPage
+            token={token}
+            theme={theme}
+            onToggleTheme={toggleTheme}
+            onAchievementUnlocked={showAchievementToast}
+          />
+        ) : activeView === "profile" ? (
+          <ProfilePage
+            token={token}
+            theme={theme}
+            onToggleTheme={toggleTheme}
+            onLogout={logout}
+            onAchievementUnlocked={showAchievementToast}
+          />
+        ) : activeView === "settings" ? (
+          <SettingsPage
+            token={token}
+            theme={theme}
+            onToggleTheme={toggleTheme}
+            onLogout={logout}
+          />
+        ) : lessonContext ? (
+          <main className="chat-shell">
+            <header className="chat-header">
+              <div className="chat-title">
+                <p className="eyebrow">{lessonContext.course_title}</p>
+                <h1>{lessonContext.lesson_title}</h1>
+              </div>
+              <div className="chat-actions">
+                <ThemeToggle theme={theme} onToggleTheme={toggleTheme} />
+              </div>
+            </header>
+            <LessonView
+              lesson={activeLesson}
+              isLoading={isLessonLoading}
+              isCompletingStep={isCompletingLessonStep}
+              token={token}
+              onPreviousStep={previousLessonStep}
+              onNextStep={advanceLesson}
+              onMarkStepRead={markLessonStepRead}
+            />
+          </main>
+        ) : (
+          <ChatWindow
+            conversation={selectedConversation}
+            lessonContext={lessonContext}
+            messages={messages}
+            onSendMessage={sendMessage}
+            onRetryMessage={retryMessage}
+            onUpdateMode={updateConversationMode}
+            onExportConversation={exportConversation}
+            isStreaming={isStreaming}
+            isLoading={isMessagesLoading}
+            isExporting={isExporting}
+            theme={theme}
+            onToggleTheme={toggleTheme}
+          />
+        )}
+      </Suspense>
 
       <ToastStack toasts={toasts} onDismiss={dismissToast} />
       {achievementToast ? (

@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from "react";
-import ReactMarkdown from "react-markdown";
+import { Suspense, lazy, useEffect, useRef, useState } from "react";
 import {
   getPracticeHistory,
   streamLessonStudyAssistant,
   streamPracticeFeedback,
 } from "../api.js";
+
+const MarkdownContent = lazy(() => import("./MarkdownContent.jsx"));
 
 const STUDY_ACTIONS = [
   { action: "summarize", label: "Summarize" },
@@ -391,7 +392,9 @@ export default function LessonView({
           {practiceError ? <p className="form-error">{practiceError}</p> : null}
           {practiceFeedback ? (
             <div className="lesson-feedback">
-              <ReactMarkdown>{practiceFeedback}</ReactMarkdown>
+              <Suspense fallback={<p>{practiceFeedback}</p>}>
+                <MarkdownContent>{practiceFeedback}</MarkdownContent>
+              </Suspense>
             </div>
           ) : null}
 
@@ -465,7 +468,9 @@ export default function LessonView({
                       </ul>
                     </div>
                   ) : null}
-                  <ReactMarkdown>{selectedAttempt.feedback}</ReactMarkdown>
+                  <Suspense fallback={<p>{selectedAttempt.feedback}</p>}>
+                    <MarkdownContent>{selectedAttempt.feedback}</MarkdownContent>
+                  </Suspense>
                 </div>
               </div>
             ) : null}
@@ -515,7 +520,9 @@ export default function LessonView({
         {studyError ? <p className="form-error">{studyError}</p> : null}
         {studyAnswer ? (
           <div className="lesson-tutor-answer">
-            <ReactMarkdown>{studyAnswer}</ReactMarkdown>
+            <Suspense fallback={<p>{studyAnswer}</p>}>
+              <MarkdownContent>{studyAnswer}</MarkdownContent>
+            </Suspense>
           </div>
         ) : null}
       </div>

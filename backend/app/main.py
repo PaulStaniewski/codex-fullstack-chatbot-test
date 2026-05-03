@@ -1,8 +1,11 @@
 import os
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
+from sqlalchemy.orm import Session
 
+from app.database import get_db
 from app.observability import request_id_middleware
 from app.routes import (
     auth_routes,
@@ -44,5 +47,6 @@ app.include_router(progress_routes.router)
 
 
 @app.get("/health")
-def health_check():
-    return {"status": "ok"}
+def health_check(db: Session = Depends(get_db)):
+    db.execute(text("SELECT 1"))
+    return {"status": "ok", "database": "ok"}

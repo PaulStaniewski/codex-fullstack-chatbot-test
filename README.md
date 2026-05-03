@@ -120,6 +120,7 @@ Services:
 - Frontend: `http://localhost:5173`
 - Backend API: `http://localhost:8000`
 - API docs: `http://localhost:8000/docs`
+- Health check: `http://localhost:8000/health`
 - PostgreSQL: `localhost:5432`
 
 Stop services:
@@ -133,6 +134,17 @@ Remove the database volume:
 ```bash
 docker compose down -v
 ```
+
+The default Compose stack uses the `dev` Dockerfile targets and keeps hot reload / bind mounts enabled for local development.
+
+Production-style image builds are available without changing the dev workflow:
+
+```bash
+docker build --target production -t chatbot-backend:prod ./backend
+docker build --target production -t chatbot-frontend:prod ./frontend
+```
+
+The backend production target runs Uvicorn without reload as a non-root user. The frontend production target builds static Vite assets and serves them with nginx, including an `/api` proxy to the backend service name for container-network deployments.
 
 ## Local Development
 
@@ -175,6 +187,8 @@ cd frontend
 npm run build
 ```
 
+GitHub Actions CI runs both backend tests and the frontend production build on pushes and pull requests.
+
 ## API Summary
 
 ### Auth
@@ -185,6 +199,12 @@ npm run build
 | `POST` | `/login` | Return JWT access + refresh tokens |
 | `POST` | `/refresh` | Exchange refresh token for a new access token |
 | `POST` | `/logout` | Validate current token and return success (stateless logout contract) |
+
+### Health
+
+| Method | Path | Description |
+| --- | --- | --- |
+| `GET` | `/health` | Verify the API is alive and can execute a database query |
 
 ### Conversations
 
@@ -260,8 +280,5 @@ The endpoint also rejects messages over 2000 characters before persistence or Op
 - Replace in-memory rate limiting with Redis.
 - Add refresh tokens and token rotation.
 - Add frontend tests with Playwright or Testing Library.
-- Add structured logging and request IDs.
-- Add pagination for conversations/messages.
 - Add markdown rendering and code block formatting.
 - Add model selection and system prompt configuration.
-- Add deployment-ready production frontend build serving.

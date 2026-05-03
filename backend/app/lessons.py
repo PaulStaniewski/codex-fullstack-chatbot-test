@@ -1,1350 +1,438 @@
-LESSONS = {'docker_basics': {'lesson_id': 'docker_basics',
-                   'course_id': 'docker',
-                   'title': 'Docker Basics',
-                   'difficulty': 'easy',
-                   'steps': [{'type': 'intro',
-                              'title': 'Why containers matter',
-                              'content': 'Docker is often introduced as a packaging tool, but the '
-                                         'bigger idea is repeatable runtime behavior. A backend '
-                                         'that works on one laptop can fail on another because the '
-                                         'Python version, operating system packages, environment '
-                                         'variables, ports, or startup command are different.\n'
-                                         '\n'
-                                         'Containers give a team a shared boundary around the '
-                                         'application process. Instead of relying on every '
-                                         'developer to manually recreate the same environment, the '
-                                         'project describes that environment in a Dockerfile and '
-                                         'runs it as a container.\n'
-                                         '\n'
-                                         'This matters most when an application grows beyond a '
-                                         'single script. A fullstack project may include a backend '
-                                         'API, frontend build tooling, a database client, '
-                                         'migration commands, and system libraries. Docker makes '
-                                         'those assumptions visible.\n'
-                                         '\n'
-                                         'In real projects, Docker also helps with onboarding. A '
-                                         'new contributor should not need a long checklist of '
-                                         'local installations before they can run the app. The '
-                                         'container becomes a documented, executable setup path.\n'
-                                         '\n'
-                                         'Docker does not remove the need to understand '
-                                         'deployment, security, networking, or persistence. It '
-                                         'gives you a controlled environment where those concerns '
-                                         'can be discussed more clearly.\n'
-                                         '\n'
-                                         'The practical goal is not just to make the app start. '
-                                         'The goal is to know what is inside the runtime, what is '
-                                         'configured from outside, what data survives restarts, '
-                                         'and how to debug the service when something fails.'},
-                             {'type': 'concept',
-                              'title': 'Images, containers, and reproducibility',
-                              'content': 'The central Docker concept is the difference between an '
-                                         'image and a container. An image is a template built from '
-                                         'instructions. A container is a running process created '
-                                         'from that template.\n'
-                                         '\n'
-                                         'This separation solves an important engineering problem. '
-                                         'The team can review and rebuild the image when '
-                                         'dependencies change, then run containers from that image '
-                                         'in a consistent way across machines.\n'
-                                         '\n'
-                                         'A Dockerfile describes build-time decisions. It chooses '
-                                         'a base image, copies files, installs dependencies, sets '
-                                         'a working directory, and defines a default command. '
-                                         'Those decisions become part of the image.\n'
-                                         '\n'
-                                         'Runtime configuration is different. Database URLs, '
-                                         'feature flags, API keys, and environment-specific values '
-                                         'are usually passed when the container starts. This keeps '
-                                         'one image usable in more than one environment.\n'
-                                         '\n'
-                                         'Docker is used when the application needs a predictable '
-                                         'filesystem, dependency set, and startup command. It is '
-                                         'especially useful when different services in the same '
-                                         'project require different runtimes.\n'
-                                         '\n'
-                                         'The model also helps debugging. If a dependency is '
-                                         'missing, ask whether the image was built correctly. If a '
-                                         'secret is wrong, ask whether runtime configuration was '
-                                         'supplied correctly.\n'
-                                         '\n'
-                                         'Good Docker practice means keeping the image '
-                                         'reproducible while keeping environment-specific '
-                                         'configuration outside the image. That boundary is the '
-                                         'foundation for the rest of the course.'},
-                             {'type': 'deep_dive',
-                              'title': 'What Docker actually isolates',
-                              'content': 'A container is not a small virtual machine. It is a '
-                                         'process running on the host kernel with isolation around '
-                                         'filesystem, networking, process visibility, and '
-                                         'environment.\n'
-                                         '\n'
-                                         'When Docker builds an image, it creates layers. Each '
-                                         'Dockerfile instruction can create a layer that may be '
-                                         'cached during future builds. This is why instruction '
-                                         'order affects build speed.\n'
-                                         '\n'
-                                         'For example, copying requirements.txt before copying the '
-                                         'whole application lets Docker reuse the '
-                                         'dependency-install layer when only source code changes. '
-                                         'Copying all source first often invalidates the cache too '
-                                         'early.\n'
-                                         '\n'
-                                         'At runtime, the container has its own filesystem view. '
-                                         'Files written inside the container disappear when the '
-                                         'container is removed unless they are stored in a volume '
-                                         'or an external service.\n'
-                                         '\n'
-                                         'Networking has similar boundaries. An app can listen on '
-                                         'port 8000 inside the container, but the host cannot '
-                                         'reach that port unless it is published. Other containers '
-                                         'may reach it differently through a Docker network.\n'
-                                         '\n'
-                                         'A common mistake is using localhost from inside a '
-                                         'container when the developer means another service. '
-                                         'Inside the backend container, localhost means the '
-                                         'backend container itself, not the host machine and not '
-                                         'the database container.\n'
-                                         '\n'
-                                         'Another mistake is rebuilding an image when the real '
-                                         'problem is runtime configuration. If the Dockerfile did '
-                                         'not change but DATABASE_URL did, the fix is usually '
-                                         'configuration, not a new image layer.\n'
-                                         '\n'
-                                         'The internal behavior matters because Docker bugs are '
-                                         'often boundary bugs. You debug them by asking which '
-                                         'boundary is involved: build cache, container filesystem, '
-                                         'host networking, service networking, environment '
-                                         'variables, or persistent storage.'},
-                             {'type': 'example',
-                              'title': 'A small backend Dockerfile',
-                              'content': 'A small backend Dockerfile might look like this:\n'
-                                         '\n'
-                                         'FROM python:3.12-slim\n'
-                                         'WORKDIR /app\n'
-                                         'COPY requirements.txt .\n'
-                                         'RUN pip install --no-cache-dir -r requirements.txt\n'
-                                         'COPY . .\n'
-                                         'CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", '
-                                         '"--port", "8000"]\n'
-                                         '\n'
-                                         'FROM selects the base runtime. In this case, the image '
-                                         'starts from a slim Python 3.12 environment rather than '
-                                         'depending on Python installed on the host machine.\n'
-                                         '\n'
-                                         'WORKDIR creates a predictable directory for the '
-                                         'application. Every following command runs from /app '
-                                         'unless another working directory is set.\n'
-                                         '\n'
-                                         'COPY requirements.txt and RUN pip install create a '
-                                         'dependency layer. This is intentionally placed before '
-                                         'copying the full source tree so normal code edits do not '
-                                         'reinstall dependencies every time.\n'
-                                         '\n'
-                                         'COPY . . adds the application source. CMD defines what '
-                                         'runs when the container starts. Binding Uvicorn to '
-                                         '0.0.0.0 is important because the server must listen '
-                                         "beyond the container's loopback interface.\n"
-                                         '\n'
-                                         'The expected behavior is that anyone with Docker can '
-                                         'build the image and run the backend without installing '
-                                         'Python packages directly on their machine. Production '
-                                         'versions would also review user permissions, image size, '
-                                         'secret handling, and healthchecks.'},
-                             {'type': 'checklist',
-                              'title': 'Docker basics checklist',
-                              'content': '- Check whether a failure happens during image build or '
-                                         'container startup; those are different phases with '
-                                         'different fixes.\n'
-                                         '- Inspect the Dockerfile instruction order when builds '
-                                         'are unexpectedly slow or dependencies reinstall too '
-                                         'often.\n'
-                                         '- Confirm the application listens on an interface '
-                                         'reachable from outside the container, usually 0.0.0.0 '
-                                         'for HTTP services.\n'
-                                         '- Verify which configuration comes from runtime '
-                                         'environment variables instead of hardcoded files.\n'
-                                         '- Check whether important data is written to a '
-                                         'disposable container filesystem or to a volume.\n'
-                                         '- Use docker logs before rebuilding; startup errors '
-                                         'often explain the real cause.\n'
-                                         '- Ask whether networking should use a host port, a '
-                                         'container port, or a service name on a Docker network.'},
-                             {'type': 'practice',
-                              'title': 'Practice - Explain the runtime boundary',
-                              'difficulty': 'easy',
-                              'content': 'A teammate says Docker is unnecessary because the app '
-                                         'already works on their laptop. Explain what problems '
-                                         'Docker still solves for a fullstack team and what Docker '
-                                         'does not automatically solve.'},
-                             {'type': 'summary',
-                              'title': 'Summary',
-                              'content': '- Docker images are reusable runtime templates; '
-                                         'containers are running instances of those templates.\n'
-                                         '- Build-time dependencies belong in the image, while '
-                                         'environment-specific configuration usually belongs at '
-                                         'runtime.\n'
-                                         '- Containers isolate the process and filesystem, but '
-                                         'they are not full virtual machines.\n'
-                                         '- Files inside a container are disposable unless stored '
-                                         'in a volume or external service.\n'
-                                         '- Most Docker debugging starts by identifying the '
-                                         'boundary involved: build, runtime config, network, or '
-                                         'persistence.\n'
-                                         '- A working local container is a starting point, not '
-                                         'proof that production security and operations are '
-                                         'ready.'}]},
- 'docker_compose_basics': {'lesson_id': 'docker_compose_basics',
-                           'course_id': 'docker',
-                           'title': 'Docker Compose Basics',
-                           'difficulty': 'easy',
-                           'steps': [{'type': 'intro',
-                                      'title': 'Why Compose exists',
-                                      'content': 'Docker Compose exists because real applications '
-                                                 'are rarely one process. A useful development '
-                                                 'environment often needs a backend, frontend, '
-                                                 'database, migration command, and sometimes a '
-                                                 'cache or worker.\n'
-                                                 '\n'
-                                                 'Without Compose, every developer has to remember '
-                                                 'several commands and run them in the right '
-                                                 'order. That knowledge usually lives in a README, '
-                                                 "terminal history, or one teammate's memory.\n"
-                                                 '\n'
-                                                 'Compose turns that knowledge into configuration. '
-                                                 'The compose file describes which services exist, '
-                                                 'how they start, which ports they expose, which '
-                                                 'variables they need, and which volumes keep '
-                                                 'data.\n'
-                                                 '\n'
-                                                 'This matters for onboarding and debugging. A new '
-                                                 'developer can run one command and see the same '
-                                                 'service graph as the rest of the team instead of '
-                                                 'assembling the stack by hand.\n'
-                                                 '\n'
-                                                 'Compose also makes architecture visible. When '
-                                                 'you read the file, you can see the backend '
-                                                 'depends on the database, the frontend talks to '
-                                                 'the API, and the database stores state in a '
-                                                 'volume.\n'
-                                                 '\n'
-                                                 'In production, teams may use other '
-                                                 'orchestrators, but the Compose mental model '
-                                                 'remains valuable. You learn to think in '
-                                                 'services, networks, configuration, startup '
-                                                 'behavior, and persistent state.'},
-                                     {'type': 'concept',
-                                      'title': 'A service graph in configuration',
-                                      'content': 'A Compose file describes a group of services. '
-                                                 'Each service represents one role in the '
-                                                 'application, such as backend, frontend, db, '
-                                                 'worker, or cache.\n'
-                                                 '\n'
-                                                 'The service definition can choose an image, '
-                                                 'build from a Dockerfile, publish ports, pass '
-                                                 'environment variables, mount volumes, and define '
-                                                 'healthchecks. This creates an executable service '
-                                                 'graph.\n'
-                                                 '\n'
-                                                 'Compose creates a default network for the '
-                                                 'project. Services on that network can reach each '
-                                                 'other by service name, which means the backend '
-                                                 'can connect to the database using db as the '
-                                                 'hostname.\n'
-                                                 '\n'
-                                                 'This solves a common local-development problem. '
-                                                 'Instead of asking whether PostgreSQL is '
-                                                 'installed locally or which port it uses on the '
-                                                 'host, the backend connects to the '
-                                                 'Compose-managed database service.\n'
-                                                 '\n'
-                                                 'Compose is used for development environments, '
-                                                 'demos, integration tests, and benchmark '
-                                                 'projects. It is best when the goal is repeatable '
-                                                 'multi-service setup rather than full production '
-                                                 'orchestration.\n'
-                                                 '\n'
-                                                 'The file also documents state. A named volume '
-                                                 'shows that database data should survive '
-                                                 'container recreation, while a bind mount shows '
-                                                 'that host files are being shared into a '
-                                                 'container.\n'
-                                                 '\n'
-                                                 'The important concept is that Compose '
-                                                 'coordinates services, but it does not '
-                                                 'automatically make those services correct. '
-                                                 'Readiness, credentials, migrations, and safe '
-                                                 'shutdown still need deliberate design.'},
-                                     {'type': 'deep_dive',
-                                      'title': 'How Compose wiring behaves',
-                                      'content': 'When docker compose up runs, Compose reads the '
-                                                 'YAML file and creates project resources. Those '
-                                                 'resources usually include containers, a default '
-                                                 'network, and any named volumes declared by the '
-                                                 'project.\n'
-                                                 '\n'
-                                                 'If a service has a build section, Compose can '
-                                                 'build an image from a Dockerfile. If a service '
-                                                 'uses image, Compose pulls or reuses that image. '
-                                                 'Then it starts containers for each service.\n'
-                                                 '\n'
-                                                 'Networking is one of the most important '
-                                                 'behaviors. Inside the Compose network, service '
-                                                 'names become DNS names. A backend should usually '
-                                                 'connect to postgresql://...@db:5432/... rather '
-                                                 'than localhost.\n'
-                                                 '\n'
-                                                 'Port publishing is separate. A mapping like '
-                                                 '8000:8000 lets the host browser reach the '
-                                                 'backend, but other containers do not need the '
-                                                 'host mapping to communicate on the internal '
-                                                 'network.\n'
-                                                 '\n'
-                                                 'Volumes are also managed separately from '
-                                                 'containers. Removing and recreating containers '
-                                                 'does not necessarily remove named volumes, which '
-                                                 'is why old database state can survive many '
-                                                 'rebuilds.\n'
-                                                 '\n'
-                                                 'Environment variables have two phases that are '
-                                                 'easy to confuse. Compose may interpolate values '
-                                                 'from the host while reading the YAML, and it may '
-                                                 'also pass values into the container '
-                                                 'environment.\n'
-                                                 '\n'
-                                                 'A common mistake is assuming depends_on means '
-                                                 'the dependency is ready. It mostly expresses '
-                                                 'startup order. A database can be started but '
-                                                 'still initializing, so readiness checks and '
-                                                 'retry logic remain necessary.\n'
-                                                 '\n'
-                                                 'The internal behavior explains many local bugs. '
-                                                 'If the wrong database state appears, inspect '
-                                                 'volumes. If a hostname fails, inspect the '
-                                                 'service name and network. If a value is missing, '
-                                                 'inspect both host interpolation and container '
-                                                 'environment.'},
-                                     {'type': 'example',
-                                      'title': 'Compose file for a small API stack',
-                                      'content': 'A small Compose file for an API and database can '
-                                                 'look like this:\n'
-                                                 '\n'
-                                                 'services:\n'
-                                                 '  backend:\n'
-                                                 '    build: ./backend\n'
-                                                 '    ports:\n'
-                                                 '      - "8000:8000"\n'
-                                                 '    environment:\n'
-                                                 '      DATABASE_URL: '
-                                                 'postgresql://postgres:postgres@db:5432/app\n'
-                                                 '    depends_on:\n'
-                                                 '      - db\n'
-                                                 '  db:\n'
-                                                 '    image: postgres:16\n'
-                                                 '    environment:\n'
-                                                 '      POSTGRES_DB: app\n'
-                                                 '      POSTGRES_USER: postgres\n'
-                                                 '      POSTGRES_PASSWORD: postgres\n'
-                                                 '    volumes:\n'
-                                                 '      - postgres_data:/var/lib/postgresql/data\n'
-                                                 '\n'
-                                                 'volumes:\n'
-                                                 '  postgres_data:\n'
-                                                 '\n'
-                                                 'The backend service builds from local source and '
-                                                 'publishes port 8000 so the host browser can '
-                                                 'reach it. DATABASE_URL uses db because db is the '
-                                                 'service name on the Compose network.\n'
-                                                 '\n'
-                                                 'The db service uses the official PostgreSQL '
-                                                 'image and declares initial database settings. '
-                                                 'The named volume stores database files outside '
-                                                 'the disposable container lifecycle.\n'
-                                                 '\n'
-                                                 'The expected behavior is that Compose creates '
-                                                 'one network, starts both containers, and lets '
-                                                 'the backend connect to PostgreSQL through the '
-                                                 'service name. A more reliable version would add '
-                                                 'healthchecks and bounded backend startup retry.'},
-                                     {'type': 'checklist',
-                                      'title': 'Compose review checklist',
-                                      'content': '- Use service names for container-to-container '
-                                                 'hostnames instead of localhost.\n'
-                                                 '- Publish only the ports humans or host tools '
-                                                 'need to access directly.\n'
-                                                 '- Inspect named volumes when database state '
-                                                 'survives rebuilds or appears stale.\n'
-                                                 '- Keep required environment variables explicit '
-                                                 'and avoid committing real secrets.\n'
-                                                 '- Use docker compose ps to check service state, '
-                                                 'ports, and health information.\n'
-                                                 '- Use docker compose logs <service> to debug one '
-                                                 'service while preserving stack context.\n'
-                                                 '- Add healthchecks or retries for services that '
-                                                 'depend on databases, queues, or external APIs.'},
-                                     {'type': 'practice',
-                                      'title': 'Practice - Design a local stack',
-                                      'difficulty': 'easy',
-                                      'content': 'Sketch a Compose setup for a React, FastAPI, and '
-                                                 'PostgreSQL application. Explain which services '
-                                                 'need ports, which services need volumes, and how '
-                                                 'the backend should connect to the database.'},
-                                     {'type': 'summary',
-                                      'title': 'Summary',
-                                      'content': '- Compose describes a multi-service application '
-                                                 'in one executable configuration file.\n'
-                                                 '- Services communicate by name on the Compose '
-                                                 'network, while host port mappings serve host '
-                                                 'access.\n'
-                                                 '- Named volumes preserve state after containers '
-                                                 'are recreated.\n'
-                                                 '- depends_on can help with order, but it does '
-                                                 'not prove readiness.\n'
-                                                 '- A good compose file documents architecture as '
-                                                 'well as startup commands.\n'
-                                                 '- Debug Compose issues by checking service '
-                                                 'names, networks, volumes, environment variables, '
-                                                 'and logs.'}]},
- 'postgres_container_not_ready': {'lesson_id': 'postgres_container_not_ready',
-                                  'course_id': 'docker',
-                                  'title': 'Postgres Container Not Ready',
-                                  'difficulty': 'medium',
-                                  'steps': [{'type': 'intro',
-                                             'title': 'The container is running, but Postgres is '
-                                                      'not ready',
-                                             'content': 'A PostgreSQL container can be running '
-                                                        'while PostgreSQL itself is still not '
-                                                        'ready for the backend. This is one of the '
-                                                        'most common Docker Compose problems in '
-                                                        'fullstack projects.\n'
-                                                        '\n'
-                                                        'The symptom is usually frustrating. The '
-                                                        'backend fails on the first startup with '
-                                                        'connection refused, timeout, or migration '
-                                                        'errors, then works after a restart.\n'
-                                                        '\n'
-                                                        'That restart is the clue. If time fixes '
-                                                        'the issue without a code change, the '
-                                                        'system probably relied on timing rather '
-                                                        'than a clear readiness signal.\n'
-                                                        '\n'
-                                                        'This matters in local development because '
-                                                        'unreliable startup makes the whole '
-                                                        'environment feel flaky. It matters even '
-                                                        'more in CI, where slower machines and '
-                                                        'parallel jobs make timing problems more '
-                                                        'visible.\n'
-                                                        '\n'
-                                                        'It also matters in production-style '
-                                                        'deployments. A database can be alive as a '
-                                                        'process while it is recovering, applying '
-                                                        'initialization, or not yet accepting the '
-                                                        'exact connection the app needs.\n'
-                                                        '\n'
-                                                        'The lesson is simple but important: '
-                                                        'container running state is not the same '
-                                                        'as service readiness. A reliable app '
-                                                        'verifies readiness with checks and '
-                                                        'retries that match the real database '
-                                                        'operation.'},
-                                            {'type': 'concept',
-                                             'title': 'Readiness means useful work can happen',
-                                             'content': 'Database readiness means the database can '
-                                                        'do the useful work the application needs '
-                                                        'right now. For a backend, that is more '
-                                                        'than opening a TCP port.\n'
-                                                        '\n'
-                                                        'A useful readiness check should prove '
-                                                        'that the backend can resolve the database '
-                                                        'hostname, open a connection, authenticate '
-                                                        'as the configured user, select the '
-                                                        'configured database, and run a basic '
-                                                        'operation.\n'
-                                                        '\n'
-                                                        'This concept solves the gap between '
-                                                        'infrastructure state and application '
-                                                        'state. Docker can report that the '
-                                                        'postgres container is running, but '
-                                                        'PostgreSQL must prove it can serve the '
-                                                        'app.\n'
-                                                        '\n'
-                                                        'Readiness is used before running '
-                                                        'migrations, before accepting HTTP '
-                                                        'traffic, and before marking a deployment '
-                                                        'as available. It is part of startup '
-                                                        'safety.\n'
-                                                        '\n'
-                                                        'The exact check depends on the workload. '
-                                                        'A simple app may use pg_isready. A '
-                                                        'backend that must run migrations may '
-                                                        'retry the migration command because that '
-                                                        'is the operation that must succeed.\n'
-                                                        '\n'
-                                                        'Readiness is not a permanent guarantee. A '
-                                                        'database can become unavailable later '
-                                                        'because of restart, disk pressure, memory '
-                                                        'pressure, network interruption, or '
-                                                        'operator action.\n'
-                                                        '\n'
-                                                        'That is why startup readiness and runtime '
-                                                        'error handling work together. Startup '
-                                                        'checks get the app online safely; runtime '
-                                                        'handling keeps the app honest after the '
-                                                        'first successful connection.'},
-                                            {'type': 'deep_dive',
-                                             'title': 'Postgres startup phases and hidden state',
-                                             'content': 'The official PostgreSQL image performs '
-                                                        'several steps during startup. On a fresh '
-                                                        'volume, it creates the database cluster, '
-                                                        'applies environment-based initialization, '
-                                                        'and may run scripts from '
-                                                        'docker-entrypoint-initdb.d.\n'
-                                                        '\n'
-                                                        'Only after that setup does the server '
-                                                        'become ready for normal client '
-                                                        'connections. During the earlier phases, '
-                                                        'the container process can exist even '
-                                                        'though the app cannot yet use the '
-                                                        'database.\n'
-                                                        '\n'
-                                                        'On an existing volume, initialization may '
-                                                        'be skipped, but startup can still involve '
-                                                        'recovery, log replay, or permission '
-                                                        'checks. Existing state can make one '
-                                                        'machine behave differently from another.\n'
-                                                        '\n'
-                                                        'Credentials are another common edge case. '
-                                                        'If a volume was initialized with old '
-                                                        'credentials, changing POSTGRES_PASSWORD '
-                                                        'in Compose does not rewrite the existing '
-                                                        'database state.\n'
-                                                        '\n'
-                                                        'Networking adds another layer. The '
-                                                        'backend must use the Compose service name '
-                                                        'and correct port. Using localhost inside '
-                                                        'the backend container points to the '
-                                                        'backend container, not the database.\n'
-                                                        '\n'
-                                                        'Fixed sleeps are a fragile workaround. A '
-                                                        'five-second sleep may pass on a fast '
-                                                        'laptop and fail in CI. A thirty-second '
-                                                        'sleep may hide real configuration '
-                                                        'mistakes and slow every startup.\n'
-                                                        '\n'
-                                                        'Better systems use bounded retry around '
-                                                        'the real operation. If migrations must '
-                                                        'run before serving, retry migrations with '
-                                                        'clear logs and a maximum wait time.\n'
-                                                        '\n'
-                                                        'The step-by-step debugging path is to '
-                                                        'inspect the error type, verify the '
-                                                        'connection string, check database logs, '
-                                                        'test readiness from inside the Docker '
-                                                        'network, and confirm whether persistent '
-                                                        'volume state is involved.'},
-                                            {'type': 'example',
-                                             'title': 'Database-aware readiness check',
-                                             'content': 'A database-aware readiness check can '
-                                                        'target the same identity the app uses:\n'
-                                                        '\n'
-                                                        'pg_isready -h db -U postgres -d app\n'
-                                                        '\n'
-                                                        'The -h db option uses the Compose service '
-                                                        'name. The -U postgres option checks the '
-                                                        'configured user. The -d app option checks '
-                                                        'the intended database.\n'
-                                                        '\n'
-                                                        'For a backend that must run migrations, '
-                                                        'the startup command can retry the real '
-                                                        'migration:\n'
-                                                        '\n'
-                                                        'until alembic upgrade head; do\n'
-                                                        '  echo "Database not ready for '
-                                                        'migrations, retrying..."\n'
-                                                        '  sleep 2\n'
-                                                        'done\n'
-                                                        'uvicorn app.main:app --host 0.0.0.0 '
-                                                        '--port 8000\n'
-                                                        '\n'
-                                                        'The readiness check tells you whether '
-                                                        'PostgreSQL accepts connections. The '
-                                                        'migration retry tells you whether the '
-                                                        'application can perform the operation '
-                                                        'required before serving.\n'
-                                                        '\n'
-                                                        'The expected behavior is patient startup '
-                                                        'during normal database initialization and '
-                                                        'clear failure when credentials, database '
-                                                        'names, or migrations are truly broken. In '
-                                                        'production, the loop should also have a '
-                                                        'maximum attempt count.'},
-                                            {'type': 'checklist',
-                                             'title': 'Postgres readiness checklist',
-                                             'content': '- Read the exact error message before '
-                                                        'changing configuration; connection '
-                                                        'refused, timeout, authentication failed, '
-                                                        'and unknown database mean different '
-                                                        'things.\n'
-                                                        '- Run readiness checks from inside the '
-                                                        'Compose network so hostname and routing '
-                                                        'match the backend.\n'
-                                                        '- Confirm DATABASE_URL uses the database '
-                                                        'service name, not localhost.\n'
-                                                        '- Compare POSTGRES_DB, POSTGRES_USER, and '
-                                                        'POSTGRES_PASSWORD with the backend '
-                                                        'connection string.\n'
-                                                        '- Inspect PostgreSQL logs for '
-                                                        'initialization, recovery, permissions, or '
-                                                        'script failures.\n'
-                                                        '- Treat persistent volumes as possible '
-                                                        'hidden state when credentials or database '
-                                                        'names changed.\n'
-                                                        '- Wrap migrations or startup queries in '
-                                                        'bounded retry logic with clear failure '
-                                                        'messages.'},
-                                            {'type': 'practice',
-                                             'title': 'Practice 1 - Diagnose',
-                                             'difficulty': 'medium',
-                                             'content': 'A backend fails on first compose up with '
-                                                        'connection refused, then works after '
-                                                        'docker compose restart. Diagnose why this '
-                                                        'points to readiness rather than a missing '
-                                                        'dependency.'},
-                                            {'type': 'practice',
-                                             'title': 'Practice 2 - Fix',
-                                             'difficulty': 'hard',
-                                             'content': 'Design a startup script that waits for '
-                                                        'PostgreSQL by retrying the real migration '
-                                                        'command with a maximum wait time and '
-                                                        'useful logs.'},
-                                            {'type': 'practice',
-                                             'title': 'Practice 3 - Production hardening',
-                                             'difficulty': 'production',
-                                             'content': 'Explain how you would adapt this local '
-                                                        'readiness pattern for production, '
-                                                        'including health endpoints, migration '
-                                                        'ownership, alerts, and what should happen '
-                                                        'if the database never becomes ready.'},
-                                            {'type': 'summary',
-                                             'title': 'Summary',
-                                             'content': '- A running PostgreSQL container is not '
-                                                        'necessarily ready for application '
-                                                        'connections.\n'
-                                                        '- Readiness should prove the operation '
-                                                        'the application actually needs.\n'
-                                                        '- Fixed sleeps are unreliable because '
-                                                        'startup time changes between '
-                                                        'environments.\n'
-                                                        '- Persistent volumes can preserve old '
-                                                        'credentials, databases, and schema '
-                                                        'state.\n'
-                                                        '- Backend startup should retry expected '
-                                                        'transient failures but fail clearly after '
-                                                        'a deadline.\n'
-                                                        '- Production readiness should be separate '
-                                                        'from liveness so traffic is not routed '
-                                                        'too early.'}]},
- 'docker_healthcheck_missing': {'lesson_id': 'docker_healthcheck_missing',
-                                'course_id': 'docker',
-                                'title': 'Docker Healthcheck Missing',
-                                'difficulty': 'medium',
-                                'steps': [{'type': 'intro',
-                                           'title': 'Why healthchecks change debugging',
-                                           'content': 'Without healthchecks, Docker can tell you '
-                                                      'whether a container process is running, but '
-                                                      'not whether the service is useful. That '
-                                                      'distinction matters in multi-container '
-                                                      'systems.\n'
-                                                      '\n'
-                                                      'A backend process might be alive while its '
-                                                      'database connection is broken. PostgreSQL '
-                                                      'might be running while it is still '
-                                                      'initializing. A frontend server might '
-                                                      'respond while serving the wrong '
-                                                      'configuration.\n'
-                                                      '\n'
-                                                      'Healthchecks give the container a small '
-                                                      'self-test. The result becomes visible as '
-                                                      'healthy, unhealthy, or starting, which is '
-                                                      'much more informative than running alone.\n'
-                                                      '\n'
-                                                      'This matters during development because it '
-                                                      'points debugging at the right service. If '
-                                                      'the database is unhealthy, the backend '
-                                                      'failure is probably a symptom rather than '
-                                                      'the first cause.\n'
-                                                      '\n'
-                                                      'It matters in CI because tests often start '
-                                                      'as soon as containers exist. A health '
-                                                      'signal can prevent integration tests from '
-                                                      'racing the services they depend on.\n'
-                                                      '\n'
-                                                      'It matters in production because platforms '
-                                                      'can use health and readiness signals to '
-                                                      'decide when to route traffic, restart '
-                                                      'services, or alert operators. The signal '
-                                                      'must be meaningful, not decorative.'},
-                                          {'type': 'concept',
-                                           'title': 'A healthcheck is an executable contract',
-                                           'content': 'A healthcheck is an executable contract. It '
-                                                      'is a command that runs inside the container '
-                                                      'and exits successfully when the service '
-                                                      'passes its basic self-test.\n'
-                                                      '\n'
-                                                      'The contract should match what other '
-                                                      'services need. If the backend needs '
-                                                      'PostgreSQL to accept SQL connections, the '
-                                                      'database healthcheck should test PostgreSQL '
-                                                      'readiness, not just process existence.\n'
-                                                      '\n'
-                                                      'For an API, a healthcheck may call an HTTP '
-                                                      'endpoint. That endpoint might simply '
-                                                      'confirm the process is alive, or it might '
-                                                      'also verify required dependencies depending '
-                                                      'on whether it is liveness or readiness.\n'
-                                                      '\n'
-                                                      'This concept is used whenever service state '
-                                                      'should be observable. Developers use it '
-                                                      'during local debugging. CI uses it before '
-                                                      'tests. Production platforms use it for '
-                                                      'routing and recovery decisions.\n'
-                                                      '\n'
-                                                      'The healthcheck command should be cheap '
-                                                      'enough to run repeatedly. A check that '
-                                                      'performs expensive work can create load or '
-                                                      'introduce its own failure mode.\n'
-                                                      '\n'
-                                                      'It should also be specific enough to catch '
-                                                      'meaningful failures. A check that always '
-                                                      'returns success gives false confidence and '
-                                                      'can make incidents harder to understand.\n'
-                                                      '\n'
-                                                      'The best healthchecks are boring, local, '
-                                                      'deterministic, and tied to a real service '
-                                                      'promise. They do not replace logs or '
-                                                      'metrics, but they make service state '
-                                                      'visible sooner.'},
-                                          {'type': 'deep_dive',
-                                           'title': 'Designing useful health signals',
-                                           'content': 'Docker healthchecks run repeatedly '
-                                                      'according to timing settings. interval '
-                                                      'controls how often the check runs, timeout '
-                                                      'controls how long one check may take, '
-                                                      'retries controls how many failures are '
-                                                      'tolerated, and start_period gives startup '
-                                                      'time before failures count.\n'
-                                                      '\n'
-                                                      'These settings matter because services have '
-                                                      'different startup profiles. PostgreSQL may '
-                                                      'need time to initialize a fresh volume, '
-                                                      'while a simple static server may be ready '
-                                                      'almost immediately.\n'
-                                                      '\n'
-                                                      'The command runs inside the container. This '
-                                                      'creates a common edge case: curl may exist '
-                                                      'on the host but not inside a minimal '
-                                                      'runtime image. The healthcheck must use '
-                                                      'tools available in the image.\n'
-                                                      '\n'
-                                                      'Another edge case is checking too much. If '
-                                                      'a healthcheck depends on an external public '
-                                                      'API, the container may become unhealthy '
-                                                      'because the internet is briefly '
-                                                      'unavailable, even though the local service '
-                                                      'is fine.\n'
-                                                      '\n'
-                                                      'Checking too little is also risky. A '
-                                                      'command that only confirms a process exists '
-                                                      'may miss broken credentials, missing '
-                                                      'databases, or a backend that cannot finish '
-                                                      'startup.\n'
-                                                      '\n'
-                                                      'Healthchecks are signals, not complete '
-                                                      'recovery systems. An unhealthy container '
-                                                      'still needs logs, metrics, and operator '
-                                                      'context to explain why it is unhealthy.\n'
-                                                      '\n'
-                                                      'They also do not replace application retry. '
-                                                      'A dependency can pass a healthcheck and '
-                                                      'then fail later. Runtime code still needs '
-                                                      'timeouts and error handling.\n'
-                                                      '\n'
-                                                      'A useful design layers these concerns: '
-                                                      'healthchecks expose state, startup scripts '
-                                                      'wait for required dependencies, application '
-                                                      'code handles runtime failures, and '
-                                                      'monitoring tracks patterns over time.'},
-                                          {'type': 'example',
-                                           'title': 'Compose healthcheck examples',
-                                           'content': 'A PostgreSQL healthcheck can look like '
-                                                      'this:\n'
-                                                      '\n'
-                                                      'services:\n'
-                                                      '  db:\n'
-                                                      '    image: postgres:16\n'
-                                                      '    healthcheck:\n'
-                                                      '      test: ["CMD-SHELL", "pg_isready -U '
-                                                      'postgres -d app"]\n'
-                                                      '      interval: 5s\n'
-                                                      '      timeout: 3s\n'
-                                                      '      retries: 10\n'
-                                                      '      start_period: 10s\n'
-                                                      '\n'
-                                                      'The test command runs inside the database '
-                                                      'container. pg_isready checks whether '
-                                                      'PostgreSQL is accepting connections for the '
-                                                      'configured user and database.\n'
-                                                      '\n'
-                                                      'The start_period gives PostgreSQL time to '
-                                                      'initialize before failures count. retries '
-                                                      'prevents one transient failure from '
-                                                      'immediately marking the service unhealthy.\n'
-                                                      '\n'
-                                                      'A backend healthcheck might call a local '
-                                                      'endpoint:\n'
-                                                      '\n'
-                                                      'test: ["CMD", "python", "-c", "import '
-                                                      'urllib.request; '
-                                                      'urllib.request.urlopen(\'http://localhost:8000/health\')"]\n'
-                                                      '\n'
-                                                      'This uses Python instead of curl so it '
-                                                      'works in images that do not install curl. '
-                                                      'The expected behavior is that health status '
-                                                      'reflects real service capability, while '
-                                                      'logs explain the cause when the check '
-                                                      'fails.'},
-                                          {'type': 'checklist',
-                                           'title': 'Healthcheck checklist',
-                                           'content': '- Confirm the healthcheck command exists '
-                                                      'inside the container image, not only on the '
-                                                      'host.\n'
-                                                      '- Choose a check that proves useful service '
-                                                      'behavior rather than process existence '
-                                                      'alone.\n'
-                                                      '- Tune start_period so normal '
-                                                      'initialization is not reported as failure.\n'
-                                                      '- Keep healthchecks cheap and local unless '
-                                                      'the service truly depends on an external '
-                                                      'system.\n'
-                                                      '- Test the failure path by temporarily '
-                                                      'breaking credentials, ports, or '
-                                                      'dependencies.\n'
-                                                      '- Make application logs explain what failed '
-                                                      'when healthchecks report unhealthy status.\n'
-                                                      '- Pair healthchecks with retry and runtime '
-                                                      'error handling because health can change '
-                                                      'after startup.'},
-                                          {'type': 'practice',
-                                           'title': 'Practice 1 - Diagnose',
-                                           'difficulty': 'medium',
-                                           'content': 'A backend starts before the database is '
-                                                      'usable, and docker ps only shows both '
-                                                      'containers as running. Explain what '
-                                                      'diagnostic signal is missing.'},
-                                          {'type': 'practice',
-                                           'title': 'Practice 2 - Fix',
-                                           'difficulty': 'hard',
-                                           'content': 'Write a Compose healthcheck strategy for '
-                                                      'PostgreSQL and the backend. Explain what '
-                                                      'each check proves and what it does not '
-                                                      'prove.'},
-                                          {'type': 'practice',
-                                           'title': 'Practice 3 - Production hardening',
-                                           'difficulty': 'production',
-                                           'content': 'Describe how healthchecks should interact '
-                                                      'with deployment readiness, runtime '
-                                                      'monitoring, restart policies, and alerting '
-                                                      'in a production environment.'},
-                                          {'type': 'summary',
-                                           'title': 'Summary',
-                                           'content': '- Healthchecks turn hidden readiness '
-                                                      'assumptions into visible service state.\n'
-                                                      '- A useful healthcheck is an executable '
-                                                      "version of the service's basic contract.\n"
-                                                      '- Timing settings control whether checks '
-                                                      'are patient, noisy, strict, or too slow.\n'
-                                                      '- Healthchecks should guide debugging but '
-                                                      'not replace logs, metrics, or error '
-                                                      'handling.\n'
-                                                      '- Minimal images may not include the tools '
-                                                      'your healthcheck command assumes.\n'
-                                                      '- Production systems use health signals as '
-                                                      'one layer in readiness, routing, restart, '
-                                                      'and alerting decisions.'}]},
- 'docker_startup_race_condition': {'lesson_id': 'docker_startup_race_condition',
-                                   'course_id': 'docker',
-                                   'title': 'Docker Compose Startup Race Condition',
-                                   'difficulty': 'hard',
-                                   'steps': [{'type': 'intro',
-                                              'title': 'Timing bugs in multi-container apps',
-                                              'content': 'A startup race condition happens when '
-                                                         'one service begins work before another '
-                                                         'service is ready. In Docker Compose, '
-                                                         'this often appears when a backend starts '
-                                                         'before PostgreSQL can accept '
-                                                         'connections.\n'
-                                                         '\n'
-                                                         'The failure may look random. The first '
-                                                         'docker compose up fails, but a restart '
-                                                         'works. Nothing changed except time, '
-                                                         'which is the strongest clue that '
-                                                         'readiness was assumed instead of '
-                                                         'verified.\n'
-                                                         '\n'
-                                                         'This topic matters because race '
-                                                         'conditions destroy trust in the '
-                                                         'development environment. Developers '
-                                                         'start rerunning commands instead of '
-                                                         'understanding failures.\n'
-                                                         '\n'
-                                                         'It also matters in CI. Automated jobs '
-                                                         'are less forgiving than humans, and '
-                                                         'slower runners often expose startup '
-                                                         'assumptions that fast laptops hide.\n'
-                                                         '\n'
-                                                         'In production-style systems, startup '
-                                                         'races can turn into deployment '
-                                                         'incidents. A service may announce '
-                                                         'readiness before migrations, '
-                                                         'dependencies, or caches are actually '
-                                                         'prepared.\n'
-                                                         '\n'
-                                                         'The real lesson is that container '
-                                                         'orchestration cannot guess every '
-                                                         'application requirement. The app must '
-                                                         'define what must be true before it '
-                                                         'starts accepting work.'},
-                                             {'type': 'concept',
-                                              'title': 'Startup order is not readiness',
-                                              'content': 'Startup order is not readiness. Compose '
-                                                         'can start one container before another, '
-                                                         'but it does not automatically know when '
-                                                         'the application inside a container is '
-                                                         'ready.\n'
-                                                         '\n'
-                                                         'depends_on expresses a structural '
-                                                         'dependency. It can say the backend '
-                                                         'should start after the database '
-                                                         'container starts, but container start '
-                                                         'does not mean PostgreSQL can run '
-                                                         'migrations.\n'
-                                                         '\n'
-                                                         'Readiness is application-specific. For '
-                                                         'one service, readiness might mean an '
-                                                         'HTTP port is open. For another, it might '
-                                                         'mean a database connection, a completed '
-                                                         'migration, or a warmed cache.\n'
-                                                         '\n'
-                                                         'This concept is used whenever a service '
-                                                         'performs startup work before serving. '
-                                                         'Databases, queues, caches, object '
-                                                         'storage emulators, and internal APIs can '
-                                                         'all have delayed readiness.\n'
-                                                         '\n'
-                                                         'The fix is not always one tool. '
-                                                         'Healthchecks, startup scripts, migration '
-                                                         'ownership, application retries, and '
-                                                         'readiness endpoints each solve part of '
-                                                         'the problem.\n'
-                                                         '\n'
-                                                         'A helpful mental model is to ask what '
-                                                         'has actually been proven. Starting a '
-                                                         'container proves Docker launched a '
-                                                         'process. Running a migration proves much '
-                                                         'more about the database path.\n'
-                                                         '\n'
-                                                         'Reliable startup design means choosing '
-                                                         'the proof that matches the risk. If '
-                                                         'schema state matters before requests are '
-                                                         'served, prove schema setup before the '
-                                                         'server announces readiness.'},
-                                             {'type': 'deep_dive',
-                                              'title': 'Layered startup reliability',
-                                              'content': 'A mature startup sequence has layers. '
-                                                         'Compose defines services and '
-                                                         'relationships. Healthchecks expose basic '
-                                                         'service state. Startup scripts wait for '
-                                                         'required operations. The application '
-                                                         'exposes readiness only after '
-                                                         'initialization succeeds.\n'
-                                                         '\n'
-                                                         'Consider database migrations. A backend '
-                                                         'may need to resolve the database '
-                                                         'hostname, authenticate, select the '
-                                                         'correct database, inspect the migration '
-                                                         'table, acquire locks, apply schema '
-                                                         'changes, and then start serving HTTP.\n'
-                                                         '\n'
-                                                         'Checking only that port 5432 is open '
-                                                         'proves very little. It does not prove '
-                                                         'credentials, database name, migration '
-                                                         'history, or migration safety.\n'
-                                                         '\n'
-                                                         'Retrying the real migration command '
-                                                         'proves much more, but it must be '
-                                                         'bounded. Infinite retry loops hide '
-                                                         'broken configuration and can make '
-                                                         'deployments appear stuck instead of '
-                                                         'failed.\n'
-                                                         '\n'
-                                                         'Multiple replicas create another edge '
-                                                         'case. If every backend container runs '
-                                                         'migrations at startup, they may compete '
-                                                         'or corrupt assumptions. Production '
-                                                         'systems often move migrations to one '
-                                                         'release step or job.\n'
-                                                         '\n'
-                                                         'Healthchecks can also be misleading. A '
-                                                         'database can pass pg_isready before a '
-                                                         'specific database extension or schema is '
-                                                         'available. A backend can pass liveness '
-                                                         'while still not ready for traffic.\n'
-                                                         '\n'
-                                                         'Old volumes add another failure mode. '
-                                                         'The database may be ready but contain '
-                                                         'schema state from an earlier branch, '
-                                                         'causing migrations or application '
-                                                         'queries to fail.\n'
-                                                         '\n'
-                                                         'Debugging proceeds step by step: '
-                                                         'identify the first failed operation, '
-                                                         'check whether startup order or readiness '
-                                                         'was assumed, inspect logs, reproduce '
-                                                         'slow startup, and add explicit proof '
-                                                         'where the system relied on timing.'},
-                                             {'type': 'example',
-                                              'title': 'Bounded retry before serving',
-                                              'content': 'A bounded startup script can retry '
-                                                         'migrations before serving:\n'
-                                                         '\n'
-                                                         '#!/bin/sh\n'
-                                                         'set -e\n'
-                                                         '\n'
-                                                         'attempt=1\n'
-                                                         'max_attempts=30\n'
-                                                         '\n'
-                                                         'until alembic upgrade head; do\n'
-                                                         '  if [ "$attempt" -ge "$max_attempts" ]; '
-                                                         'then\n'
-                                                         '    echo "Database never became ready '
-                                                         'for migrations"\n'
-                                                         '    exit 1\n'
-                                                         '  fi\n'
-                                                         '  echo "Migration attempt $attempt '
-                                                         'failed; retrying in 2 seconds"\n'
-                                                         '  attempt=$((attempt + 1))\n'
-                                                         '  sleep 2\n'
-                                                         'done\n'
-                                                         '\n'
-                                                         'exec uvicorn app.main:app --host 0.0.0.0 '
-                                                         '--port 8000\n'
-                                                         '\n'
-                                                         'set -e stops the script on unexpected '
-                                                         'failures outside the retry loop. The '
-                                                         'loop retries the real dependency '
-                                                         'operation with a maximum attempt count.\n'
-                                                         '\n'
-                                                         'The final exec replaces the shell with '
-                                                         'Uvicorn so container stop signals reach '
-                                                         'the server process. The expected '
-                                                         'behavior is patient startup during '
-                                                         'normal database initialization and clear '
-                                                         'failure when the dependency never '
-                                                         'becomes usable.'},
-                                             {'type': 'checklist',
-                                              'title': 'Race-condition checklist',
-                                              'content': '- Identify the first operation that '
-                                                         'fails: DNS, TCP connection, '
-                                                         'authentication, migration lock, schema '
-                                                         'query, or app import.\n'
-                                                         '- Replace fixed sleeps with readiness '
-                                                         'checks or retries tied to real '
-                                                         'dependency behavior.\n'
-                                                         '- Add a maximum retry budget so broken '
-                                                         'configuration does not loop forever.\n'
-                                                         '- Include attempt count, target service, '
-                                                         'and failing operation in startup logs.\n'
-                                                         '- Decide whether migrations are safe to '
-                                                         'run from every container or need one '
-                                                         'owner.\n'
-                                                         '- Expose backend readiness only after '
-                                                         'required startup work has completed.\n'
-                                                         '- Test slow database startup '
-                                                         'intentionally so the race is reproduced '
-                                                         'under controlled conditions.'},
-                                             {'type': 'practice',
-                                              'title': 'Practice 1 - Diagnose',
-                                              'difficulty': 'hard',
-                                              'content': 'A FastAPI container crashes on alembic '
-                                                         'upgrade head during docker compose up, '
-                                                         'but succeeds when restarted. Explain why '
-                                                         'this is a startup race and identify '
-                                                         'which logs you would inspect first.'},
-                                             {'type': 'practice',
-                                              'title': 'Practice 2 - Fix',
-                                              'difficulty': 'hard',
-                                              'content': 'Design a bounded retry startup flow for '
-                                                         'a backend that must run migrations '
-                                                         'before serving traffic. Include how it '
-                                                         'should log and how it should fail.'},
-                                             {'type': 'practice',
-                                              'title': 'Practice 3 - Production hardening',
-                                              'difficulty': 'production',
-                                              'content': 'Explain how the design changes when the '
-                                                         'backend runs multiple replicas and '
-                                                         'migrations should not be executed '
-                                                         'concurrently by every container.'},
-                                             {'type': 'summary',
-                                              'title': 'Summary',
-                                              'content': '- Startup races often look random '
-                                                         'because timing changes between restarts '
-                                                         'and machines.\n'
-                                                         '- Container startup order does not prove '
-                                                         'application readiness.\n'
-                                                         '- Retrying the real startup operation is '
-                                                         'usually stronger than checking an open '
-                                                         'port.\n'
-                                                         '- Retry loops must have deadlines and '
-                                                         'useful logs.\n'
-                                                         '- Multi-replica deployments need a clear '
-                                                         'migration ownership strategy.\n'
-                                                         '- Reliable startup is layered across '
-                                                         'Compose configuration, dependency '
-                                                         'health, startup scripts, app readiness, '
-                                                         'and monitoring.'}]},
- 'docker_production_hardening': {'lesson_id': 'docker_production_hardening',
-                                 'course_id': 'docker',
-                                 'title': 'Docker Production Hardening',
-                                 'difficulty': 'production',
-                                 'steps': [{'type': 'intro',
-                                            'title': 'From runnable to dependable',
-                                            'content': 'A container that runs locally is not '
-                                                       'automatically ready for production. Local '
-                                                       'setups often optimize for speed and '
-                                                       'convenience, while production needs '
-                                                       'safety, observability, and predictable '
-                                                       'recovery.\n'
-                                                       '\n'
-                                                       'Production hardening is the process of '
-                                                       'reducing avoidable risk in the image, '
-                                                       'runtime configuration, process behavior, '
-                                                       'and operational signals.\n'
-                                                       '\n'
-                                                       'This matters because containers can make '
-                                                       'deployment feel deceptively simple. The '
-                                                       'same abstraction that hides local setup '
-                                                       'complexity can also hide root users, '
-                                                       'copied secrets, missing healthchecks, and '
-                                                       'poor shutdown behavior.\n'
-                                                       '\n'
-                                                       'Real systems fail in ordinary ways. A '
-                                                       'dependency vulnerability appears. A '
-                                                       'container restarts during traffic. A '
-                                                       'secret is accidentally copied into an '
-                                                       'image. Logs disappear because they were '
-                                                       'written to an internal file.\n'
-                                                       '\n'
-                                                       'Hardening does not mean making the '
-                                                       'container perfect. It means making the '
-                                                       'most common and expensive failure modes '
-                                                       'less likely, easier to detect, and easier '
-                                                       'to recover from.\n'
-                                                       '\n'
-                                                       'The practical outcome is a service that '
-                                                       'can be rebuilt, deployed, stopped, '
-                                                       'observed, and reviewed with confidence. '
-                                                       'Production Docker is operational '
-                                                       'engineering, not just packaging.'},
-                                           {'type': 'concept',
-                                            'title': 'Hardening reduces blast radius',
-                                            'content': 'The core concept is blast-radius '
-                                                       'reduction. If the service fails or is '
-                                                       'compromised, the container should expose '
-                                                       'as little as possible and recover as '
-                                                       'predictably as possible.\n'
-                                                       '\n'
-                                                       'Running as a non-root user reduces the '
-                                                       'impact of application compromise. Keeping '
-                                                       'secrets out of images reduces the damage '
-                                                       'if an image is shared or leaked.\n'
-                                                       '\n'
-                                                       'Small runtime images reduce unnecessary '
-                                                       'tools and packages. This can reduce '
-                                                       'vulnerability surface and make image '
-                                                       'scanning easier to understand.\n'
-                                                       '\n'
-                                                       'Explicit configuration reduces surprises. '
-                                                       'The service should not depend on a '
-                                                       "developer's local files, hidden "
-                                                       'environment variables, or bind mounts that '
-                                                       'do not exist in deployment.\n'
-                                                       '\n'
-                                                       'Hardening is used during release '
-                                                       'preparation, security review, platform '
-                                                       'migration, and incident response. It gives '
-                                                       'teams concrete questions to ask before the '
-                                                       'service reaches users.\n'
-                                                       '\n'
-                                                       'The concept also improves debugging. When '
-                                                       'logs go to stdout, healthchecks are '
-                                                       'meaningful, and shutdown is graceful, '
-                                                       'operators can understand the service '
-                                                       'without entering the container.\n'
-                                                       '\n'
-                                                       'Good hardening is continuous. Base images '
-                                                       'age, dependencies change, threat models '
-                                                       'evolve, and deployment platforms impose '
-                                                       'new constraints. The review has to '
-                                                       'repeat.'},
-                                           {'type': 'deep_dive',
-                                            'title': 'Operational details that matter',
-                                            'content': 'Production Docker behavior depends on many '
-                                                       'small technical choices. The base image '
-                                                       'determines available packages, default '
-                                                       'users, update cadence, and vulnerability '
-                                                       'surface.\n'
-                                                       '\n'
-                                                       'The build process determines what enters '
-                                                       'the final image. If test files, local '
-                                                       'secrets, virtual environments, or build '
-                                                       'tools are copied accidentally, the runtime '
-                                                       'image carries unnecessary risk.\n'
-                                                       '\n'
-                                                       'User permissions matter. A process running '
-                                                       'as root has more power inside the '
-                                                       'container than most web services need. A '
-                                                       'non-root user limits damage if the process '
-                                                       'is exploited.\n'
-                                                       '\n'
-                                                       'Signal handling matters too. Containers '
-                                                       'are stopped with signals. If the app or '
-                                                       'shell wrapper does not pass SIGTERM '
-                                                       'correctly, the platform may kill the '
-                                                       'service before it finishes in-flight '
-                                                       'work.\n'
-                                                       '\n'
-                                                       'Logging should usually go to stdout or '
-                                                       'stderr so the platform can collect it. '
-                                                       'Logs written only to files inside the '
-                                                       'container may disappear when the container '
-                                                       'is recreated.\n'
-                                                       '\n'
-                                                       'Health and readiness signals need to '
-                                                       'represent real service state. A container '
-                                                       'that is alive but cannot reach required '
-                                                       'dependencies should not receive user '
-                                                       'traffic.\n'
-                                                       '\n'
-                                                       'Secrets should be injected by the runtime '
-                                                       'environment, not baked into the Dockerfile '
-                                                       'or committed compose files. Baked secrets '
-                                                       'are hard to rotate and easy to leak.\n'
-                                                       '\n'
-                                                       'Edge cases include cached vulnerable '
-                                                       'layers, multi-stage builds that still copy '
-                                                       'build artifacts into runtime images, and '
-                                                       'environment drift between staging and '
-                                                       'production. Hardening is the discipline of '
-                                                       'finding these issues before an incident.'},
-                                           {'type': 'example',
-                                            'title': 'A more production-minded Dockerfile',
-                                            'content': 'A more production-minded Dockerfile might '
-                                                       'look like this:\n'
-                                                       '\n'
-                                                       'FROM python:3.12-slim AS runtime\n'
-                                                       'ENV PYTHONDONTWRITEBYTECODE=1     '
-                                                       'PYTHONUNBUFFERED=1\n'
-                                                       'WORKDIR /app\n'
-                                                       'RUN adduser --disabled-password --gecos "" '
-                                                       'appuser\n'
-                                                       'COPY requirements.txt .\n'
-                                                       'RUN pip install --no-cache-dir -r '
-                                                       'requirements.txt\n'
-                                                       'COPY . .\n'
-                                                       'USER appuser\n'
-                                                       'CMD ["uvicorn", "app.main:app", "--host", '
-                                                       '"0.0.0.0", "--port", "8000"]\n'
-                                                       '\n'
-                                                       'The slim base limits unnecessary packages. '
-                                                       'PYTHONUNBUFFERED makes logs appear '
-                                                       'promptly in container output. The non-root '
-                                                       'user reduces privilege.\n'
-                                                       '\n'
-                                                       'Dependency installation happens before '
-                                                       'source copy to preserve build caching. '
-                                                       'USER appuser ensures the server runs '
-                                                       'without root privileges.\n'
-                                                       '\n'
-                                                       'The expected behavior is not merely that '
-                                                       'the API starts. The expected behavior is '
-                                                       'that it starts with clearer runtime '
-                                                       'assumptions, fewer privileges, and logs '
-                                                       'that the platform can collect. A release '
-                                                       'pipeline should also scan the final image '
-                                                       'and verify secrets are not copied into '
-                                                       'it.'},
-                                           {'type': 'checklist',
-                                            'title': 'Production hardening checklist',
-                                            'content': '- Run the application as a non-root user '
-                                                       'unless there is a documented reason not '
-                                                       'to.\n'
-                                                       '- Keep secrets out of Dockerfiles, image '
-                                                       'layers, build logs, and committed compose '
-                                                       'files.\n'
-                                                       '- Use small runtime images and avoid '
-                                                       'copying build-only tools into production '
-                                                       'images.\n'
-                                                       '- Send logs to stdout or stderr so the '
-                                                       'deployment platform can collect them.\n'
-                                                       '- Add health and readiness checks that '
-                                                       'represent real service capability.\n'
-                                                       '- Verify the process handles shutdown '
-                                                       "signals within the platform's termination "
-                                                       'window.\n'
-                                                       '- Scan images and rebuild when base images '
-                                                       'or dependencies receive security fixes.\n'
-                                                       '- Check that the build context excludes '
-                                                       '.env files, local databases, virtual '
-                                                       'environments, and generated secrets.'},
-                                           {'type': 'practice',
-                                            'title': 'Practice 1 - Diagnose',
-                                            'difficulty': 'production',
-                                            'content': 'Review a Dockerfile that runs as root, '
-                                                       'copies .env into the image, and writes '
-                                                       'logs to /tmp/app.log. Identify the '
-                                                       'production risks and rank the most urgent '
-                                                       'fixes.'},
-                                           {'type': 'practice',
-                                            'title': 'Practice 2 - Fix',
-                                            'difficulty': 'production',
-                                            'content': 'Propose a hardened Dockerfile and runtime '
-                                                       'configuration for a FastAPI backend. '
-                                                       'Include user permissions, logging, '
-                                                       'secrets, and startup command choices.'},
-                                           {'type': 'practice',
-                                            'title': 'Practice 3 - Production hardening',
-                                            'difficulty': 'production',
-                                            'content': 'Design an operational review checklist for '
-                                                       'Docker images before release, including '
-                                                       'vulnerability scanning, healthchecks, '
-                                                       'rollback readiness, and secret handling.'},
-                                           {'type': 'summary',
-                                            'title': 'Summary',
-                                            'content': '- Production readiness includes image '
-                                                       'contents, runtime configuration, process '
-                                                       'lifecycle, and operational signals.\n'
-                                                       '- Least privilege reduces blast radius '
-                                                       'when something fails or is compromised.\n'
-                                                       '- Secrets should be injected at runtime '
-                                                       'rather than baked into images.\n'
-                                                       '- Logs, healthchecks, and graceful '
-                                                       'shutdown are reliability features, not '
-                                                       'decoration.\n'
-                                                       '- Image scanning and rebuild discipline '
-                                                       'matter because dependencies age.\n'
-                                                       '- Production Docker quality comes from '
-                                                       'repeated review as the app, platform, and '
-                                                       'threat model change.'}]}}
+LESSONS = {
+    "docker_basics": {
+        "lesson_id": "docker_basics",
+        "course_id": "docker",
+        "title": "Docker Basics",
+        "difficulty": "easy",
+        "steps": [
+            {
+                "type": "intro",
+                "title": "Why Docker matters",
+                "content": (
+                    "Docker helps teams run an app in a repeatable environment. Instead of asking "
+                    "every developer to install the same Python, Node, system packages, and startup "
+                    "tools by hand, the project can describe the runtime in a Dockerfile. This makes "
+                    "local setup, demos, CI, and production-like practice more predictable. Docker "
+                    "does not replace understanding your app, but it makes the runtime boundary "
+                    "clearer."
+                ),
+            },
+            {
+                "type": "concept",
+                "title": "Images and containers",
+                "content": (
+                    "An image is a reusable template. It contains the files, dependencies, and default "
+                    "command needed to start the app. A container is a running instance of that image. "
+                    "This separation is useful because the team can rebuild the image when dependencies "
+                    "change, then run containers from the same template. Build-time setup belongs in the "
+                    "image. Runtime configuration, such as database URLs and secrets, should usually be "
+                    "passed in when the container starts."
+                ),
+            },
+            {
+                "type": "example",
+                "title": "A small backend Dockerfile",
+                "content": (
+                    "A simple FastAPI image might use python:3.12-slim, set WORKDIR /app, copy "
+                    "requirements.txt, install dependencies, copy the app source, and run Uvicorn. "
+                    "Copying requirements first helps Docker cache dependency installation when only "
+                    "application code changes. The server should bind to 0.0.0.0 so traffic can reach it "
+                    "from outside the container. A production image should also consider non-root users, "
+                    "smaller images, secrets, and healthchecks."
+                ),
+            },
+            {
+                "type": "checklist",
+                "title": "Docker basics checklist",
+                "content": (
+                    "- Know whether you are debugging image build or container startup.\n"
+                    "- Keep dependency installation separate from source copy when possible.\n"
+                    "- Pass environment-specific values at runtime.\n"
+                    "- Use volumes only for data that must survive container recreation.\n"
+                    "- Bind web apps to 0.0.0.0 inside the container.\n"
+                    "- Read container logs before rebuilding."
+                ),
+            },
+            {
+                "type": "practice",
+                "title": "Practice - Explain the runtime boundary",
+                "difficulty": "easy",
+                "content": (
+                    "Explain to a teammate what Docker makes repeatable for a backend app and what it "
+                    "does not automatically solve."
+                ),
+            },
+            {
+                "type": "summary",
+                "title": "Summary",
+                "content": (
+                    "- Images are templates; containers are running instances.\n"
+                    "- Docker makes runtime setup easier to share.\n"
+                    "- Runtime config should usually stay outside the image.\n"
+                    "- Container files are disposable unless stored in a volume.\n"
+                    "- Docker helps reproducibility, not application design by itself."
+                ),
+            },
+        ],
+    },
+    "docker_compose_basics": {
+        "lesson_id": "docker_compose_basics",
+        "course_id": "docker",
+        "title": "Docker Compose Basics",
+        "difficulty": "easy",
+        "steps": [
+            {
+                "type": "intro",
+                "title": "Why Compose exists",
+                "content": (
+                    "Most fullstack apps need more than one process. You may have a React frontend, a "
+                    "FastAPI backend, PostgreSQL, and migrations. Docker Compose lets you describe those "
+                    "services in one file so a developer can start the stack consistently. It turns setup "
+                    "instructions into runnable configuration."
+                ),
+            },
+            {
+                "type": "concept",
+                "title": "Services, networks, and volumes",
+                "content": (
+                    "A Compose service is one role in the system, such as backend, frontend, or db. "
+                    "Compose creates a network where services can reach each other by service name. That "
+                    "means a backend container should connect to PostgreSQL with host db, not localhost. "
+                    "Ports expose services to your host machine. Volumes store data outside the container "
+                    "so it can survive recreation."
+                ),
+            },
+            {
+                "type": "example",
+                "title": "A small API stack",
+                "content": (
+                    "A local stack might define backend and db services. The backend builds from "
+                    "./backend, publishes 8000:8000, and gets DATABASE_URL set to "
+                    "postgresql://postgres:postgres@db:5432/app. The db service uses the postgres image "
+                    "and stores files in a named volume. The important detail is the hostname: db works "
+                    "inside the Compose network because it is the service name."
+                ),
+            },
+            {
+                "type": "checklist",
+                "title": "Compose checklist",
+                "content": (
+                    "- Name services by role.\n"
+                    "- Use service names for container-to-container connections.\n"
+                    "- Publish only ports needed from the host.\n"
+                    "- Use named volumes for persistent database data.\n"
+                    "- Keep required environment variables explicit.\n"
+                    "- Add healthchecks or retry logic for dependencies."
+                ),
+            },
+            {
+                "type": "practice",
+                "title": "Practice - Design a local stack",
+                "difficulty": "easy",
+                "content": (
+                    "Sketch a Compose setup for React, FastAPI, and PostgreSQL. Name the services, ports, "
+                    "volume, and backend database hostname."
+                ),
+            },
+            {
+                "type": "summary",
+                "title": "Summary",
+                "content": (
+                    "- Compose runs a multi-service app from one file.\n"
+                    "- Services communicate by service name.\n"
+                    "- Host ports are separate from internal networking.\n"
+                    "- Volumes preserve state.\n"
+                    "- Startup order is not the same as readiness."
+                ),
+            },
+        ],
+    },
+    "postgres_container_not_ready": {
+        "lesson_id": "postgres_container_not_ready",
+        "course_id": "docker",
+        "title": "Postgres Container Not Ready",
+        "difficulty": "medium",
+        "steps": [
+            {
+                "type": "intro",
+                "title": "Running is not ready",
+                "content": (
+                    "A PostgreSQL container can be running before PostgreSQL is ready for your app. The "
+                    "backend may fail on first startup, then work after a restart. That usually means the "
+                    "app depended on timing instead of readiness. Reliable setups check whether the "
+                    "database can accept the real connection the backend needs."
+                ),
+            },
+            {
+                "type": "concept",
+                "title": "Readiness means useful work can happen",
+                "content": (
+                    "Database readiness means more than an open port. The backend must resolve the host, "
+                    "connect, authenticate, select the right database, and often run migrations. A good "
+                    "startup flow retries expected temporary failures but stops after a clear deadline. "
+                    "This keeps slow startup from becoming random failure while still exposing bad "
+                    "credentials or broken migrations."
+                ),
+            },
+            {
+                "type": "example",
+                "title": "Check the same database the app uses",
+                "content": (
+                    "A useful check is pg_isready -h db -U postgres -d app. The host db is the Compose "
+                    "service name. The user and database should match the backend connection string. If "
+                    "the backend must run migrations before serving, retry alembic upgrade head with a "
+                    "maximum attempt count, then start Uvicorn only after migrations succeed."
+                ),
+            },
+            {
+                "type": "checklist",
+                "title": "Postgres readiness checklist",
+                "content": (
+                    "- Read the exact connection error.\n"
+                    "- Use the Compose service name, not localhost.\n"
+                    "- Match POSTGRES_DB, POSTGRES_USER, and DATABASE_URL.\n"
+                    "- Check Postgres logs during first startup.\n"
+                    "- Remember old volumes may keep old state.\n"
+                    "- Use bounded retries, not fixed sleeps."
+                ),
+            },
+            {
+                "type": "practice",
+                "title": "Practice - Diagnose first-start failure",
+                "difficulty": "medium",
+                "content": (
+                    "A backend fails with connection refused on first compose up but works after restart. "
+                    "Explain why this points to readiness and list the first three checks you would make."
+                ),
+            },
+            {
+                "type": "summary",
+                "title": "Summary",
+                "content": (
+                    "- A running container is not always a ready database.\n"
+                    "- Readiness should test the real app connection.\n"
+                    "- Fixed sleeps are fragile.\n"
+                    "- Volumes can preserve old database state.\n"
+                    "- Retry startup work with a clear deadline."
+                ),
+            },
+        ],
+    },
+    "docker_healthcheck_missing": {
+        "lesson_id": "docker_healthcheck_missing",
+        "course_id": "docker",
+        "title": "Docker Healthcheck Missing",
+        "difficulty": "medium",
+        "steps": [
+            {
+                "type": "intro",
+                "title": "Why healthchecks help",
+                "content": (
+                    "Docker can show that a container process is running, but that does not prove the "
+                    "service is usable. A backend might be alive while the database connection is broken. "
+                    "A healthcheck adds a small repeated test so developers and tools can see whether the "
+                    "service is healthy."
+                ),
+            },
+            {
+                "type": "concept",
+                "title": "A healthcheck is a service promise",
+                "content": (
+                    "A healthcheck is a command that exits successfully when the service passes a basic "
+                    "self-test. For Postgres, that may be pg_isready. For FastAPI, it may be a /health "
+                    "endpoint. The check should be cheap, reliable, and close to what other services need. "
+                    "It should not depend on unrelated external systems unless the app truly cannot work "
+                    "without them."
+                ),
+            },
+            {
+                "type": "example",
+                "title": "Backend and database checks",
+                "content": (
+                    "A Postgres healthcheck can run pg_isready -U postgres -d app. A backend healthcheck "
+                    "can call http://localhost:8000/health from inside the container. The database check "
+                    "proves Postgres accepts connections. The backend check proves the API process can "
+                    "respond. These checks help debugging, but the app still needs runtime error handling."
+                ),
+            },
+            {
+                "type": "checklist",
+                "title": "Healthcheck checklist",
+                "content": (
+                    "- Check useful service behavior, not only process existence.\n"
+                    "- Use commands available inside the image.\n"
+                    "- Set a start period for slow services.\n"
+                    "- Keep checks cheap and local.\n"
+                    "- Test failure paths intentionally.\n"
+                    "- Pair healthchecks with app-level retries."
+                ),
+            },
+            {
+                "type": "practice",
+                "title": "Practice - Pick health signals",
+                "difficulty": "medium",
+                "content": (
+                    "Choose one healthcheck for PostgreSQL and one for a FastAPI backend. Explain what "
+                    "each check proves and what it does not prove."
+                ),
+            },
+            {
+                "type": "summary",
+                "title": "Summary",
+                "content": (
+                    "- Running is not the same as healthy.\n"
+                    "- Healthchecks make service state visible.\n"
+                    "- Good checks are cheap and meaningful.\n"
+                    "- Timing settings reduce noise during startup.\n"
+                    "- Healthchecks do not replace error handling."
+                ),
+            },
+        ],
+    },
+    "docker_startup_race_condition": {
+        "lesson_id": "docker_startup_race_condition",
+        "course_id": "docker",
+        "title": "Docker Compose Startup Race Condition",
+        "difficulty": "hard",
+        "steps": [
+            {
+                "type": "intro",
+                "title": "Timing bugs in local stacks",
+                "content": (
+                    "A startup race happens when one service starts work before another service is ready. "
+                    "In Compose, the backend may run migrations before Postgres accepts connections. If a "
+                    "restart fixes the issue, the system probably relied on timing instead of an explicit "
+                    "readiness rule."
+                ),
+            },
+            {
+                "type": "concept",
+                "title": "Startup order is not readiness",
+                "content": (
+                    "depends_on can express that the backend should start after the database container, "
+                    "but it does not prove the database can run queries or migrations. Readiness is "
+                    "application-specific. A safe backend startup should wait for the real operation it "
+                    "needs, such as a migration, and fail clearly if that operation never succeeds."
+                ),
+            },
+            {
+                "type": "example",
+                "title": "Bounded retry before serving",
+                "content": (
+                    "A startup script can retry alembic upgrade head before starting Uvicorn. It should "
+                    "log each failed attempt, sleep briefly, and stop after a maximum number of attempts. "
+                    "After migrations succeed, it can exec uvicorn so the server receives shutdown signals "
+                    "properly. This makes normal slow startup safe without hiding permanent failures."
+                ),
+            },
+            {
+                "type": "checklist",
+                "title": "Race-condition checklist",
+                "content": (
+                    "- Identify the first operation that fails.\n"
+                    "- Replace fixed sleeps with readiness checks or retries.\n"
+                    "- Retry the real startup operation when possible.\n"
+                    "- Add a maximum retry budget.\n"
+                    "- Log attempt count and failing operation.\n"
+                    "- Decide who owns migrations in multi-replica deployments."
+                ),
+            },
+            {
+                "type": "practice",
+                "title": "Practice - Design startup retry",
+                "difficulty": "hard",
+                "content": (
+                    "Design a bounded retry flow for a backend that must run migrations before serving "
+                    "traffic. Include what it logs and when it exits."
+                ),
+            },
+            {
+                "type": "summary",
+                "title": "Summary",
+                "content": (
+                    "- Startup order does not prove readiness.\n"
+                    "- Race conditions often look random.\n"
+                    "- Retry real dependency operations, not arbitrary sleeps.\n"
+                    "- Retry loops need deadlines.\n"
+                    "- Migrations need clear ownership when services scale."
+                ),
+            },
+        ],
+    },
+    "docker_production_hardening": {
+        "lesson_id": "docker_production_hardening",
+        "course_id": "docker",
+        "title": "Docker Production Hardening",
+        "difficulty": "production",
+        "steps": [
+            {
+                "type": "intro",
+                "title": "From runnable to safer",
+                "content": (
+                    "A container that runs locally is not automatically production-ready. Production "
+                    "hardening reduces avoidable risk in the image, runtime configuration, process "
+                    "permissions, logging, health signals, and shutdown behavior. The goal is not "
+                    "perfection. The goal is a service that is easier to operate and safer when something "
+                    "goes wrong."
+                ),
+            },
+            {
+                "type": "concept",
+                "title": "Reduce blast radius",
+                "content": (
+                    "Hardening means limiting what the container can access and making behavior explicit. "
+                    "Run as a non-root user when possible. Keep secrets out of images and source control. "
+                    "Use small runtime images. Send logs to stdout or stderr. Expose health and readiness "
+                    "signals. These choices reduce damage if the app fails or is compromised and make "
+                    "operations easier to debug."
+                ),
+            },
+            {
+                "type": "example",
+                "title": "A more production-minded image",
+                "content": (
+                    "A production-minded Python image may use python:3.12-slim, set PYTHONUNBUFFERED=1, "
+                    "install dependencies without cache, copy only needed files, create an app user, and "
+                    "run Uvicorn as that user. The image should not copy .env files or local data. A "
+                    "release process should scan the final image and rebuild when base images or "
+                    "dependencies receive security fixes."
+                ),
+            },
+            {
+                "type": "checklist",
+                "title": "Production hardening checklist",
+                "content": (
+                    "- Run the app as non-root when possible.\n"
+                    "- Keep secrets out of images and build logs.\n"
+                    "- Use small runtime images.\n"
+                    "- Log to stdout or stderr.\n"
+                    "- Add useful health and readiness checks.\n"
+                    "- Verify graceful shutdown."
+                ),
+            },
+            {
+                "type": "practice",
+                "title": "Practice - Review a Dockerfile",
+                "difficulty": "production",
+                "content": (
+                    "Review a Dockerfile that runs as root, copies .env, and writes logs to a file inside "
+                    "the container. List the risks and the first fixes you would make."
+                ),
+            },
+            {
+                "type": "summary",
+                "title": "Summary",
+                "content": (
+                    "- Local success is not production readiness.\n"
+                    "- Least privilege reduces risk.\n"
+                    "- Secrets belong in runtime configuration, not images.\n"
+                    "- Logs and healthchecks support operations.\n"
+                    "- Images need regular review and rebuilds."
+                ),
+            },
+        ],
+    },
+}
 
 
 def get_lesson(lesson_id: str) -> dict | None:

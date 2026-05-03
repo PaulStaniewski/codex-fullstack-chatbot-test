@@ -1,3 +1,5 @@
+from app import models
+from app.database import get_db
 from app.routes import auth_routes
 
 
@@ -48,7 +50,81 @@ def test_refresh_access_token(client):
     body = refresh_response.json()
     assert body["access_token"]
     assert body["token_type"] == "bearer"
-    assert body.get("refresh_token") is None
+    assert body["refresh_token"]
+    assert body["refresh_token"] != refresh_token
+
+
+def test_login_creates_refresh_session(client):
+    client.post(
+        "/register",
+        json={"email": "session@example.com", "password": "password123"},
+    )
+
+    response = client.post(
+        "/login",
+        json={"email": "session@example.com", "password": "password123"},
+    )
+    refresh_token = response.json()["refresh_token"]
+
+    db = next(client.app.dependency_overrides[get_db]())
+    try:
+        sessions = db.query(models.RefreshSession).all()
+    finally:
+        db.close()
+
+    assert response.status_code == 200
+    assert len(sessions) == 1
+    assert sessions[0].token_hash
+    assert sessions[0].token_hash != refresh_token
+    assert sessions[0].revoked_at is None
+
+
+def test_refresh_rotates_token_and_revokes_old_session(client):
+    client.post(
+        "/register",
+        json={"email": "rotate@example.com", "password": "password123"},
+    )
+    login_response = client.post(
+        "/login",
+        json={"email": "rotate@example.com", "password": "password123"},
+    )
+    old_refresh_token = login_response.json()["refresh_token"]
+
+    refresh_response = client.post("/refresh", json={"refresh_token": old_refresh_token})
+    new_refresh_token = refresh_response.json()["refresh_token"]
+
+    db = next(client.app.dependency_overrides[get_db]())
+    try:
+        sessions = db.query(models.RefreshSession).order_by(models.RefreshSession.created_at.asc()).all()
+    finally:
+        db.close()
+
+    assert refresh_response.status_code == 200
+    assert new_refresh_token
+    assert new_refresh_token != old_refresh_token
+    assert len(sessions) == 2
+    assert sessions[0].revoked_at is not None
+    assert sessions[0].replaced_by_session_id == sessions[1].id
+    assert sessions[1].revoked_at is None
+
+
+def test_old_refresh_token_cannot_be_reused_after_rotation(client):
+    client.post(
+        "/register",
+        json={"email": "reuse@example.com", "password": "password123"},
+    )
+    login_response = client.post(
+        "/login",
+        json={"email": "reuse@example.com", "password": "password123"},
+    )
+    old_refresh_token = login_response.json()["refresh_token"]
+
+    first_refresh = client.post("/refresh", json={"refresh_token": old_refresh_token})
+    second_refresh = client.post("/refresh", json={"refresh_token": old_refresh_token})
+
+    assert first_refresh.status_code == 200
+    assert second_refresh.status_code == 401
+    assert second_refresh.json()["detail"] == "Could not validate credentials"
 
 
 def test_refresh_rejects_access_token(client):
@@ -104,6 +180,49 @@ def test_logout_user(client):
 
     assert response.status_code == 200
     assert response.json() == {"success": True}
+
+
+def test_logout_revokes_refresh_session(client):
+    client.post(
+        "/register",
+        json={"email": "logout-session@example.com", "password": "password1234"},
+    )
+    login_response = client.post(
+        "/login",
+        json={"email": "logout-session@example.com", "password": "password1234"},
+    )
+    token = login_response.json()["access_token"]
+
+    response = client.post("/logout", headers={"Authorization": f"Bearer {token}"})
+
+    db = next(client.app.dependency_overrides[get_db]())
+    try:
+        session = db.query(models.RefreshSession).one()
+    finally:
+        db.close()
+
+    assert response.status_code == 200
+    assert session.revoked_at is not None
+
+
+def test_revoked_refresh_token_cannot_refresh_after_logout(client):
+    client.post(
+        "/register",
+        json={"email": "logout-refresh@example.com", "password": "password1234"},
+    )
+    login_response = client.post(
+        "/login",
+        json={"email": "logout-refresh@example.com", "password": "password1234"},
+    )
+    access_token = login_response.json()["access_token"]
+    refresh_token = login_response.json()["refresh_token"]
+
+    logout_response = client.post("/logout", headers={"Authorization": f"Bearer {access_token}"})
+    refresh_response = client.post("/refresh", json={"refresh_token": refresh_token})
+
+    assert logout_response.status_code == 200
+    assert refresh_response.status_code == 401
+    assert refresh_response.json()["detail"] == "Could not validate credentials"
 
 
 def test_logout_requires_authentication(client):

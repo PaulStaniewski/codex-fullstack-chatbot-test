@@ -197,8 +197,8 @@ GitHub Actions CI runs both backend tests and the frontend production build on p
 | --- | --- | --- |
 | `POST` | `/register` | Create user account |
 | `POST` | `/login` | Return JWT access + refresh tokens |
-| `POST` | `/refresh` | Exchange refresh token for a new access token |
-| `POST` | `/logout` | Validate current token and return success (stateless logout contract) |
+| `POST` | `/refresh` | Rotate refresh token and return new access + refresh tokens |
+| `POST` | `/logout` | Revoke the current refresh session and return success |
 
 ### Health
 
@@ -238,9 +238,9 @@ Most endpoints use `Authorization: Bearer <token>`. The streaming endpoint accep
 2. User logs in and receives a JWT access token and refresh token.
 3. Frontend stores both tokens in `localStorage`.
 4. Protected REST requests send `Authorization: Bearer <access_token>`.
-5. If an access token expires, the frontend calls `/refresh` once and retries the original request.
+5. If an access token expires, the frontend calls `/refresh` once, receives a rotated refresh token, and retries the original request.
 6. Frontend logout clears tokens, selected conversation, and local UI state.
-7. `POST /logout` validates the token and returns success, but does not revoke JWTs yet because auth is currently stateless access-token-only.
+7. `POST /logout` validates the access token and revokes the matching server-side refresh session.
 
 ### SSE Streaming Flow
 
@@ -271,14 +271,12 @@ The endpoint also rejects messages over 2000 characters before persistence or Op
 - Rate limiting is not shared across multiple backend replicas.
 - `EventSource` sends the JWT in the query string because custom headers are not supported.
 - The frontend uses simple `prompt()` / `confirm()` dialogs for conversation rename/delete.
-- No refresh token flow is implemented.
 - No frontend test suite is included.
 - OpenAI errors are intentionally hidden from the user behind safe generic messages.
 
 ## Next Improvements
 
 - Replace in-memory rate limiting with Redis.
-- Add refresh tokens and token rotation.
 - Add frontend tests with Playwright or Testing Library.
 - Add markdown rendering and code block formatting.
 - Add model selection and system prompt configuration.

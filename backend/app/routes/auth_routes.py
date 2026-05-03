@@ -98,16 +98,22 @@ def login_user(
         )
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
     _clear_failed_login_attempts(client_ip)
+    refresh_token, refresh_session = auth.create_refresh_session(db, user.id)
+    db.commit()
     return schemas.Token(
-        access_token=auth.create_access_token(str(user.id)),
-        refresh_token=auth.create_refresh_token(str(user.id)),
+        access_token=auth.create_access_token(str(user.id), session_id=refresh_session.id),
+        refresh_token=refresh_token,
     )
 
 
 @router.post("/refresh", response_model=schemas.Token)
-def refresh_access_token(refresh_in: schemas.RefreshRequest):
-    user_id = auth.get_subject_from_token(refresh_in.refresh_token, expected_type="refresh")
-    return schemas.Token(access_token=auth.create_access_token(user_id))
+def refresh_access_token(refresh_in: schemas.RefreshRequest, db: Session = Depends(get_db)):
+    access_token, refresh_token, _refresh_session = auth.rotate_refresh_session(
+        db,
+        refresh_in.refresh_token,
+    )
+    db.commit()
+    return schemas.Token(access_token=access_token, refresh_token=refresh_token)
 
 
 @router.get("/me", response_model=schemas.UserRead)
@@ -116,8 +122,12 @@ def read_current_user(current_user: models.User = Depends(auth.get_current_user)
 
 
 @router.post("/logout")
-def logout_user(current_user: models.User = Depends(auth.get_current_user)):
-    # Access-token-only JWT auth is currently stateless.
-    # This endpoint validates the token and provides a stable logout contract
-    # for auditability and future token/session revocation support.
+def logout_user(
+    token: str = Depends(auth.oauth2_scheme),
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db),
+):
+    session_id = auth.get_session_id_from_access_token(token)
+    auth.revoke_refresh_session(db, session_id, current_user.id)
+    db.commit()
     return {"success": True}

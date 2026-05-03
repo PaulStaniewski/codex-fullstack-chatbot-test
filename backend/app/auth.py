@@ -1,5 +1,7 @@
 import os
 import logging
+import hashlib
+import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Mapping
 
@@ -63,16 +65,134 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     return password_context.verify(plain_password, hashed_password)
 
 
-def create_access_token(subject: str) -> str:
+def create_access_token(subject: str, session_id: str | None = None) -> str:
     expires_at = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     payload = {"sub": subject, "exp": expires_at, "type": "access"}
+    if session_id:
+        payload["sid"] = session_id
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
 
-def create_refresh_token(subject: str) -> str:
+def create_refresh_token(subject: str, session_id: str | None = None) -> str:
     expires_at = datetime.now(timezone.utc) + timedelta(minutes=REFRESH_TOKEN_EXPIRE_MINUTES)
     payload = {"sub": subject, "exp": expires_at, "type": "refresh"}
+    if session_id:
+        payload["sid"] = session_id
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+
+
+def hash_token(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def _normalize_datetime(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value
+
+
+def create_refresh_session(db: Session, user_id: int) -> tuple[str, models.RefreshSession]:
+    session_id = str(uuid.uuid4())
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=REFRESH_TOKEN_EXPIRE_MINUTES)
+    refresh_token = create_refresh_token(str(user_id), session_id=session_id)
+    refresh_session = models.RefreshSession(
+        id=session_id,
+        user_id=user_id,
+        token_hash=hash_token(refresh_token),
+        expires_at=expires_at,
+    )
+    db.add(refresh_session)
+    db.flush()
+    return refresh_token, refresh_session
+
+
+def _refresh_credentials_error() -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+
+def get_refresh_session_from_token(db: Session, refresh_token: str) -> models.RefreshSession:
+    credentials_error = _refresh_credentials_error()
+    try:
+        payload = jwt.decode(refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
+        subject = payload.get("sub")
+        token_type = payload.get("type")
+        session_id = payload.get("sid")
+        if subject is None or token_type != "refresh" or not session_id:
+            raise credentials_error
+        user_id = int(subject)
+    except (JWTError, ValueError):
+        logger.info(
+            "auth.failure",
+            extra={"request_id": get_request_id(), "reason": "invalid_refresh_token"},
+        )
+        raise credentials_error from None
+
+    refresh_session = db.get(models.RefreshSession, str(session_id))
+    now = datetime.now(timezone.utc)
+    if (
+        refresh_session is None
+        or refresh_session.user_id != user_id
+        or refresh_session.token_hash != hash_token(refresh_token)
+        or refresh_session.revoked_at is not None
+        or _normalize_datetime(refresh_session.expires_at) <= now
+    ):
+        logger.info(
+            "auth.failure",
+            extra={
+                "request_id": get_request_id(),
+                "reason": "refresh_session_invalid",
+                "user_id": user_id,
+            },
+        )
+        raise credentials_error
+
+    return refresh_session
+
+
+def rotate_refresh_session(
+    db: Session,
+    refresh_token: str,
+) -> tuple[str, str, models.RefreshSession]:
+    refresh_session = get_refresh_session_from_token(db, refresh_token)
+    now = datetime.now(timezone.utc)
+    refresh_session.revoked_at = now
+    next_refresh_token, next_session = create_refresh_session(db, refresh_session.user_id)
+    refresh_session.replaced_by_session_id = next_session.id
+    access_token = create_access_token(str(refresh_session.user_id), session_id=next_session.id)
+    db.flush()
+    return access_token, next_refresh_token, next_session
+
+
+def revoke_refresh_session(db: Session, session_id: str | None, user_id: int) -> int:
+    now = datetime.now(timezone.utc)
+    query = db.query(models.RefreshSession).filter(
+        models.RefreshSession.user_id == user_id,
+        models.RefreshSession.revoked_at.is_(None),
+    )
+    if session_id:
+        query = query.filter(models.RefreshSession.id == session_id)
+
+    revoked_count = 0
+    for refresh_session in query.all():
+        refresh_session.revoked_at = now
+        revoked_count += 1
+    db.flush()
+    return revoked_count
+
+
+def get_session_id_from_access_token(token: str) -> str | None:
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    except JWTError:
+        return None
+    if payload.get("type") != "access":
+        return None
+    session_id = payload.get("sid")
+    return str(session_id) if session_id else None
 
 
 def authenticate_user(db: Session, email: str, password: str) -> models.User | None:

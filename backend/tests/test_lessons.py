@@ -5,6 +5,7 @@ from app.routes.lesson_routes import (
     build_lesson_study_prompt,
     build_lesson_tutor_prompt,
     build_practice_feedback_prompt,
+    format_practice_feedback_for_user,
     get_reading_steps_for_study,
     parse_practice_feedback_metadata,
 )
@@ -22,10 +23,15 @@ async def _fake_feedback_stream(_openai_input):
 
 
 async def _fake_scored_feedback_stream(_openai_input):
-    yield "Good answer. Add the exact route path.\n\n"
-    yield "Score: 82\n"
-    yield "Strengths:\n- Mentions a health endpoint\n- Understands GET usage\n"
-    yield "Improvements:\n- Include the /health path\n- Mention the decorator"
+    yield '{"summary_feedback":"Good answer. Add the exact route path.",'
+    yield '"score":82,'
+    yield '"strengths":["Mentions a health endpoint","Understands GET usage"],'
+    yield '"improvements":["Include the /health path","Mention the decorator"],'
+    yield '"suggested_answer":"I would add a GET /health endpoint that returns a simple status."}'
+
+
+async def _fake_malformed_feedback_stream(_openai_input):
+    yield "{not valid json"
 
 
 def test_get_lesson_creates_progress(client):
@@ -587,9 +593,11 @@ def test_practice_feedback_prompt_includes_instruction_and_user_answer():
     assert step["title"] in combined_content
     assert step["content"] in combined_content
     assert "I would use @app.get('/health')." in combined_content
-    assert "Score: <0-100>" in combined_content
-    assert "Strengths:" in combined_content
-    assert "Improvements:" in combined_content
+    assert '"score": 0' in combined_content
+    assert '"strengths": ["..."]' in combined_content
+    assert '"improvements": ["..."]' in combined_content
+    assert '"suggested_answer": "..."' in combined_content
+    assert '"summary_feedback": "..."' in combined_content
 
 
 def test_practice_submission_saved_after_feedback(client, monkeypatch):
@@ -682,15 +690,13 @@ def test_practice_history_unknown_lesson_returns_404(client):
     assert response.status_code == 404
 
 
-def test_practice_feedback_metadata_parser_extracts_score_strengths_and_improvements():
+def test_practice_feedback_metadata_parser_extracts_structured_feedback():
     feedback = (
-        "Nice work.\n\n"
-        "Score: 91\n"
-        "Strengths:\n"
-        "- Clear route choice\n"
-        "- Good HTTP method\n"
-        "Improvements:\n"
-        "- Include response shape\n"
+        '{"score":91,'
+        '"strengths":["Clear route choice","Good HTTP method"],'
+        '"improvements":["Include response shape"],'
+        '"suggested_answer":"Use a GET /health route.",'
+        '"summary_feedback":"Nice work."}'
     )
 
     metadata = parse_practice_feedback_metadata(feedback)
@@ -698,14 +704,47 @@ def test_practice_feedback_metadata_parser_extracts_score_strengths_and_improvem
     assert metadata["score"] == 91
     assert metadata["strengths"] == ["Clear route choice", "Good HTTP method"]
     assert metadata["improvements"] == ["Include response shape"]
+    assert metadata["suggested_answer"] == "Use a GET /health route."
+    assert metadata["summary_feedback"] == "Nice work."
 
 
-def test_practice_feedback_metadata_parser_tolerates_unstructured_feedback():
-    metadata = parse_practice_feedback_metadata("This is just normal feedback.")
+def test_practice_feedback_metadata_parser_tolerates_malformed_json():
+    metadata = parse_practice_feedback_metadata("{not valid json")
 
     assert metadata["score"] is None
     assert metadata["strengths"] is None
     assert metadata["improvements"] is None
+    assert metadata["suggested_answer"] is None
+    assert metadata["summary_feedback"] is None
+
+
+def test_practice_feedback_metadata_parser_rejects_invalid_score():
+    metadata = parse_practice_feedback_metadata(
+        '{"score":101,"strengths":["Good"],"improvements":["Add detail"],'
+        '"suggested_answer":"Better answer","summary_feedback":"Summary"}'
+    )
+
+    assert metadata["score"] is None
+    assert metadata["strengths"] == ["Good"]
+    assert metadata["improvements"] == ["Add detail"]
+
+
+def test_practice_feedback_formatter_uses_valid_structured_output():
+    metadata = parse_practice_feedback_metadata(
+        '{"score":74,"strengths":["Good endpoint choice"],'
+        '"improvements":["Mention the response"],'
+        '"suggested_answer":"Return a simple status object.",'
+        '"summary_feedback":"Solid start."}'
+    )
+
+    feedback = format_practice_feedback_for_user(metadata, "raw json")
+
+    assert "Solid start." in feedback
+    assert "Suggested answer:" in feedback
+    assert "Return a simple status object." in feedback
+    assert "Good endpoint choice" in feedback
+    assert "Mention the response" in feedback
+    assert "Score: 74/100" in feedback
 
 
 def test_practice_submission_saves_score_metadata(client, monkeypatch):
@@ -735,10 +774,12 @@ def test_practice_submission_saves_score_metadata(client, monkeypatch):
         "Include the /health path",
         "Mention the decorator",
     ]
+    assert "Good answer. Add the exact route path." in submission["feedback"]
+    assert "Suggested answer:" in submission["feedback"]
 
 
-def test_practice_submission_parsing_failure_still_saves_feedback(client, monkeypatch):
-    monkeypatch.setattr("app.routes.lesson_routes._stream_openai_text", _fake_feedback_stream)
+def test_practice_submission_malformed_json_still_saves_fallback_feedback(client, monkeypatch):
+    monkeypatch.setattr("app.routes.lesson_routes._stream_openai_text", _fake_malformed_feedback_stream)
     token = _register_and_login(client)
 
     client.get(
@@ -755,7 +796,7 @@ def test_practice_submission_parsing_failure_still_saves_feedback(client, monkey
     )
     submission = history_response.json()[0]
 
-    assert submission["feedback"] == "Good start. Mention the route decorator too."
+    assert submission["feedback"] == "{not valid json"
     assert submission["score"] is None
     assert submission["strengths"] is None
     assert submission["improvements"] is None

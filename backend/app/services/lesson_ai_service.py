@@ -1,5 +1,5 @@
+import json
 import logging
-import re
 from collections.abc import Awaitable, Callable
 
 from fastapi import HTTPException, status
@@ -133,18 +133,21 @@ def build_practice_feedback_prompt(
             "content": (
                 "You are an AI programming tutor reviewing a learner's practice answer.\n"
                 "Use the provided lesson and practice instruction as the source of truth.\n"
-                "Give concise feedback.\n"
-                "Mention what is correct.\n"
-                "Mention what is missing or unclear.\n"
-                "Suggest one improved answer.\n"
                 "Be supportive and not harsh.\n"
                 "Do not invent requirements outside the lesson.\n"
-                "End with this compact structured section exactly:\n"
-                "Score: <0-100>\n"
-                "Strengths:\n"
-                "- ...\n"
-                "Improvements:\n"
-                "- ..."
+                "Return only a valid JSON object with this exact structure:\n"
+                "{\n"
+                '  "score": 0,\n'
+                '  "strengths": ["..."],\n'
+                '  "improvements": ["..."],\n'
+                '  "suggested_answer": "...",\n'
+                '  "summary_feedback": "..."\n'
+                "}\n"
+                "score must be an integer from 0 to 100.\n"
+                "strengths and improvements must be arrays of concise strings.\n"
+                "suggested_answer must be one improved answer.\n"
+                "summary_feedback must be concise learner-facing feedback.\n"
+                "Do not wrap the JSON in Markdown. Do not include any text outside the JSON object."
             ),
         },
         {
@@ -160,41 +163,109 @@ def build_practice_feedback_prompt(
     ]
 
 
-def _parse_bullets(section_text: str) -> list[str] | None:
-    items = [
-        line.strip().lstrip("-*").strip()
-        for line in section_text.splitlines()
-        if line.strip().startswith(("-", "*"))
-    ]
-    clean_items = [item for item in items if item]
-    return clean_items or None
-
-
-def parse_practice_feedback_metadata(feedback: str) -> dict[str, int | list[str] | None]:
-    metadata: dict[str, int | list[str] | None] = {
+def _empty_practice_feedback_metadata() -> dict[str, int | list[str] | str | None]:
+    return {
         "score": None,
         "strengths": None,
         "improvements": None,
+        "suggested_answer": None,
+        "summary_feedback": None,
     }
 
-    score_match = re.search(r"(?im)^\s*Score:\s*(\d{1,3})\s*$", feedback)
-    if score_match:
-        score = int(score_match.group(1))
-        if 0 <= score <= 100:
-            metadata["score"] = score
 
-    strengths_match = re.search(
-        r"(?ims)^\s*Strengths:\s*(.*?)(?=^\s*Improvements:|\Z)",
-        feedback,
-    )
-    if strengths_match:
-        metadata["strengths"] = _parse_bullets(strengths_match.group(1))
+def _strip_json_code_fence(value: str) -> str:
+    clean_value = value.strip()
+    if not clean_value.startswith("```") or not clean_value.endswith("```"):
+        return clean_value
 
-    improvements_match = re.search(r"(?ims)^\s*Improvements:\s*(.*)\Z", feedback)
-    if improvements_match:
-        metadata["improvements"] = _parse_bullets(improvements_match.group(1))
+    lines = clean_value.splitlines()
+    if len(lines) < 3:
+        return clean_value
 
-    return metadata
+    return "\n".join(lines[1:-1]).strip()
+
+
+def _clean_string_list(value: object) -> list[str] | None:
+    if not isinstance(value, list):
+        return None
+
+    clean_items = [item.strip() for item in value if isinstance(item, str) and item.strip()]
+    return clean_items or None
+
+
+def _clean_string(value: object) -> str | None:
+    if not isinstance(value, str):
+        return None
+
+    clean_value = value.strip()
+    return clean_value or None
+
+
+def parse_practice_feedback_metadata(feedback: str) -> dict[str, int | list[str] | str | None]:
+    try:
+        payload = json.loads(_strip_json_code_fence(feedback))
+    except json.JSONDecodeError:
+        return _empty_practice_feedback_metadata()
+
+    if not isinstance(payload, dict):
+        return _empty_practice_feedback_metadata()
+
+    raw_score = payload.get("score")
+    score = raw_score if isinstance(raw_score, int) and not isinstance(raw_score, bool) else None
+    if score is None or score < 0 or score > 100:
+        score = None
+
+    return {
+        "score": score,
+        "strengths": _clean_string_list(payload.get("strengths")),
+        "improvements": _clean_string_list(payload.get("improvements")),
+        "suggested_answer": _clean_string(
+            payload.get("suggested_answer", payload.get("corrected_answer"))
+        ),
+        "summary_feedback": _clean_string(payload.get("summary_feedback")),
+    }
+
+
+def format_practice_feedback_for_user(
+    metadata: dict[str, int | list[str] | str | None],
+    fallback_feedback: str,
+) -> str:
+    summary_feedback = metadata.get("summary_feedback")
+    suggested_answer = metadata.get("suggested_answer")
+    strengths = metadata.get("strengths")
+    improvements = metadata.get("improvements")
+    score = metadata.get("score")
+
+    if not any([summary_feedback, suggested_answer, strengths, improvements, score is not None]):
+        return fallback_feedback
+
+    lines: list[str] = []
+    if summary_feedback:
+        lines.append(str(summary_feedback))
+
+    if suggested_answer:
+        if lines:
+            lines.append("")
+        lines.extend(["Suggested answer:", str(suggested_answer)])
+
+    if strengths:
+        if lines:
+            lines.append("")
+        lines.append("Strengths:")
+        lines.extend(f"- {item}" for item in strengths)
+
+    if improvements:
+        if lines:
+            lines.append("")
+        lines.append("Improvements:")
+        lines.extend(f"- {item}" for item in improvements)
+
+    if score is not None:
+        if lines:
+            lines.append("")
+        lines.append(f"Score: {score}/100")
+
+    return "\n".join(lines).strip()
 
 
 def get_next_practice_attempt_number(
@@ -285,7 +356,6 @@ async def stream_practice_feedback_response(
                     return
                 if chunk:
                     chunks.append(chunk)
-                    yield chat_service.format_sse_data(chunk)
         except AuthenticationError:
             logger.exception("OpenAI authentication failed during practice feedback stream")
             yield chat_service.format_sse_data(chat_service.SAFE_STREAM_ERROR)
@@ -315,10 +385,12 @@ async def stream_practice_feedback_response(
             yield chat_service.format_sse_data(chat_service.SAFE_STREAM_ERROR)
             return
 
-        feedback = "".join(chunks).strip()
-        if not feedback:
+        raw_feedback = "".join(chunks).strip()
+        if not raw_feedback:
             return
-        metadata = parse_practice_feedback_metadata(feedback)
+        metadata = parse_practice_feedback_metadata(raw_feedback)
+        feedback = format_practice_feedback_for_user(metadata, raw_feedback)
+        yield chat_service.format_sse_data(feedback)
 
         db.add(
             models.PracticeSubmission(

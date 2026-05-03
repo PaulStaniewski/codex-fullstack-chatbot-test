@@ -54,6 +54,29 @@ def test_refresh_access_token(client):
     assert body["refresh_token"] != refresh_token
 
 
+def test_stream_token_requires_auth(client):
+    response = client.post("/stream-token")
+
+    assert response.status_code == 401
+
+
+def test_stream_token_endpoint_issues_short_lived_opaque_token(client):
+    client.post("/register", json={"email": "stream-token@example.com", "password": "password123"})
+    login_response = client.post(
+        "/login",
+        json={"email": "stream-token@example.com", "password": "password123"},
+    )
+    access_token = login_response.json()["access_token"]
+
+    response = client.post("/stream-token", headers={"Authorization": f"Bearer {access_token}"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["stream_token"]
+    assert "." not in body["stream_token"]
+    assert body["expires_at"]
+
+
 def test_login_creates_refresh_session(client):
     client.post(
         "/register",

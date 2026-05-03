@@ -47,20 +47,20 @@ async function tryRefreshAccessToken() {
   return refreshInFlightPromise;
 }
 
-export function getStreamUrl(conversationId, message, token) {
+export function getStreamUrl(conversationId, message, streamToken) {
   const params = new URLSearchParams({
     conversation_id: String(conversationId),
     message,
-    token,
+    token: streamToken,
   });
 
   return `${getApiBaseUrl()}/chat-stream?${params.toString()}`;
 }
 
-export function getLessonStudyStreamUrl({ lessonId, action, question, stepIndex, token }) {
+export function getLessonStudyStreamUrl({ lessonId, action, question, stepIndex, streamToken }) {
   const params = new URLSearchParams({
     action,
-    token,
+    token: streamToken,
   });
 
   if (question) {
@@ -88,57 +88,78 @@ export function streamLessonStudyAssistant({
   onError,
   onDone,
 }) {
-  const stream = new EventSource(
-    getLessonStudyStreamUrl({ lessonId, action, question, stepIndex, token }),
-  );
+  let stream = null;
   let receivedContent = "";
   let didFinalize = false;
+  let didCancel = false;
 
-  stream.onmessage = (event) => {
-    receivedContent += event.data;
-    onToken?.(event.data, receivedContent);
+  const attachHandlers = (activeStream) => {
+    activeStream.onmessage = (event) => {
+      receivedContent += event.data;
+      onToken?.(event.data, receivedContent);
 
-    if (receivedContent.startsWith("Error:")) {
+      if (receivedContent.startsWith("Error:")) {
+        didFinalize = true;
+        activeStream.close();
+        onError?.(receivedContent);
+        onDone?.(receivedContent);
+      }
+    };
+
+    activeStream.addEventListener("done", () => {
+      if (didFinalize) {
+        return;
+      }
+
       didFinalize = true;
-      stream.close();
-      onError?.(receivedContent);
+      activeStream.close();
       onDone?.(receivedContent);
-    }
+    });
+
+    activeStream.addEventListener("error", (event) => {
+      if (didFinalize) {
+        return;
+      }
+
+      didFinalize = true;
+      activeStream.close();
+      const errorMessage = getSseEventData(event) || "Unable to get study response.";
+      onError?.(errorMessage);
+      onDone?.(receivedContent || errorMessage);
+    });
   };
 
-  stream.addEventListener("done", () => {
-    if (didFinalize) {
-      return;
-    }
-
-    didFinalize = true;
-    stream.close();
-    onDone?.(receivedContent);
-  });
-
-  stream.addEventListener("error", (event) => {
-    if (didFinalize) {
-      return;
-    }
-
-    didFinalize = true;
-    stream.close();
-    const errorMessage = getSseEventData(event) || "Unable to get study response.";
-    onError?.(errorMessage);
-    onDone?.(receivedContent || errorMessage);
-  });
+  createStreamToken(token)
+    .then(({ stream_token: streamToken }) => {
+      if (didCancel) {
+        return;
+      }
+      stream = new EventSource(
+        getLessonStudyStreamUrl({ lessonId, action, question, stepIndex, streamToken }),
+      );
+      attachHandlers(stream);
+    })
+    .catch(() => {
+      if (didFinalize) {
+        return;
+      }
+      didFinalize = true;
+      onError?.("Unable to start study response.");
+      onDone?.("");
+    });
 
   return () => {
     didFinalize = true;
-    stream.close();
+    didCancel = true;
+    stream?.close();
   };
 }
 
-export function getPracticeFeedbackStreamUrl({ lessonId, stepIndex, answer, token }) {
+export function getPracticeFeedbackStreamUrl({ lessonId, stepIndex, answer, streamToken }) {
   const params = new URLSearchParams({
     step_index: String(stepIndex),
     answer,
-    token,
+    token: streamToken,
   });
 
   return `${getApiBaseUrl()}/lessons/${encodeURIComponent(lessonId)}/practice-feedback-stream?${params.toString()}`;
@@ -153,49 +174,70 @@ export function streamPracticeFeedback({
   onError,
   onDone,
 }) {
-  const stream = new EventSource(
-    getPracticeFeedbackStreamUrl({ lessonId, stepIndex, answer, token }),
-  );
+  let stream = null;
   let receivedContent = "";
   let didFinalize = false;
+  let didCancel = false;
 
-  stream.onmessage = (event) => {
-    receivedContent += event.data;
-    onToken?.(event.data, receivedContent);
+  const attachHandlers = (activeStream) => {
+    activeStream.onmessage = (event) => {
+      receivedContent += event.data;
+      onToken?.(event.data, receivedContent);
 
-    if (receivedContent.startsWith("Error:")) {
+      if (receivedContent.startsWith("Error:")) {
+        didFinalize = true;
+        activeStream.close();
+        onError?.(receivedContent);
+        onDone?.(receivedContent);
+      }
+    };
+
+    activeStream.addEventListener("done", () => {
+      if (didFinalize) {
+        return;
+      }
+
       didFinalize = true;
-      stream.close();
-      onError?.(receivedContent);
+      activeStream.close();
       onDone?.(receivedContent);
-    }
+    });
+
+    activeStream.addEventListener("error", (event) => {
+      if (didFinalize) {
+        return;
+      }
+
+      didFinalize = true;
+      activeStream.close();
+      const errorMessage = getSseEventData(event) || "Unable to get practice feedback.";
+      onError?.(errorMessage);
+      onDone?.(receivedContent || errorMessage);
+    });
   };
 
-  stream.addEventListener("done", () => {
-    if (didFinalize) {
-      return;
-    }
-
-    didFinalize = true;
-    stream.close();
-    onDone?.(receivedContent);
-  });
-
-  stream.addEventListener("error", (event) => {
-    if (didFinalize) {
-      return;
-    }
-
-    didFinalize = true;
-    stream.close();
-    const errorMessage = getSseEventData(event) || "Unable to get practice feedback.";
-    onError?.(errorMessage);
-    onDone?.(receivedContent || errorMessage);
-  });
+  createStreamToken(token)
+    .then(({ stream_token: streamToken }) => {
+      if (didCancel) {
+        return;
+      }
+      stream = new EventSource(
+        getPracticeFeedbackStreamUrl({ lessonId, stepIndex, answer, streamToken }),
+      );
+      attachHandlers(stream);
+    })
+    .catch(() => {
+      if (didFinalize) {
+        return;
+      }
+      didFinalize = true;
+      onError?.("Unable to start practice feedback.");
+      onDone?.("");
+    });
 
   return () => {
     didFinalize = true;
-    stream.close();
+    didCancel = true;
+    stream?.close();
   };
 }
 
@@ -245,6 +287,13 @@ export async function apiFetch(path, { token, skipAuthRefresh = false, ...option
   }
 
   return data;
+}
+
+export function createStreamToken(token) {
+  return apiFetch("/stream-token", {
+    method: "POST",
+    token,
+  });
 }
 
 export function getLesson(lessonId, token) {

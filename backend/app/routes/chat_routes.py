@@ -77,7 +77,7 @@ async def chat_stream(
     if not clean_message:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Message cannot be empty")
 
-    current_user = auth.get_user_from_token(db, token)
+    current_user = auth.get_user_from_sse_token(db, token)
     user_id = current_user.id
     conversation = _get_owned_conversation(db, conversation_id, user_id)
     should_generate_title = not conversation.title.strip()

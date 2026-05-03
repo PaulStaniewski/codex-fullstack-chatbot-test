@@ -294,7 +294,7 @@ async def lesson_tutor_stream(
     if not clean_question:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Question cannot be empty")
 
-    current_user = auth.get_user_from_token(db, token)
+    current_user = auth.get_user_from_sse_token(db, token)
     lesson = get_lesson_or_404(lesson_id)
     lesson_progress = (
         db.query(models.LessonProgress)
@@ -342,7 +342,7 @@ async def lesson_study_stream(
     if action == "custom_question" and not clean_question:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Question cannot be empty")
 
-    current_user = auth.get_user_from_token(db, token)
+    current_user = auth.get_user_from_sse_token(db, token)
     lesson = get_lesson_or_404(lesson_id)
     reading_steps = get_reading_steps_for_study(lesson, step_index)
     openai_input = build_lesson_study_prompt(
@@ -383,7 +383,7 @@ async def lesson_practice_feedback_stream(
     if not clean_answer:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Answer cannot be empty")
 
-    current_user = auth.get_user_from_token(db, token)
+    current_user = auth.get_user_from_sse_token(db, token)
     lesson = get_lesson_or_404(lesson_id)
     step = resolve_lesson_step(lesson, None, step_index)
     if step["type"] != "practice":

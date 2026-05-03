@@ -3,6 +3,7 @@ import {
   apiFetch,
   configureAuthRefresh,
   completeLessonStep,
+  createStreamToken,
   getApiBaseUrl,
   getLesson,
   getLessonProgress,
@@ -716,7 +717,8 @@ export default function App() {
 
       let assistantContent = "";
       let didFinalizeStream = false;
-      const stream = new EventSource(getStreamUrl(conversation.id, content, token));
+      const { stream_token: streamToken } = await createStreamToken(token);
+      const stream = new EventSource(getStreamUrl(conversation.id, content, streamToken));
       eventSourceRef.current = stream;
 
       const finalizeFailedStream = (message, toastMessage = "Streaming failed. Please try again.") => {

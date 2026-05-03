@@ -40,6 +40,11 @@ class RefreshRequest(BaseModel):
     refresh_token: str
 
 
+class StreamToken(BaseModel):
+    stream_token: str
+    expires_at: datetime
+
+
 class ConversationCreate(BaseModel):
     title: str = Field(default="New conversation", max_length=255)
 

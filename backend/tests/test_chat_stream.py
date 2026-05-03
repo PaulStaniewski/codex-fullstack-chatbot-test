@@ -18,6 +18,12 @@ def _create_authenticated_conversation(client):
     return token, conversation_id
 
 
+def _create_stream_token(client, access_token):
+    response = client.post("/stream-token", headers={"Authorization": f"Bearer {access_token}"})
+    assert response.status_code == 200
+    return response.json()["stream_token"]
+
+
 async def _fake_openai_stream(_openai_input):
     for chunk in ["This ", "is ", "a streamed assistant response."]:
         yield chunk
@@ -51,10 +57,11 @@ def test_chat_stream_invalid_conversation_returns_404(client):
 def test_chat_stream_returns_sse_data(client, monkeypatch):
     monkeypatch.setattr("app.routes.chat_routes._stream_openai_text", _fake_openai_stream)
     token, conversation_id = _create_authenticated_conversation(client)
+    stream_token = _create_stream_token(client, token)
 
     response = client.get(
         "/chat-stream",
-        params={"conversation_id": conversation_id, "message": "hello", "token": token},
+        params={"conversation_id": conversation_id, "message": "hello", "token": stream_token},
     )
 
     assert response.status_code == 200
@@ -62,6 +69,39 @@ def test_chat_stream_returns_sse_data(client, monkeypatch):
     assert "data: This " in response.text
     assert "data: a streamed assistant response." in response.text
     assert "event: done" in response.text
+
+
+def test_chat_stream_token_is_single_use(client, monkeypatch):
+    monkeypatch.setattr("app.routes.chat_routes._stream_openai_text", _fake_openai_stream)
+    token, conversation_id = _create_authenticated_conversation(client)
+    stream_token = _create_stream_token(client, token)
+
+    first_response = client.get(
+        "/chat-stream",
+        params={"conversation_id": conversation_id, "message": "hello", "token": stream_token},
+    )
+    second_response = client.get(
+        "/chat-stream",
+        params={"conversation_id": conversation_id, "message": "again", "token": stream_token},
+    )
+
+    assert first_response.status_code == 200
+    assert "event: done" in first_response.text
+    assert second_response.status_code == 401
+
+
+def test_chat_stream_rejects_expired_stream_token(client, monkeypatch):
+    monkeypatch.setattr("app.routes.chat_routes._stream_openai_text", _fake_openai_stream)
+    monkeypatch.setattr("app.auth.STREAM_TOKEN_EXPIRE_SECONDS", -1)
+    token, conversation_id = _create_authenticated_conversation(client)
+    stream_token = _create_stream_token(client, token)
+
+    response = client.get(
+        "/chat-stream",
+        params={"conversation_id": conversation_id, "message": "hello", "token": stream_token},
+    )
+
+    assert response.status_code == 401
 
 
 def test_chat_stream_normal_streaming_still_works(client, monkeypatch):

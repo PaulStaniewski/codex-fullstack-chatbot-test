@@ -17,6 +17,12 @@ def _register_and_login(client, email="lesson@example.com"):
     return response.json()["access_token"]
 
 
+def _create_stream_token(client, access_token):
+    response = client.post("/stream-token", headers={"Authorization": f"Bearer {access_token}"})
+    assert response.status_code == 200
+    return response.json()["stream_token"]
+
+
 async def _fake_feedback_stream(_openai_input):
     yield "Good start. "
     yield "Mention the route decorator too."
@@ -468,16 +474,36 @@ def test_lesson_study_stream_invalid_action_returns_400(client):
 def test_lesson_study_stream_emits_done_event(client, monkeypatch):
     monkeypatch.setattr("app.routes.lesson_routes._stream_openai_text", _fake_lesson_stream)
     token = _register_and_login(client, "study-done@example.com")
+    stream_token = _create_stream_token(client, token)
 
     response = client.get(
         "/lessons/docker_basics/study-stream",
-        params={"action": "summarize", "token": token},
+        params={"action": "summarize", "token": stream_token},
     )
 
     assert response.status_code == 200
     assert "data: Lesson " in response.text
     assert "data: response." in response.text
     assert "event: done" in response.text
+
+
+def test_lesson_study_stream_token_is_single_use(client, monkeypatch):
+    monkeypatch.setattr("app.routes.lesson_routes._stream_openai_text", _fake_lesson_stream)
+    token = _register_and_login(client, "study-single-use@example.com")
+    stream_token = _create_stream_token(client, token)
+
+    first_response = client.get(
+        "/lessons/docker_basics/study-stream",
+        params={"action": "summarize", "token": stream_token},
+    )
+    second_response = client.get(
+        "/lessons/docker_basics/study-stream",
+        params={"action": "summarize", "token": stream_token},
+    )
+
+    assert first_response.status_code == 200
+    assert "event: done" in first_response.text
+    assert second_response.status_code == 401
 
 
 def test_lesson_study_stream_emits_error_event(client, monkeypatch):
@@ -644,13 +670,14 @@ def test_practice_feedback_prompt_includes_instruction_and_user_answer():
 def test_practice_submission_saved_after_feedback(client, monkeypatch):
     monkeypatch.setattr("app.routes.lesson_routes._stream_openai_text", _fake_feedback_stream)
     token = _register_and_login(client)
+    stream_token = _create_stream_token(client, token)
 
     response = client.get(
         "/lessons/docker_compose_basics/practice-feedback-stream",
         params={
             "step_index": 5,
             "answer": "I would create a health function.",
-            "token": token,
+            "token": stream_token,
         },
     )
 

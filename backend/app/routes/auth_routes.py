@@ -116,6 +116,16 @@ def refresh_access_token(refresh_in: schemas.RefreshRequest, db: Session = Depen
     return schemas.Token(access_token=access_token, refresh_token=refresh_token)
 
 
+@router.post("/stream-token", response_model=schemas.StreamToken)
+def issue_stream_token(
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db),
+):
+    stream_token, token_record = auth.create_stream_token(db, current_user.id)
+    db.commit()
+    return schemas.StreamToken(stream_token=stream_token, expires_at=token_record.expires_at)
+
+
 @router.get("/me", response_model=schemas.UserRead)
 def read_current_user(current_user: models.User = Depends(auth.get_current_user)):
     return current_user

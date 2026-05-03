@@ -1,6 +1,7 @@
 import os
 import logging
 import hashlib
+import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Mapping
@@ -19,6 +20,7 @@ from app.observability import get_request_id
 DEFAULT_JWT_ALGORITHM = "HS256"
 DEFAULT_ACCESS_TOKEN_EXPIRE_MINUTES = 60
 DEFAULT_REFRESH_TOKEN_EXPIRE_MINUTES = 10080
+DEFAULT_STREAM_TOKEN_EXPIRE_SECONDS = 60
 PRODUCTION_ENV_NAMES = {"prod", "production"}
 INSECURE_JWT_SECRET_VALUES = {
     "change-me-in-production",
@@ -52,6 +54,9 @@ def _resolve_auth_settings(environ: Mapping[str, str] | None = None) -> tuple[st
 
 
 SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES, REFRESH_TOKEN_EXPIRE_MINUTES = _resolve_auth_settings()
+STREAM_TOKEN_EXPIRE_SECONDS = int(
+    os.getenv("STREAM_TOKEN_EXPIRE_SECONDS", str(DEFAULT_STREAM_TOKEN_EXPIRE_SECONDS))
+)
 
 password_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login")
@@ -182,6 +187,69 @@ def revoke_refresh_session(db: Session, session_id: str | None, user_id: int) ->
         revoked_count += 1
     db.flush()
     return revoked_count
+
+
+def create_stream_token(db: Session, user_id: int) -> tuple[str, models.StreamToken]:
+    token = secrets.token_urlsafe(32)
+    stream_token = models.StreamToken(
+        id=str(uuid.uuid4()),
+        user_id=user_id,
+        token_hash=hash_token(token),
+        expires_at=datetime.now(timezone.utc) + timedelta(seconds=STREAM_TOKEN_EXPIRE_SECONDS),
+    )
+    db.add(stream_token)
+    db.flush()
+    return token, stream_token
+
+
+def consume_stream_token(db: Session, token: str) -> models.User:
+    credentials_error = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate stream token",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    stream_token = (
+        db.query(models.StreamToken)
+        .filter(models.StreamToken.token_hash == hash_token(token))
+        .first()
+    )
+    now = datetime.now(timezone.utc)
+    if (
+        stream_token is None
+        or stream_token.used_at is not None
+        or _normalize_datetime(stream_token.expires_at) <= now
+    ):
+        logger.info(
+            "auth.failure",
+            extra={"request_id": get_request_id(), "reason": "stream_token_invalid"},
+        )
+        raise credentials_error
+
+    user = db.get(models.User, stream_token.user_id)
+    if user is None:
+        logger.info(
+            "auth.failure",
+            extra={
+                "request_id": get_request_id(),
+                "reason": "stream_token_user_not_found",
+                "user_id": stream_token.user_id,
+            },
+        )
+        raise credentials_error
+
+    stream_token.used_at = now
+    db.flush()
+    return user
+
+
+def get_user_from_sse_token(db: Session, token: str) -> models.User:
+    try:
+        user = consume_stream_token(db, token)
+        db.commit()
+        return user
+    except HTTPException:
+        db.rollback()
+        return get_user_from_token(db, token)
 
 
 def get_session_id_from_access_token(token: str) -> str | None:

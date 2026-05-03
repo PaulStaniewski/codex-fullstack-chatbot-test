@@ -11,6 +11,7 @@ os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key")
 
 from app.database import Base, get_db
 from app.main import app
+from app.routes import auth_routes, chat_routes
 
 
 SQLALCHEMY_DATABASE_URL = "sqlite://"
@@ -26,6 +27,8 @@ TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engin
 @pytest.fixture()
 def client():
     Base.metadata.create_all(bind=engine)
+    auth_routes._failed_login_buckets.clear()
+    chat_routes._rate_limit_buckets.clear()
 
     def override_get_db():
         db = TestingSessionLocal()

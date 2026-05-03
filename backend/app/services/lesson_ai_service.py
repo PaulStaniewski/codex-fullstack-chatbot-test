@@ -303,6 +303,7 @@ async def stream_lesson_ai_response(
     started_at = time.perf_counter()
     model = os.getenv("OPENAI_MODEL", chat_service.OPENAI_MODEL)
     outcome = "success"
+    usage_tracker = chat_service.AIUsageTracker()
     request_id = request_id or get_request_id()
     request_id_token = set_request_id(request_id)
     logger.info(
@@ -317,7 +318,7 @@ async def stream_lesson_ai_response(
     )
     try:
         try:
-            async for chunk in stream_text(openai_input):
+            async for chunk in chat_service.iterate_stream_text(stream_text, openai_input, usage_tracker):
                 if await is_disconnected():
                     outcome = "disconnected"
                     logger.info(
@@ -440,6 +441,14 @@ async def stream_lesson_ai_response(
             )
             yield chat_service.format_sse_event("error", chat_service.SAFE_STREAM_ERROR)
         else:
+            chat_service.record_ai_usage(
+                db,
+                user_id=user_id,
+                request_id=request_id,
+                feature=stream_name,
+                usage=usage_tracker.usage,
+                latency_ms=(time.perf_counter() - started_at) * 1000,
+            )
             yield chat_service.format_sse_event("done", "done")
     finally:
         logger.info(
@@ -475,6 +484,7 @@ async def stream_practice_feedback_response(
     started_at = time.perf_counter()
     model = os.getenv("OPENAI_MODEL", chat_service.OPENAI_MODEL)
     outcome = "empty"
+    usage_tracker = chat_service.AIUsageTracker()
     request_id = request_id or get_request_id()
     request_id_token = set_request_id(request_id)
     logger.info(
@@ -489,7 +499,7 @@ async def stream_practice_feedback_response(
     )
     try:
         try:
-            async for chunk in stream_text(openai_input):
+            async for chunk in chat_service.iterate_stream_text(stream_text, openai_input, usage_tracker):
                 if await is_disconnected():
                     outcome = "disconnected"
                     logger.info(
@@ -621,6 +631,14 @@ async def stream_practice_feedback_response(
 
         raw_feedback = "".join(chunks).strip()
         if not raw_feedback:
+            chat_service.record_ai_usage(
+                db,
+                user_id=user_id,
+                request_id=request_id,
+                feature="practice",
+                usage=usage_tracker.usage,
+                latency_ms=(time.perf_counter() - started_at) * 1000,
+            )
             yield chat_service.format_sse_event("done", "done")
             return
         metadata = parse_practice_feedback_metadata(raw_feedback)
@@ -647,6 +665,14 @@ async def stream_practice_feedback_response(
         )
         outcome = "success"
         db.commit()
+        chat_service.record_ai_usage(
+            db,
+            user_id=user_id,
+            request_id=request_id,
+            feature="practice",
+            usage=usage_tracker.usage,
+            latency_ms=(time.perf_counter() - started_at) * 1000,
+        )
         yield chat_service.format_sse_event("done", "done")
     finally:
         logger.info(

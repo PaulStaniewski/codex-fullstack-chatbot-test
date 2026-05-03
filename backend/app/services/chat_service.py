@@ -1,7 +1,10 @@
 import logging
 import os
 import time
+import json
 from collections.abc import AsyncIterator, Awaitable, Callable
+from dataclasses import dataclass
+from datetime import date
 
 from openai import (
     APIConnectionError,
@@ -12,6 +15,7 @@ from openai import (
     AsyncOpenAI,
     OpenAIError,
 )
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app import models, progress as progress_service
@@ -30,6 +34,8 @@ CHAT_STREAM_RATE_LIMIT = 10
 CHAT_STREAM_RATE_WINDOW_SECONDS = 60
 DEFAULT_CHAT_HISTORY_MAX_MESSAGES = 20
 DEFAULT_CHAT_HISTORY_MAX_CHARS = 12000
+DEFAULT_OPENAI_INPUT_COST_PER_1M_TOKENS = 0.0
+DEFAULT_OPENAI_OUTPUT_COST_PER_1M_TOKENS = 0.0
 
 
 def _get_positive_int_env(name: str, default: int) -> int:
@@ -52,7 +58,24 @@ CHAT_HISTORY_MAX_CHARS = _get_positive_int_env(
     DEFAULT_CHAT_HISTORY_MAX_CHARS,
 )
 
-StreamTextCallable = Callable[[list[dict[str, str]]], AsyncIterator[str]]
+@dataclass
+class AIUsage:
+    prompt_tokens: int
+    completion_tokens: int
+    total_tokens: int
+    model: str
+
+
+class AIUsageTracker:
+    def __init__(self) -> None:
+        self.usage: AIUsage | None = None
+
+    def capture(self, usage: AIUsage | None) -> None:
+        if usage is not None:
+            self.usage = usage
+
+
+StreamTextCallable = Callable[..., AsyncIterator[str]]
 DisconnectCallable = Callable[[], Awaitable[bool]]
 
 
@@ -138,7 +161,89 @@ def build_openai_input(
     return openai_input
 
 
-async def stream_openai_text(openai_input: list[dict[str, str]]):
+def _get_field(value, *names):
+    for name in names:
+        if isinstance(value, dict) and name in value:
+            return value[name]
+        if hasattr(value, name):
+            return getattr(value, name)
+    return None
+
+
+def _coerce_int(value) -> int:
+    try:
+        return int(value or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def extract_usage_from_openai_event(event, fallback_model: str | None = None) -> AIUsage | None:
+    response = _get_field(event, "response") or event
+    usage = _get_field(response, "usage") or _get_field(event, "usage")
+    if usage is None:
+        return None
+
+    prompt_tokens = _coerce_int(_get_field(usage, "input_tokens", "prompt_tokens"))
+    completion_tokens = _coerce_int(_get_field(usage, "output_tokens", "completion_tokens"))
+    total_tokens = _coerce_int(_get_field(usage, "total_tokens"))
+    if not total_tokens:
+        total_tokens = prompt_tokens + completion_tokens
+
+    model = _get_field(response, "model") or _get_field(event, "model") or fallback_model
+    if not model:
+        return None
+
+    return AIUsage(
+        prompt_tokens=prompt_tokens,
+        completion_tokens=completion_tokens,
+        total_tokens=total_tokens,
+        model=str(model),
+    )
+
+
+def _get_float_env(name: str, default: float) -> float:
+    raw_value = os.getenv(name)
+    if raw_value is None:
+        return default
+    try:
+        return float(raw_value)
+    except ValueError:
+        return default
+
+
+def get_model_token_pricing(model: str) -> tuple[float, float]:
+    raw_pricing = os.getenv("OPENAI_MODEL_PRICING_JSON")
+    if raw_pricing:
+        try:
+            pricing_by_model = json.loads(raw_pricing)
+            pricing = pricing_by_model.get(model) or pricing_by_model.get("default")
+            if pricing:
+                return (
+                    float(pricing.get("input_cost_per_1m_tokens", pricing.get("input", 0.0))),
+                    float(pricing.get("output_cost_per_1m_tokens", pricing.get("output", 0.0))),
+                )
+        except (TypeError, ValueError, json.JSONDecodeError):
+            logger.warning("openai.pricing_config_invalid", extra={"request_id": get_request_id()})
+
+    return (
+        _get_float_env("OPENAI_INPUT_COST_PER_1M_TOKENS", DEFAULT_OPENAI_INPUT_COST_PER_1M_TOKENS),
+        _get_float_env("OPENAI_OUTPUT_COST_PER_1M_TOKENS", DEFAULT_OPENAI_OUTPUT_COST_PER_1M_TOKENS),
+    )
+
+
+def estimate_usage_cost_usd(usage: AIUsage) -> float:
+    input_cost_per_1m, output_cost_per_1m = get_model_token_pricing(usage.model)
+    return round(
+        (usage.prompt_tokens / 1_000_000 * input_cost_per_1m)
+        + (usage.completion_tokens / 1_000_000 * output_cost_per_1m),
+        8,
+    )
+
+
+async def stream_openai_text(
+    openai_input: list[dict[str, str]],
+    usage_callback: Callable[[AIUsage | None], None] | None = None,
+):
     if not os.getenv("OPENAI_API_KEY"):
         raise RuntimeError("OPENAI_API_KEY is not configured")
 
@@ -161,8 +266,118 @@ async def stream_openai_text(openai_input: list[dict[str, str]]):
     )
 
     async for event in stream:
-        if event.type == "response.output_text.delta":
-            yield event.delta
+        if _get_field(event, "type") == "response.output_text.delta":
+            yield _get_field(event, "delta") or ""
+        usage = extract_usage_from_openai_event(event, fallback_model=model)
+        if usage_callback and usage:
+            usage_callback(usage)
+
+
+async def iterate_stream_text(
+    stream_text: StreamTextCallable,
+    openai_input: list[dict[str, str]],
+    usage_tracker: AIUsageTracker,
+):
+    try:
+        stream = stream_text(openai_input, usage_callback=usage_tracker.capture)
+    except TypeError:
+        stream = stream_text(openai_input)
+
+    async for chunk in stream:
+        yield chunk
+
+
+def record_ai_usage(
+    db: Session,
+    *,
+    user_id: int,
+    request_id: str | None,
+    feature: str,
+    usage: AIUsage | None,
+    latency_ms: float,
+) -> models.AIUsageRecord | None:
+    if usage is None:
+        return None
+
+    estimated_cost_usd = estimate_usage_cost_usd(usage)
+    record = models.AIUsageRecord(
+        user_id=user_id,
+        request_id=request_id,
+        feature=feature,
+        model=usage.model,
+        prompt_tokens=usage.prompt_tokens,
+        completion_tokens=usage.completion_tokens,
+        total_tokens=usage.total_tokens,
+        estimated_cost_usd=estimated_cost_usd,
+        latency_ms=latency_ms,
+    )
+    db.add(record)
+    db.commit()
+    logger.info(
+        "openai.usage",
+        extra={
+            "request_id": request_id,
+            "user_id": user_id,
+            "feature": feature,
+            "model": usage.model,
+            "prompt_tokens": usage.prompt_tokens,
+            "completion_tokens": usage.completion_tokens,
+            "total_tokens": usage.total_tokens,
+            "estimated_cost_usd": estimated_cost_usd,
+            "latency_ms": round(latency_ms, 2),
+        },
+    )
+    return record
+
+
+def get_ai_usage_summary_for_user(db: Session, user_id: int) -> dict[str, float | int]:
+    row = (
+        db.query(
+            func.coalesce(func.sum(models.AIUsageRecord.prompt_tokens), 0),
+            func.coalesce(func.sum(models.AIUsageRecord.completion_tokens), 0),
+            func.coalesce(func.sum(models.AIUsageRecord.total_tokens), 0),
+            func.coalesce(func.sum(models.AIUsageRecord.estimated_cost_usd), 0.0),
+            func.count(models.AIUsageRecord.id),
+        )
+        .filter(models.AIUsageRecord.user_id == user_id)
+        .one()
+    )
+    return {
+        "prompt_tokens": int(row[0] or 0),
+        "completion_tokens": int(row[1] or 0),
+        "total_tokens": int(row[2] or 0),
+        "estimated_cost_usd": float(row[3] or 0.0),
+        "requests": int(row[4] or 0),
+    }
+
+
+def get_daily_ai_usage_for_user(db: Session, user_id: int) -> list[dict[str, float | int | str]]:
+    day = func.date(models.AIUsageRecord.created_at)
+    rows = (
+        db.query(
+            day,
+            func.coalesce(func.sum(models.AIUsageRecord.prompt_tokens), 0),
+            func.coalesce(func.sum(models.AIUsageRecord.completion_tokens), 0),
+            func.coalesce(func.sum(models.AIUsageRecord.total_tokens), 0),
+            func.coalesce(func.sum(models.AIUsageRecord.estimated_cost_usd), 0.0),
+            func.count(models.AIUsageRecord.id),
+        )
+        .filter(models.AIUsageRecord.user_id == user_id)
+        .group_by(day)
+        .order_by(day)
+        .all()
+    )
+    return [
+        {
+            "date": row[0].isoformat() if isinstance(row[0], date) else str(row[0]),
+            "prompt_tokens": int(row[1] or 0),
+            "completion_tokens": int(row[2] or 0),
+            "total_tokens": int(row[3] or 0),
+            "estimated_cost_usd": float(row[4] or 0.0),
+            "requests": int(row[5] or 0),
+        }
+        for row in rows
+    ]
 
 
 def persist_user_message(
@@ -251,6 +466,7 @@ async def stream_chat_response(
     started_at = time.perf_counter()
     model = os.getenv("OPENAI_MODEL", OPENAI_MODEL)
     outcome = "empty"
+    usage_tracker = AIUsageTracker()
     request_id = request_id or get_request_id()
     request_id_token = set_request_id(request_id)
     logger.info(
@@ -264,7 +480,7 @@ async def stream_chat_response(
     )
     try:
         try:
-            async for chunk in stream_text(openai_input):
+            async for chunk in iterate_stream_text(stream_text, openai_input, usage_tracker):
                 if await is_disconnected():
                     outcome = "disconnected"
                     logger.info(
@@ -399,6 +615,14 @@ async def stream_chat_response(
                 should_generate_title=should_generate_title,
                 title_source=clean_message,
             )
+        record_ai_usage(
+            db,
+            user_id=user_id,
+            request_id=request_id,
+            feature="chat",
+            usage=usage_tracker.usage,
+            latency_ms=(time.perf_counter() - started_at) * 1000,
+        )
         yield format_sse_event("done", "done")
     finally:
         logger.info(

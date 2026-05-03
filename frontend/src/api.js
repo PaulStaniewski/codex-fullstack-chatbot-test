@@ -74,6 +74,10 @@ export function getLessonStudyStreamUrl({ lessonId, action, question, stepIndex,
   return `${getApiBaseUrl()}/lessons/${encodeURIComponent(lessonId)}/study-stream?${params.toString()}`;
 }
 
+function getSseEventData(event) {
+  return typeof event?.data === "string" ? event.data : "";
+}
+
 export function streamLessonStudyAssistant({
   lessonId,
   action,
@@ -102,19 +106,27 @@ export function streamLessonStudyAssistant({
     }
   };
 
-  stream.onerror = () => {
+  stream.addEventListener("done", () => {
     if (didFinalize) {
       return;
     }
 
     didFinalize = true;
     stream.close();
-    if (receivedContent) {
-      onDone?.(receivedContent);
-    } else {
-      onError?.("Unable to get study response.");
+    onDone?.(receivedContent);
+  });
+
+  stream.addEventListener("error", (event) => {
+    if (didFinalize) {
+      return;
     }
-  };
+
+    didFinalize = true;
+    stream.close();
+    const errorMessage = getSseEventData(event) || "Unable to get study response.";
+    onError?.(errorMessage);
+    onDone?.(receivedContent || errorMessage);
+  });
 
   return () => {
     didFinalize = true;
@@ -159,19 +171,27 @@ export function streamPracticeFeedback({
     }
   };
 
-  stream.onerror = () => {
+  stream.addEventListener("done", () => {
     if (didFinalize) {
       return;
     }
 
     didFinalize = true;
     stream.close();
-    if (receivedContent) {
-      onDone?.(receivedContent);
-    } else {
-      onError?.("Unable to get practice feedback.");
+    onDone?.(receivedContent);
+  });
+
+  stream.addEventListener("error", (event) => {
+    if (didFinalize) {
+      return;
     }
-  };
+
+    didFinalize = true;
+    stream.close();
+    const errorMessage = getSseEventData(event) || "Unable to get practice feedback.";
+    onError?.(errorMessage);
+    onDone?.(receivedContent || errorMessage);
+  });
 
   return () => {
     didFinalize = true;

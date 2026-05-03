@@ -23,6 +23,7 @@ CHAT_STREAM_RATE_WINDOW_SECONDS = chat_service.CHAT_STREAM_RATE_WINDOW_SECONDS
 _rate_limit_buckets: dict[int, list[float]] = {}
 
 _format_sse_data = chat_service.format_sse_data
+_format_sse_event = chat_service.format_sse_event
 build_system_prompt = chat_service.build_system_prompt
 generate_conversation_title = chat_service.generate_conversation_title
 _build_openai_input = chat_service.build_openai_input
@@ -93,7 +94,7 @@ async def chat_stream(
             },
         )
         return StreamingResponse(
-            iter([_format_sse_data(MESSAGE_TOO_LONG_ERROR)]),
+            iter([_format_sse_event("error", MESSAGE_TOO_LONG_ERROR)]),
             media_type="text/event-stream",
         )
 
@@ -109,7 +110,7 @@ async def chat_stream(
             },
         )
         return StreamingResponse(
-            iter([_format_sse_data(RATE_LIMIT_ERROR)]),
+            iter([_format_sse_event("error", RATE_LIMIT_ERROR)]),
             media_type="text/event-stream",
         )
 

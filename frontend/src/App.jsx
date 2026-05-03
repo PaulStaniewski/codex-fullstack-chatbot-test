@@ -719,6 +719,45 @@ export default function App() {
       const stream = new EventSource(getStreamUrl(conversation.id, content, token));
       eventSourceRef.current = stream;
 
+      const finalizeFailedStream = (message, toastMessage = "Streaming failed. Please try again.") => {
+        didFinalizeStream = true;
+        stream.close();
+        eventSourceRef.current = null;
+        setIsStreaming(false);
+        setFailedMessage(content);
+        setMessages((current) =>
+          current.map((currentMessage) =>
+            currentMessage.id === tempAssistantMessage.id
+              ? {
+                  ...currentMessage,
+                  content: message || "Streaming failed. Please try again.",
+                  failed: true,
+                  retryContent: content,
+                  isStreaming: false,
+                }
+              : currentMessage,
+          ),
+        );
+        showToast("error", toastMessage);
+      };
+
+      const finalizeSuccessfulStream = () => {
+        didFinalizeStream = true;
+        stream.close();
+        eventSourceRef.current = null;
+        setIsStreaming(false);
+        setFailedMessage(null);
+        setMessages((current) =>
+          current.map((message) =>
+            message.id === tempAssistantMessage.id
+              ? { ...message, content: assistantContent, isStreaming: false }
+              : message,
+          ),
+        );
+        loadConversations();
+        checkProgressAchievements();
+      };
+
       stream.onmessage = (event) => {
         assistantContent += event.data;
         const isStreamError = assistantContent.startsWith("Error:");
@@ -731,53 +770,30 @@ export default function App() {
         );
 
         if (isStreamError) {
-          didFinalizeStream = true;
-          stream.close();
-          eventSourceRef.current = null;
-          setIsStreaming(false);
-          setFailedMessage(content);
-          setMessages((current) =>
-            current.map((message) =>
-              message.id === tempAssistantMessage.id
-                ? { ...message, failed: true, retryContent: content }
-                : message,
-            ),
-          );
-          showToast("error", "Unable to generate response.");
+          finalizeFailedStream(assistantContent, "Unable to generate response.");
         }
       };
 
-      stream.onerror = () => {
+      stream.addEventListener("done", () => {
         if (didFinalizeStream || eventSourceRef.current !== stream) {
           return;
         }
 
-        didFinalizeStream = true;
-        stream.close();
-        eventSourceRef.current = null;
-        setIsStreaming(false);
-        setMessages((current) =>
-          current.map((message) =>
-            message.id === tempAssistantMessage.id
-              ? {
-                  ...message,
-                  content: assistantContent || "Streaming failed. Please try again.",
-                  failed: !assistantContent,
-                  retryContent: !assistantContent ? content : undefined,
-                  isStreaming: false,
-                }
-              : message,
-          ),
-        );
-        if (!assistantContent) {
-          setFailedMessage(content);
-          showToast("error", "Streaming failed. Please try again.");
-        } else {
-          setFailedMessage(null);
-          loadConversations();
-          checkProgressAchievements();
+        finalizeSuccessfulStream();
+      });
+
+      stream.addEventListener("error", (event) => {
+        if (didFinalizeStream || eventSourceRef.current !== stream) {
+          return;
         }
-      };
+
+        const serverError = typeof event?.data === "string" ? event.data : "";
+        assistantContent = serverError || assistantContent;
+        finalizeFailedStream(
+          serverError || assistantContent,
+          serverError ? "Unable to generate response." : "Streaming failed. Please try again.",
+        );
+      });
     } catch (err) {
       setIsStreaming(false);
       setFailedMessage(content);

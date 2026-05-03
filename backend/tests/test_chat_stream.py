@@ -61,6 +61,7 @@ def test_chat_stream_returns_sse_data(client, monkeypatch):
     assert response.headers["content-type"].startswith("text/event-stream")
     assert "data: This " in response.text
     assert "data: a streamed assistant response." in response.text
+    assert "event: done" in response.text
 
 
 def test_chat_stream_normal_streaming_still_works(client, monkeypatch):
@@ -74,6 +75,7 @@ def test_chat_stream_normal_streaming_still_works(client, monkeypatch):
 
     assert response.status_code == 200
     assert "data: This " in response.text
+    assert "event: done" in response.text
     assert "Error:" not in response.text
 
 
@@ -224,7 +226,9 @@ def test_chat_stream_returns_safe_error_when_openai_key_missing(client, monkeypa
     )
 
     assert stream_response.status_code == 200
+    assert "event: error" in stream_response.text
     assert "data: Error: Unable to generate response." in stream_response.text
+    assert "event: done" not in stream_response.text
 
     messages_response = client.get(
         "/messages",
@@ -247,8 +251,10 @@ def test_chat_stream_returns_safe_error_and_skips_assistant_on_stream_failure(
     )
 
     assert stream_response.status_code == 200
+    assert "event: error" in stream_response.text
     assert "data: Error: Unable to generate response." in stream_response.text
     assert "stream failed" not in stream_response.text
+    assert "event: done" not in stream_response.text
 
     messages_response = client.get(
         "/messages",
@@ -269,6 +275,7 @@ def test_chat_stream_rejects_message_that_is_too_long(client, monkeypatch):
     )
 
     assert response.status_code == 200
+    assert "event: error" in response.text
     assert "data: Error: Message is too long." in response.text
 
     messages_response = client.get(
@@ -309,6 +316,9 @@ def test_chat_stream_rate_limit_exceeded(client, monkeypatch):
     assert first_response.status_code == 200
     assert second_response.status_code == 200
     assert limited_response.status_code == 200
+    assert "event: done" in first_response.text
+    assert "event: done" in second_response.text
+    assert "event: error" in limited_response.text
     assert "data: Error: Too many requests. Please wait a moment." in limited_response.text
     assert calls == 2
 

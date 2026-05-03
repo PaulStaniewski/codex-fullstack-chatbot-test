@@ -348,7 +348,7 @@ async def stream_lesson_ai_response(
                     "reason": "openai_authentication_failed",
                 },
             )
-            yield chat_service.format_sse_data(chat_service.SAFE_STREAM_ERROR)
+            yield chat_service.format_sse_event("error", chat_service.SAFE_STREAM_ERROR)
         except APITimeoutError:
             outcome = "error"
             logger.exception(
@@ -363,7 +363,7 @@ async def stream_lesson_ai_response(
                     "reason": "openai_timeout",
                 },
             )
-            yield chat_service.format_sse_data(chat_service.SAFE_STREAM_ERROR)
+            yield chat_service.format_sse_event("error", chat_service.SAFE_STREAM_ERROR)
         except APIConnectionError:
             outcome = "error"
             logger.exception(
@@ -378,7 +378,7 @@ async def stream_lesson_ai_response(
                     "reason": "openai_connection_failed",
                 },
             )
-            yield chat_service.format_sse_data(chat_service.SAFE_STREAM_ERROR)
+            yield chat_service.format_sse_event("error", chat_service.SAFE_STREAM_ERROR)
         except APIStatusError:
             outcome = "error"
             logger.exception(
@@ -393,7 +393,7 @@ async def stream_lesson_ai_response(
                     "reason": "openai_status_error",
                 },
             )
-            yield chat_service.format_sse_data(chat_service.SAFE_STREAM_ERROR)
+            yield chat_service.format_sse_event("error", chat_service.SAFE_STREAM_ERROR)
         except APIError:
             outcome = "error"
             logger.exception(
@@ -408,7 +408,7 @@ async def stream_lesson_ai_response(
                     "reason": "openai_api_error",
                 },
             )
-            yield chat_service.format_sse_data(chat_service.SAFE_STREAM_ERROR)
+            yield chat_service.format_sse_event("error", chat_service.SAFE_STREAM_ERROR)
         except OpenAIError:
             outcome = "error"
             logger.exception(
@@ -423,7 +423,7 @@ async def stream_lesson_ai_response(
                     "reason": "openai_error",
                 },
             )
-            yield chat_service.format_sse_data(chat_service.SAFE_STREAM_ERROR)
+            yield chat_service.format_sse_event("error", chat_service.SAFE_STREAM_ERROR)
         except Exception:
             outcome = "error"
             logger.exception(
@@ -438,7 +438,9 @@ async def stream_lesson_ai_response(
                     "reason": "unexpected_error",
                 },
             )
-            yield chat_service.format_sse_data(chat_service.SAFE_STREAM_ERROR)
+            yield chat_service.format_sse_event("error", chat_service.SAFE_STREAM_ERROR)
+        else:
+            yield chat_service.format_sse_event("done", "done")
     finally:
         logger.info(
             "lesson_stream.end",
@@ -518,7 +520,7 @@ async def stream_practice_feedback_response(
                     "reason": "openai_authentication_failed",
                 },
             )
-            yield chat_service.format_sse_data(chat_service.SAFE_STREAM_ERROR)
+            yield chat_service.format_sse_event("error", chat_service.SAFE_STREAM_ERROR)
             return
         except APITimeoutError:
             outcome = "error"
@@ -534,7 +536,7 @@ async def stream_practice_feedback_response(
                     "reason": "openai_timeout",
                 },
             )
-            yield chat_service.format_sse_data(chat_service.SAFE_STREAM_ERROR)
+            yield chat_service.format_sse_event("error", chat_service.SAFE_STREAM_ERROR)
             return
         except APIConnectionError:
             outcome = "error"
@@ -550,7 +552,7 @@ async def stream_practice_feedback_response(
                     "reason": "openai_connection_failed",
                 },
             )
-            yield chat_service.format_sse_data(chat_service.SAFE_STREAM_ERROR)
+            yield chat_service.format_sse_event("error", chat_service.SAFE_STREAM_ERROR)
             return
         except APIStatusError:
             outcome = "error"
@@ -566,7 +568,7 @@ async def stream_practice_feedback_response(
                     "reason": "openai_status_error",
                 },
             )
-            yield chat_service.format_sse_data(chat_service.SAFE_STREAM_ERROR)
+            yield chat_service.format_sse_event("error", chat_service.SAFE_STREAM_ERROR)
             return
         except APIError:
             outcome = "error"
@@ -582,7 +584,7 @@ async def stream_practice_feedback_response(
                     "reason": "openai_api_error",
                 },
             )
-            yield chat_service.format_sse_data(chat_service.SAFE_STREAM_ERROR)
+            yield chat_service.format_sse_event("error", chat_service.SAFE_STREAM_ERROR)
             return
         except OpenAIError:
             outcome = "error"
@@ -598,7 +600,7 @@ async def stream_practice_feedback_response(
                     "reason": "openai_error",
                 },
             )
-            yield chat_service.format_sse_data(chat_service.SAFE_STREAM_ERROR)
+            yield chat_service.format_sse_event("error", chat_service.SAFE_STREAM_ERROR)
             return
         except Exception:
             outcome = "error"
@@ -614,11 +616,12 @@ async def stream_practice_feedback_response(
                     "reason": "unexpected_error",
                 },
             )
-            yield chat_service.format_sse_data(chat_service.SAFE_STREAM_ERROR)
+            yield chat_service.format_sse_event("error", chat_service.SAFE_STREAM_ERROR)
             return
 
         raw_feedback = "".join(chunks).strip()
         if not raw_feedback:
+            yield chat_service.format_sse_event("done", "done")
             return
         metadata = parse_practice_feedback_metadata(raw_feedback)
         feedback = format_practice_feedback_for_user(metadata, raw_feedback)
@@ -644,6 +647,7 @@ async def stream_practice_feedback_response(
         )
         outcome = "success"
         db.commit()
+        yield chat_service.format_sse_event("done", "done")
     finally:
         logger.info(
             "practice_stream.end",

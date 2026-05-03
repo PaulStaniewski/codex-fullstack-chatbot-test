@@ -22,6 +22,16 @@ async def _fake_feedback_stream(_openai_input):
     yield "Mention the route decorator too."
 
 
+async def _fake_lesson_stream(_openai_input):
+    yield "Lesson "
+    yield "response."
+
+
+async def _failing_openai_stream(_openai_input):
+    raise RuntimeError("stream failed")
+    yield
+
+
 async def _fake_scored_feedback_stream(_openai_input):
     yield '{"summary_feedback":"Good answer. Add the exact route path.",'
     yield '"score":82,'
@@ -455,6 +465,37 @@ def test_lesson_study_stream_invalid_action_returns_400(client):
     assert response.status_code == 400
 
 
+def test_lesson_study_stream_emits_done_event(client, monkeypatch):
+    monkeypatch.setattr("app.routes.lesson_routes._stream_openai_text", _fake_lesson_stream)
+    token = _register_and_login(client, "study-done@example.com")
+
+    response = client.get(
+        "/lessons/docker_basics/study-stream",
+        params={"action": "summarize", "token": token},
+    )
+
+    assert response.status_code == 200
+    assert "data: Lesson " in response.text
+    assert "data: response." in response.text
+    assert "event: done" in response.text
+
+
+def test_lesson_study_stream_emits_error_event(client, monkeypatch):
+    monkeypatch.setattr("app.routes.lesson_routes._stream_openai_text", _failing_openai_stream)
+    token = _register_and_login(client, "study-error@example.com")
+
+    response = client.get(
+        "/lessons/docker_basics/study-stream",
+        params={"action": "summarize", "token": token},
+    )
+
+    assert response.status_code == 200
+    assert "event: error" in response.text
+    assert "data: Error: Unable to generate response." in response.text
+    assert "stream failed" not in response.text
+    assert "event: done" not in response.text
+
+
 def test_lesson_study_prompt_includes_material_action_and_question():
     lesson = get_lesson("docker_basics")
     reading_steps = get_reading_steps_for_study(lesson)
@@ -615,6 +656,7 @@ def test_practice_submission_saved_after_feedback(client, monkeypatch):
 
     assert response.status_code == 200
     assert "Good start" in response.text
+    assert "event: done" in response.text
 
     history_response = client.get(
         "/lessons/docker_compose_basics/practice-history",
@@ -625,6 +667,26 @@ def test_practice_submission_saved_after_feedback(client, monkeypatch):
     assert len(history) == 1
     assert history[0]["answer"] == "I would create a health function."
     assert history[0]["feedback"] == "Good start. Mention the route decorator too."
+
+
+def test_practice_feedback_stream_emits_error_event(client, monkeypatch):
+    monkeypatch.setattr("app.routes.lesson_routes._stream_openai_text", _failing_openai_stream)
+    token = _register_and_login(client, "practice-error@example.com")
+
+    response = client.get(
+        "/lessons/docker_compose_basics/practice-feedback-stream",
+        params={
+            "step_index": 5,
+            "answer": "I would create a health function.",
+            "token": token,
+        },
+    )
+
+    assert response.status_code == 200
+    assert "event: error" in response.text
+    assert "data: Error: Unable to generate response." in response.text
+    assert "stream failed" not in response.text
+    assert "event: done" not in response.text
 
 
 def test_practice_history_returns_user_only_submissions(client, monkeypatch):

@@ -56,9 +56,14 @@ StreamTextCallable = Callable[[list[dict[str, str]]], AsyncIterator[str]]
 DisconnectCallable = Callable[[], Awaitable[bool]]
 
 
-def format_sse_data(value: str) -> str:
+def format_sse_data(value: str, event: str | None = None) -> str:
     lines = value.replace("\r\n", "\n").replace("\r", "\n").split("\n")
-    return "".join(f"data: {line}\n" for line in lines) + "\n"
+    event_prefix = f"event: {event}\n" if event else ""
+    return event_prefix + "".join(f"data: {line}\n" for line in lines) + "\n"
+
+
+def format_sse_event(event: str, value: str = "") -> str:
+    return format_sse_data(value, event=event)
 
 
 def build_system_prompt(mode: str) -> str:
@@ -290,7 +295,7 @@ async def stream_chat_response(
                     "reason": "openai_authentication_failed",
                 },
             )
-            yield format_sse_data(SAFE_STREAM_ERROR)
+            yield format_sse_event("error", SAFE_STREAM_ERROR)
             return
         except APITimeoutError:
             outcome = "error"
@@ -305,7 +310,7 @@ async def stream_chat_response(
                     "reason": "openai_timeout",
                 },
             )
-            yield format_sse_data(SAFE_STREAM_ERROR)
+            yield format_sse_event("error", SAFE_STREAM_ERROR)
             return
         except APIConnectionError:
             outcome = "error"
@@ -320,7 +325,7 @@ async def stream_chat_response(
                     "reason": "openai_connection_failed",
                 },
             )
-            yield format_sse_data(SAFE_STREAM_ERROR)
+            yield format_sse_event("error", SAFE_STREAM_ERROR)
             return
         except APIStatusError:
             outcome = "error"
@@ -335,7 +340,7 @@ async def stream_chat_response(
                     "reason": "openai_status_error",
                 },
             )
-            yield format_sse_data(SAFE_STREAM_ERROR)
+            yield format_sse_event("error", SAFE_STREAM_ERROR)
             return
         except APIError:
             outcome = "error"
@@ -350,7 +355,7 @@ async def stream_chat_response(
                     "reason": "openai_api_error",
                 },
             )
-            yield format_sse_data(SAFE_STREAM_ERROR)
+            yield format_sse_event("error", SAFE_STREAM_ERROR)
             return
         except OpenAIError:
             outcome = "error"
@@ -365,7 +370,7 @@ async def stream_chat_response(
                     "reason": "openai_error",
                 },
             )
-            yield format_sse_data(SAFE_STREAM_ERROR)
+            yield format_sse_event("error", SAFE_STREAM_ERROR)
             return
         except Exception:
             outcome = "error"
@@ -380,22 +385,21 @@ async def stream_chat_response(
                     "reason": "unexpected_error",
                 },
             )
-            yield format_sse_data(SAFE_STREAM_ERROR)
+            yield format_sse_event("error", SAFE_STREAM_ERROR)
             return
 
         assistant_content = "".join(chunks).strip()
-        if not assistant_content:
-            return
-
-        outcome = "success"
-        persist_assistant_message(
-            db,
-            conversation_id=conversation_id,
-            user_id=user_id,
-            content=assistant_content,
-            should_generate_title=should_generate_title,
-            title_source=clean_message,
-        )
+        if assistant_content:
+            outcome = "success"
+            persist_assistant_message(
+                db,
+                conversation_id=conversation_id,
+                user_id=user_id,
+                content=assistant_content,
+                should_generate_title=should_generate_title,
+                title_source=clean_message,
+            )
+        yield format_sse_event("done", "done")
     finally:
         logger.info(
             "chat_stream.end",

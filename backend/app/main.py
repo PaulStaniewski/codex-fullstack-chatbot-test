@@ -6,7 +6,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.observability import request_id_middleware
+from app.observability import request_id_middleware, security_headers_middleware
 from app.routes import (
     auth_routes,
     chat_routes,
@@ -19,6 +19,7 @@ from app.routes import (
 
 app = FastAPI(title="Fullstack Chatbot API")
 app.middleware("http")(request_id_middleware)
+app.middleware("http")(security_headers_middleware)
 
 
 def _get_allowed_origins() -> list[str]:

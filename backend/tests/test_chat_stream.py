@@ -45,13 +45,25 @@ def test_chat_stream_requires_token(client):
 
 def test_chat_stream_invalid_conversation_returns_404(client):
     token, _conversation_id = _create_authenticated_conversation(client)
+    stream_token = _create_stream_token(client, token)
 
     response = client.get(
         "/chat-stream",
-        params={"conversation_id": 999, "message": "hello", "token": token},
+        params={"conversation_id": 999, "message": "hello", "token": stream_token},
     )
 
     assert response.status_code == 404
+
+
+def test_chat_stream_rejects_access_token_query_param(client):
+    token, conversation_id = _create_authenticated_conversation(client)
+
+    response = client.get(
+        "/chat-stream",
+        params={"conversation_id": conversation_id, "message": "hello", "token": token},
+    )
+
+    assert response.status_code == 401
 
 
 def test_chat_stream_returns_sse_data(client, monkeypatch):
@@ -107,10 +119,11 @@ def test_chat_stream_rejects_expired_stream_token(client, monkeypatch):
 def test_chat_stream_normal_streaming_still_works(client, monkeypatch):
     monkeypatch.setattr("app.routes.chat_routes._stream_openai_text", _fake_openai_stream)
     token, conversation_id = _create_authenticated_conversation(client)
+    stream_token = _create_stream_token(client, token)
 
     response = client.get(
         "/chat-stream",
-        params={"conversation_id": conversation_id, "message": "hello", "token": token},
+        params={"conversation_id": conversation_id, "message": "hello", "token": stream_token},
     )
 
     assert response.status_code == 200
@@ -134,13 +147,14 @@ def test_chat_stream_uses_interview_system_prompt(client, monkeypatch):
         json={"mode": "interview"},
         headers={"Authorization": f"Bearer {token}"},
     )
+    stream_token = _create_stream_token(client, token)
 
     response = client.get(
         "/chat-stream",
         params={
             "conversation_id": conversation_id,
             "message": "Practice FastAPI interviews",
-            "token": token,
+            "token": stream_token,
         },
     )
 
@@ -176,10 +190,11 @@ def test_chat_stream_limits_openai_history_by_recent_messages(client, monkeypatc
             },
             headers={"Authorization": f"Bearer {token}"},
         )
+    stream_token = _create_stream_token(client, token)
 
     response = client.get(
         "/chat-stream",
-        params={"conversation_id": conversation_id, "message": "current", "token": token},
+        params={"conversation_id": conversation_id, "message": "current", "token": stream_token},
     )
 
     assert response.status_code == 200
@@ -220,10 +235,11 @@ def test_chat_stream_limits_openai_history_by_character_budget(client, monkeypat
         },
         headers={"Authorization": f"Bearer {token}"},
     )
+    stream_token = _create_stream_token(client, token)
 
     response = client.get(
         "/chat-stream",
-        params={"conversation_id": conversation_id, "message": "current", "token": token},
+        params={"conversation_id": conversation_id, "message": "current", "token": stream_token},
     )
 
     assert response.status_code == 200
@@ -236,10 +252,11 @@ def test_chat_stream_limits_openai_history_by_character_budget(client, monkeypat
 def test_chat_stream_persists_user_and_assistant_messages(client, monkeypatch):
     monkeypatch.setattr("app.routes.chat_routes._stream_openai_text", _fake_openai_stream)
     token, conversation_id = _create_authenticated_conversation(client)
+    stream_token = _create_stream_token(client, token)
 
     stream_response = client.get(
         "/chat-stream",
-        params={"conversation_id": conversation_id, "message": "hello", "token": token},
+        params={"conversation_id": conversation_id, "message": "hello", "token": stream_token},
     )
     assert stream_response.status_code == 200
 
@@ -259,10 +276,11 @@ def test_chat_stream_persists_user_and_assistant_messages(client, monkeypatch):
 def test_chat_stream_returns_safe_error_when_openai_key_missing(client, monkeypatch):
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     token, conversation_id = _create_authenticated_conversation(client)
+    stream_token = _create_stream_token(client, token)
 
     stream_response = client.get(
         "/chat-stream",
-        params={"conversation_id": conversation_id, "message": "hello", "token": token},
+        params={"conversation_id": conversation_id, "message": "hello", "token": stream_token},
     )
 
     assert stream_response.status_code == 200
@@ -284,10 +302,11 @@ def test_chat_stream_returns_safe_error_and_skips_assistant_on_stream_failure(
 ):
     monkeypatch.setattr("app.routes.chat_routes._stream_openai_text", _failing_openai_stream)
     token, conversation_id = _create_authenticated_conversation(client)
+    stream_token = _create_stream_token(client, token)
 
     stream_response = client.get(
         "/chat-stream",
-        params={"conversation_id": conversation_id, "message": "hello", "token": token},
+        params={"conversation_id": conversation_id, "message": "hello", "token": stream_token},
     )
 
     assert stream_response.status_code == 200
@@ -308,10 +327,11 @@ def test_chat_stream_returns_safe_error_and_skips_assistant_on_stream_failure(
 def test_chat_stream_rejects_message_that_is_too_long(client, monkeypatch):
     monkeypatch.setattr("app.routes.chat_routes._stream_openai_text", _fake_openai_stream)
     token, conversation_id = _create_authenticated_conversation(client)
+    stream_token = _create_stream_token(client, token)
 
     response = client.get(
         "/chat-stream",
-        params={"conversation_id": conversation_id, "message": "x" * 2001, "token": token},
+        params={"conversation_id": conversation_id, "message": "x" * 2001, "token": stream_token},
     )
 
     assert response.status_code == 200
@@ -342,15 +362,27 @@ def test_chat_stream_rate_limit_exceeded(client, monkeypatch):
 
     first_response = client.get(
         "/chat-stream",
-        params={"conversation_id": conversation_id, "message": "one", "token": token},
+        params={
+            "conversation_id": conversation_id,
+            "message": "one",
+            "token": _create_stream_token(client, token),
+        },
     )
     second_response = client.get(
         "/chat-stream",
-        params={"conversation_id": conversation_id, "message": "two", "token": token},
+        params={
+            "conversation_id": conversation_id,
+            "message": "two",
+            "token": _create_stream_token(client, token),
+        },
     )
     limited_response = client.get(
         "/chat-stream",
-        params={"conversation_id": conversation_id, "message": "three", "token": token},
+        params={
+            "conversation_id": conversation_id,
+            "message": "three",
+            "token": _create_stream_token(client, token),
+        },
     )
 
     assert first_response.status_code == 200
@@ -380,13 +412,14 @@ def test_chat_stream_generates_title_for_empty_conversation_title(client, monkey
         headers={"Authorization": f"Bearer {token}"},
     )
     conversation_id = conversation_response.json()["id"]
+    stream_token = _create_stream_token(client, token)
 
     stream_response = client.get(
         "/chat-stream",
         params={
             "conversation_id": conversation_id,
             "message": "explain Docker networking!",
-            "token": token,
+            "token": stream_token,
         },
     )
     conversations_response = client.get(

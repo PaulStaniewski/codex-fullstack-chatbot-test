@@ -27,6 +27,12 @@ def _register_and_login(client, email="progress@example.com"):
     return login_response.json()["access_token"]
 
 
+def _create_stream_token(client, token):
+    response = client.post("/stream-token", headers={"Authorization": f"Bearer {token}"})
+    assert response.status_code == 200
+    return response.json()["stream_token"]
+
+
 async def _fake_openai_stream(_openai_input):
     yield "Assistant reply"
 
@@ -69,9 +75,10 @@ def test_progress_tracks_sessions_messages_and_achievements(client, monkeypatch)
         headers={"Authorization": f"Bearer {token}"},
     )
     conversation_id = conversation_response.json()["id"]
+    stream_token = _create_stream_token(client, token)
     stream_response = client.get(
         "/chat-stream",
-        params={"conversation_id": conversation_id, "message": "hello", "token": token},
+        params={"conversation_id": conversation_id, "message": "hello", "token": stream_token},
     )
     assert stream_response.status_code == 200
     assert "Assistant reply" in stream_response.text

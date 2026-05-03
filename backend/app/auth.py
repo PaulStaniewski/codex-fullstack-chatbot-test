@@ -249,7 +249,7 @@ def get_user_from_sse_token(db: Session, token: str) -> models.User:
         return user
     except HTTPException:
         db.rollback()
-        return get_user_from_token(db, token)
+        raise
 
 
 def get_session_id_from_access_token(token: str) -> str | None:

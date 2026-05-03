@@ -23,6 +23,10 @@ def _create_stream_token(client, access_token):
     return response.json()["stream_token"]
 
 
+def _stream_params(client, access_token, **params):
+    return {**params, "token": _create_stream_token(client, access_token)}
+
+
 async def _fake_feedback_stream(_openai_input):
     yield "Good start. "
     yield "Mention the route decorator too."
@@ -449,12 +453,23 @@ def test_lesson_study_stream_requires_auth(client):
     assert response.status_code == 401
 
 
+def test_lesson_study_stream_rejects_access_token_query_param(client):
+    token = _register_and_login(client, "study-access-token@example.com")
+
+    response = client.get(
+        "/lessons/docker_basics/study-stream",
+        params={"action": "summarize", "token": token},
+    )
+
+    assert response.status_code == 401
+
+
 def test_lesson_study_stream_unknown_lesson_returns_404(client):
     token = _register_and_login(client, "study-unknown@example.com")
 
     response = client.get(
         "/lessons/unknown/study-stream",
-        params={"action": "summarize", "token": token},
+        params=_stream_params(client, token, action="summarize"),
     )
 
     assert response.status_code == 404
@@ -465,7 +480,7 @@ def test_lesson_study_stream_invalid_action_returns_400(client):
 
     response = client.get(
         "/lessons/docker_basics/study-stream",
-        params={"action": "invalid", "token": token},
+        params=_stream_params(client, token, action="invalid"),
     )
 
     assert response.status_code == 400
@@ -512,7 +527,7 @@ def test_lesson_study_stream_emits_error_event(client, monkeypatch):
 
     response = client.get(
         "/lessons/docker_basics/study-stream",
-        params={"action": "summarize", "token": token},
+        params=_stream_params(client, token, action="summarize"),
     )
 
     assert response.status_code == 200
@@ -555,7 +570,7 @@ def test_lesson_tutor_stream_unknown_lesson_returns_404(client):
 
     response = client.get(
         "/lessons/unknown/tutor-stream",
-        params={"question": "Explain this", "token": token},
+        params=_stream_params(client, token, question="Explain this"),
     )
 
     assert response.status_code == 404
@@ -566,7 +581,7 @@ def test_lesson_tutor_stream_invalid_step_index_returns_400(client):
 
     response = client.get(
         "/lessons/docker_basics/tutor-stream",
-        params={"question": "Explain this", "step_index": 99, "token": token},
+        params=_stream_params(client, token, question="Explain this", step_index=99),
     )
 
     assert response.status_code == 400
@@ -577,7 +592,7 @@ def test_lesson_tutor_stream_empty_question_rejected(client):
 
     response = client.get(
         "/lessons/docker_basics/tutor-stream",
-        params={"question": "   ", "token": token},
+        params=_stream_params(client, token, question="   "),
     )
 
     assert response.status_code == 400
@@ -605,12 +620,23 @@ def test_practice_feedback_stream_requires_auth(client):
     assert response.status_code == 401
 
 
+def test_practice_feedback_stream_rejects_access_token_query_param(client):
+    token = _register_and_login(client, "practice-access-token@example.com")
+
+    response = client.get(
+        "/lessons/docker_compose_basics/practice-feedback-stream",
+        params={"step_index": 5, "answer": "I would add app.get.", "token": token},
+    )
+
+    assert response.status_code == 401
+
+
 def test_practice_feedback_stream_unknown_lesson_returns_404(client):
     token = _register_and_login(client)
 
     response = client.get(
         "/lessons/unknown/practice-feedback-stream",
-        params={"step_index": 0, "answer": "My answer", "token": token},
+        params=_stream_params(client, token, step_index=0, answer="My answer"),
     )
 
     assert response.status_code == 404
@@ -621,7 +647,7 @@ def test_practice_feedback_stream_invalid_step_index_returns_400(client):
 
     response = client.get(
         "/lessons/docker_compose_basics/practice-feedback-stream",
-        params={"step_index": 99, "answer": "My answer", "token": token},
+        params=_stream_params(client, token, step_index=99, answer="My answer"),
     )
 
     assert response.status_code == 400
@@ -632,7 +658,7 @@ def test_practice_feedback_stream_non_practice_step_rejected(client):
 
     response = client.get(
         "/lessons/docker_compose_basics/practice-feedback-stream",
-        params={"step_index": 0, "answer": "My answer", "token": token},
+        params=_stream_params(client, token, step_index=0, answer="My answer"),
     )
 
     assert response.status_code == 400
@@ -643,7 +669,7 @@ def test_practice_feedback_stream_empty_answer_rejected(client):
 
     response = client.get(
         "/lessons/docker_compose_basics/practice-feedback-stream",
-        params={"step_index": 5, "answer": "   ", "token": token},
+        params=_stream_params(client, token, step_index=5, answer="   "),
     )
 
     assert response.status_code == 400
@@ -670,15 +696,15 @@ def test_practice_feedback_prompt_includes_instruction_and_user_answer():
 def test_practice_submission_saved_after_feedback(client, monkeypatch):
     monkeypatch.setattr("app.routes.lesson_routes._stream_openai_text", _fake_feedback_stream)
     token = _register_and_login(client)
-    stream_token = _create_stream_token(client, token)
 
     response = client.get(
         "/lessons/docker_compose_basics/practice-feedback-stream",
-        params={
-            "step_index": 5,
-            "answer": "I would create a health function.",
-            "token": stream_token,
-        },
+        params=_stream_params(
+            client,
+            token,
+            step_index=5,
+            answer="I would create a health function.",
+        ),
     )
 
     assert response.status_code == 200
@@ -702,11 +728,12 @@ def test_practice_feedback_stream_emits_error_event(client, monkeypatch):
 
     response = client.get(
         "/lessons/docker_compose_basics/practice-feedback-stream",
-        params={
-            "step_index": 5,
-            "answer": "I would create a health function.",
-            "token": token,
-        },
+        params=_stream_params(
+            client,
+            token,
+            step_index=5,
+            answer="I would create a health function.",
+        ),
     )
 
     assert response.status_code == 200
@@ -723,11 +750,11 @@ def test_practice_history_returns_user_only_submissions(client, monkeypatch):
 
     client.get(
         "/lessons/docker_compose_basics/practice-feedback-stream",
-        params={"step_index": 5, "answer": "First user answer", "token": first_token},
+        params=_stream_params(client, first_token, step_index=5, answer="First user answer"),
     )
     client.get(
         "/lessons/docker_compose_basics/practice-feedback-stream",
-        params={"step_index": 5, "answer": "Second user answer", "token": second_token},
+        params=_stream_params(client, second_token, step_index=5, answer="Second user answer"),
     )
 
     response = client.get(
@@ -746,11 +773,11 @@ def test_practice_history_ordered_newest_first(client, monkeypatch):
 
     client.get(
         "/lessons/docker_compose_basics/practice-feedback-stream",
-        params={"step_index": 5, "answer": "Older answer", "token": token},
+        params=_stream_params(client, token, step_index=5, answer="Older answer"),
     )
     client.get(
         "/lessons/docker_compose_basics/practice-feedback-stream",
-        params={"step_index": 5, "answer": "Newer answer", "token": token},
+        params=_stream_params(client, token, step_index=5, answer="Newer answer"),
     )
 
     response = client.get(
@@ -769,7 +796,7 @@ def test_practice_history_supports_limit_and_offset_pagination(client, monkeypat
     for answer in ["First answer", "Second answer", "Third answer"]:
         client.get(
             "/lessons/docker_compose_basics/practice-feedback-stream",
-            params={"step_index": 5, "answer": answer, "token": token},
+            params=_stream_params(client, token, step_index=5, answer=answer),
         )
 
     response = client.get(
@@ -874,11 +901,12 @@ def test_practice_submission_saves_score_metadata(client, monkeypatch):
 
     client.get(
         "/lessons/docker_compose_basics/practice-feedback-stream",
-        params={
-            "step_index": 5,
-            "answer": "I would use a GET endpoint.",
-            "token": token,
-        },
+        params=_stream_params(
+            client,
+            token,
+            step_index=5,
+            answer="I would use a GET endpoint.",
+        ),
     )
     history_response = client.get(
         "/lessons/docker_compose_basics/practice-history",
@@ -905,11 +933,12 @@ def test_practice_submission_malformed_json_still_saves_fallback_feedback(client
 
     client.get(
         "/lessons/docker_compose_basics/practice-feedback-stream",
-        params={
-            "step_index": 5,
-            "answer": "I would create a health route.",
-            "token": token,
-        },
+        params=_stream_params(
+            client,
+            token,
+            step_index=5,
+            answer="I would create a health route.",
+        ),
     )
     history_response = client.get(
         "/lessons/docker_compose_basics/practice-history",
@@ -929,7 +958,7 @@ def test_practice_submission_first_attempt_number_is_one(client, monkeypatch):
 
     client.get(
         "/lessons/docker_compose_basics/practice-feedback-stream",
-        params={"step_index": 5, "answer": "First answer", "token": token},
+        params=_stream_params(client, token, step_index=5, answer="First answer"),
     )
     history_response = client.get(
         "/lessons/docker_compose_basics/practice-history",
@@ -945,11 +974,11 @@ def test_practice_submission_second_attempt_increments(client, monkeypatch):
 
     client.get(
         "/lessons/docker_compose_basics/practice-feedback-stream",
-        params={"step_index": 5, "answer": "First answer", "token": token},
+        params=_stream_params(client, token, step_index=5, answer="First answer"),
     )
     client.get(
         "/lessons/docker_compose_basics/practice-feedback-stream",
-        params={"step_index": 5, "answer": "Second answer", "token": token},
+        params=_stream_params(client, token, step_index=5, answer="Second answer"),
     )
     history_response = client.get(
         "/lessons/docker_compose_basics/practice-history",
@@ -965,11 +994,11 @@ def test_practice_submission_numbering_scoped_to_step(client, monkeypatch):
 
     client.get(
         "/lessons/docker_compose_basics/practice-feedback-stream",
-        params={"step_index": 5, "answer": "Routing practice", "token": token},
+        params=_stream_params(client, token, step_index=5, answer="Routing practice"),
     )
     client.get(
         "/lessons/postgres_container_not_ready/practice-feedback-stream",
-        params={"step_index": 5, "answer": "Dependency practice", "token": token},
+        params=_stream_params(client, token, step_index=5, answer="Dependency practice"),
     )
 
     routing_history = client.get(
@@ -992,11 +1021,11 @@ def test_practice_submission_numbering_scoped_to_user(client, monkeypatch):
 
     client.get(
         "/lessons/docker_compose_basics/practice-feedback-stream",
-        params={"step_index": 5, "answer": "First user answer", "token": first_token},
+        params=_stream_params(client, first_token, step_index=5, answer="First user answer"),
     )
     client.get(
         "/lessons/docker_compose_basics/practice-feedback-stream",
-        params={"step_index": 5, "answer": "Second user answer", "token": second_token},
+        params=_stream_params(client, second_token, step_index=5, answer="Second user answer"),
     )
 
     first_history = client.get(

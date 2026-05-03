@@ -19,6 +19,12 @@ def _create_conversation(client, token, title="Original title"):
     return response.json()
 
 
+def _create_stream_token(client, token):
+    response = client.post("/stream-token", headers={"Authorization": f"Bearer {token}"})
+    assert response.status_code == 200
+    return response.json()["stream_token"]
+
+
 def test_owner_can_rename_conversation(client):
     token = _register_and_login(client, "owner@example.com")
     conversation = _create_conversation(client, token)
@@ -54,10 +60,11 @@ def test_owner_can_delete_conversation_and_related_messages(client, monkeypatch)
     monkeypatch.setattr("app.routes.chat_routes._stream_openai_text", fake_stream)
     token = _register_and_login(client, "owner@example.com")
     conversation = _create_conversation(client, token)
+    stream_token = _create_stream_token(client, token)
 
     client.get(
         "/chat-stream",
-        params={"conversation_id": conversation["id"], "message": "hello", "token": token},
+        params={"conversation_id": conversation["id"], "message": "hello", "token": stream_token},
     )
 
     response = client.delete(
@@ -158,10 +165,11 @@ def test_owner_can_export_conversation(client, monkeypatch):
     monkeypatch.setattr("app.routes.chat_routes._stream_openai_text", fake_stream)
     token = _register_and_login(client, "owner@example.com")
     conversation = _create_conversation(client, token, title="Export me")
+    stream_token = _create_stream_token(client, token)
 
     client.get(
         "/chat-stream",
-        params={"conversation_id": conversation["id"], "message": "hello", "token": token},
+        params={"conversation_id": conversation["id"], "message": "hello", "token": stream_token},
     )
     response = client.get(
         f"/conversations/{conversation['id']}/export",

@@ -9,71 +9,74 @@ LESSONS = {
                 "type": "intro",
                 "title": "What Docker is",
                 "content": (
-                    "Docker is a tool for packaging an application with the files, dependencies, and "
-                    "startup command it needs. It runs that package as a container, which is an isolated "
-                    "app process with its own filesystem and environment."
+                    "Docker packages an app with the runtime, files, dependencies, and startup command "
+                    "it needs. It exists to reduce works on my machine bugs by running the app in a "
+                    "repeatable container instead of relying on each developer's laptop setup."
                 ),
             },
             {
                 "type": "concept",
                 "title": "Images and containers",
                 "content": (
-                    "An image is the built template for your app. It includes things like the base "
-                    "runtime, installed packages, copied source files, and default command. A container "
-                    "is what you get when you run that image. The image is like a saved recipe; the "
-                    "container is the running meal. Docker solves the classic works on my machine problem "
-                    "by making the runtime repeatable. Instead of relying on each laptop to have the same "
-                    "Python version and packages, the project builds one image and runs containers from it."
+                    "An image is the built template for your app; a container is a running instance of "
+                    "that image. Think of the image as a recipe and the container as the meal being "
+                    "served. Build means creating the image: installing packages, copying files, and "
+                    "saving a default command. Run means starting a container from that image with runtime "
+                    "settings like ports and environment variables. A container is not a full virtual "
+                    "machine; it is an isolated process with its own filesystem, process view, network "
+                    "view, and environment. Common trap: localhost inside a container means that same "
+                    "container, not your database or host machine."
                 ),
             },
             {
                 "type": "example",
                 "title": "A small backend Dockerfile",
                 "content": (
-                    "A simple Dockerfile can look like this:\n\n"
+                    "A FastAPI Dockerfile can look like this:\n\n"
                     "FROM python:3.12-slim\n"
                     "WORKDIR /app\n"
                     "COPY requirements.txt .\n"
                     "RUN pip install --no-cache-dir -r requirements.txt\n"
                     "COPY . .\n"
                     "CMD [\"uvicorn\", \"app.main:app\", \"--host\", \"0.0.0.0\", \"--port\", \"8000\"]\n\n"
-                    "FROM chooses the Python base image. WORKDIR sets the app folder. COPY and RUN add "
-                    "dependencies and source code to the image. CMD is the command used when a container "
-                    "starts from the image. Binding to 0.0.0.0 lets traffic reach the app from outside "
-                    "the container."
+                    "FROM chooses Python on a small Linux base. WORKDIR makes /app the working folder. "
+                    "COPY requirements.txt adds only the dependency list first. RUN installs those "
+                    "dependencies into the image. This order helps caching: code edits do not reinstall "
+                    "packages unless requirements.txt changes. COPY . . adds the app source. CMD is the "
+                    "default command used when a container starts, not during image build."
                 ),
             },
             {
                 "type": "checklist",
                 "title": "Docker basics checklist",
                 "content": (
-                    "- Build creates an image; run starts a container from that image.\n"
-                    "- Put installed dependencies and app files in the image.\n"
-                    "- Pass config like DATABASE_URL when the container runs.\n"
-                    "- Rebuild the image after Dockerfile or dependency changes.\n"
-                    "- Check container logs when startup fails.\n"
-                    "- Remember localhost inside a container means that container."
+                    "- Decide first: is this a build failure or a run failure?\n"
+                    "- Missing package? Check requirements.txt and rebuild the image.\n"
+                    "- Database URL failing? Do not use localhost when you mean another container.\n"
+                    "- App unreachable? Check host port mapping and the app bind address.\n"
+                    "- Data disappeared? Use a volume instead of container storage.\n"
+                    "- Read container logs before rebuilding or changing code."
                 ),
             },
             {
                 "type": "practice",
-                "title": "Practice - Debug a teammate setup",
+                "title": "Practice - Debug database connection",
                 "difficulty": "easy",
                 "content": (
-                    "A teammate can run the backend locally, but CI fails because Python packages are "
-                    "missing. Explain how a Docker image and container would make this setup more "
-                    "repeatable."
+                    "Your FastAPI container starts but logs Connection refused localhost:5432 when it "
+                    "tries to reach Postgres. Explain what localhost means inside the container and what "
+                    "you would check next."
                 ),
             },
             {
                 "type": "summary",
                 "title": "Summary",
                 "content": (
-                    "- An image is the built template for an app.\n"
-                    "- A container is a running instance of an image.\n"
-                    "- Docker improves reproducibility across machines.\n"
-                    "- Build-time setup belongs in the image.\n"
-                    "- Runtime config should be passed when the container starts."
+                    "- Docker makes app runtime setup repeatable.\n"
+                    "- An image is the built template; a container is the running instance.\n"
+                    "- Build creates the image; run starts the container.\n"
+                    "- localhost inside a container means that container.\n"
+                    "- Reproducible images reduce works on my machine bugs."
                 ),
             },
         ],

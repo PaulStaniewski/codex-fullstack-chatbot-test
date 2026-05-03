@@ -1,5 +1,5 @@
 from app import models
-from app.lessons import get_lesson
+from app.lessons import LESSONS, get_lesson
 from app.progress import XP_PER_LESSON_COMPLETION
 from app.routes.lesson_routes import (
     build_lesson_study_prompt,
@@ -52,6 +52,54 @@ async def _fake_scored_feedback_stream(_openai_input):
 
 async def _fake_malformed_feedback_stream(_openai_input):
     yield "{not valid json"
+
+
+def test_lessons_dictionary_has_valid_structure():
+    expected_lesson_ids = {
+        "docker_basics",
+        "docker_compose_basics",
+        "postgres_container_not_ready",
+        "docker_healthcheck_missing",
+        "docker_startup_race_condition",
+        "docker_production_hardening",
+    }
+
+    assert set(LESSONS) == expected_lesson_ids
+    for lesson_id, lesson in LESSONS.items():
+        assert lesson["lesson_id"] == lesson_id
+        assert lesson["course_id"] == "docker"
+        assert lesson["title"].strip()
+        assert lesson["difficulty"] in {"easy", "medium", "hard", "production"}
+        assert len(lesson["steps"]) >= 1
+
+        step_types = {step["type"] for step in lesson["steps"]}
+        assert "intro" in step_types
+        assert "summary" in step_types
+        assert "practice" in step_types
+
+        for step in lesson["steps"]:
+            assert step["type"] in {
+                "intro",
+                "concept",
+                "deep_dive",
+                "example",
+                "checklist",
+                "practice",
+                "summary",
+            }
+            assert step["title"].strip()
+            assert step["content"].strip()
+            if step["type"] == "practice":
+                assert step["difficulty"] in {"easy", "medium", "hard", "production"}
+
+
+def test_lessons_use_resolved_final_content():
+    assert "Docker is often introduced as a packaging tool" in LESSONS["docker_basics"]["steps"][0][
+        "content"
+    ]
+    assert "Startup races often look random" in LESSONS["docker_startup_race_condition"]["steps"][8][
+        "content"
+    ]
 
 
 def test_get_lesson_creates_progress(client):

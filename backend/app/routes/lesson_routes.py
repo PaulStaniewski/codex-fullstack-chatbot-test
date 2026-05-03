@@ -11,6 +11,8 @@ from app.services import chat_service, lesson_ai_service
 
 
 router = APIRouter(prefix="/lessons", tags=["lessons"])
+DEFAULT_PRACTICE_HISTORY_LIMIT = 50
+MAX_PRACTICE_HISTORY_LIMIT = 100
 
 THEORY_STEP_XP = {
     "intro": 5,
@@ -407,6 +409,8 @@ async def lesson_practice_feedback_stream(
 @router.get("/{lesson_id}/practice-history", response_model=list[schemas.PracticeSubmissionRead])
 def get_practice_history(
     lesson_id: str,
+    limit: int = Query(default=DEFAULT_PRACTICE_HISTORY_LIMIT, ge=1, le=MAX_PRACTICE_HISTORY_LIMIT),
+    offset: int = Query(default=0, ge=0),
     current_user: models.User = Depends(auth.get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -418,5 +422,7 @@ def get_practice_history(
             models.PracticeSubmission.lesson_id == lesson_id,
         )
         .order_by(models.PracticeSubmission.created_at.desc(), models.PracticeSubmission.id.desc())
+        .offset(offset)
+        .limit(limit)
         .all()
     )

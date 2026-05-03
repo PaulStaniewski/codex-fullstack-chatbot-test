@@ -26,6 +26,29 @@ MAX_CHAT_MESSAGE_LENGTH = 2000
 MAX_GENERATED_TITLE_LENGTH = 60
 CHAT_STREAM_RATE_LIMIT = 10
 CHAT_STREAM_RATE_WINDOW_SECONDS = 60
+DEFAULT_CHAT_HISTORY_MAX_MESSAGES = 20
+DEFAULT_CHAT_HISTORY_MAX_CHARS = 12000
+
+
+def _get_positive_int_env(name: str, default: int) -> int:
+    raw_value = os.getenv(name)
+    if raw_value is None:
+        return default
+    try:
+        value = int(raw_value)
+    except ValueError:
+        return default
+    return max(0, value)
+
+
+CHAT_HISTORY_MAX_MESSAGES = _get_positive_int_env(
+    "CHAT_HISTORY_MAX_MESSAGES",
+    DEFAULT_CHAT_HISTORY_MAX_MESSAGES,
+)
+CHAT_HISTORY_MAX_CHARS = _get_positive_int_env(
+    "CHAT_HISTORY_MAX_CHARS",
+    DEFAULT_CHAT_HISTORY_MAX_CHARS,
+)
 
 StreamTextCallable = Callable[[list[dict[str, str]]], AsyncIterator[str]]
 DisconnectCallable = Callable[[], Awaitable[bool]]
@@ -78,18 +101,32 @@ def generate_conversation_title(text: str) -> str:
 def build_openai_input(
     db: Session, conversation_id: int, current_message: str, mode: str
 ) -> list[dict[str, str]]:
-    previous_messages = (
+    recent_messages = (
         db.query(models.Message)
         .filter(models.Message.conversation_id == conversation_id)
-        .order_by(models.Message.created_at.asc())
+        .order_by(models.Message.created_at.desc(), models.Message.id.desc())
+        .limit(CHAT_HISTORY_MAX_MESSAGES)
         .all()
     )
+    previous_messages = list(reversed(recent_messages))
+
+    history_messages: list[dict[str, str]] = []
+    used_chars = 0
+    for message in reversed(previous_messages):
+        if message.role not in {"user", "assistant"} or not message.content:
+            continue
+
+        message_chars = len(message.content)
+        if CHAT_HISTORY_MAX_CHARS and used_chars + message_chars > CHAT_HISTORY_MAX_CHARS:
+            continue
+
+        history_messages.append({"role": message.role, "content": message.content})
+        used_chars += message_chars
+
+    history_messages.reverse()
+
     openai_input = [{"role": "system", "content": build_system_prompt(mode)}]
-    openai_input.extend([
-        {"role": message.role, "content": message.content}
-        for message in previous_messages
-        if message.role in {"user", "assistant"} and message.content
-    ])
+    openai_input.extend(history_messages)
     openai_input.append({"role": "user", "content": current_message})
     return openai_input
 

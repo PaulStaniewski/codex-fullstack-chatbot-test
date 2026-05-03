@@ -111,6 +111,86 @@ def test_chat_stream_uses_interview_system_prompt(client, monkeypatch):
     )
 
 
+def test_chat_stream_limits_openai_history_by_recent_messages(client, monkeypatch):
+    captured_input = None
+
+    async def capture_openai_input(openai_input):
+        nonlocal captured_input
+        captured_input = openai_input
+        yield "ok"
+
+    monkeypatch.setattr("app.routes.chat_routes._stream_openai_text", capture_openai_input)
+    monkeypatch.setattr("app.services.chat_service.CHAT_HISTORY_MAX_MESSAGES", 4)
+    monkeypatch.setattr("app.services.chat_service.CHAT_HISTORY_MAX_CHARS", 1000)
+    monkeypatch.setattr("app.routes.chat_routes._rate_limit_buckets", {})
+    token, conversation_id = _create_authenticated_conversation(client)
+    for index in range(6):
+        client.post(
+            "/messages",
+            json={
+                "conversation_id": conversation_id,
+                "role": "user" if index % 2 == 0 else "assistant",
+                "content": f"history-{index}",
+            },
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+    response = client.get(
+        "/chat-stream",
+        params={"conversation_id": conversation_id, "message": "current", "token": token},
+    )
+
+    assert response.status_code == 200
+    prompt_contents = [message["content"] for message in captured_input]
+    assert "history-0" not in prompt_contents
+    assert "history-1" not in prompt_contents
+    assert prompt_contents[-5:] == ["history-2", "history-3", "history-4", "history-5", "current"]
+
+
+def test_chat_stream_limits_openai_history_by_character_budget(client, monkeypatch):
+    captured_input = None
+
+    async def capture_openai_input(openai_input):
+        nonlocal captured_input
+        captured_input = openai_input
+        yield "ok"
+
+    monkeypatch.setattr("app.routes.chat_routes._stream_openai_text", capture_openai_input)
+    monkeypatch.setattr("app.services.chat_service.CHAT_HISTORY_MAX_MESSAGES", 10)
+    monkeypatch.setattr("app.services.chat_service.CHAT_HISTORY_MAX_CHARS", 12)
+    monkeypatch.setattr("app.routes.chat_routes._rate_limit_buckets", {})
+    token, conversation_id = _create_authenticated_conversation(client)
+    client.post(
+        "/messages",
+        json={
+            "conversation_id": conversation_id,
+            "role": "user",
+            "content": "old-message-too-long",
+        },
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    client.post(
+        "/messages",
+        json={
+            "conversation_id": conversation_id,
+            "role": "assistant",
+            "content": "recent",
+        },
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    response = client.get(
+        "/chat-stream",
+        params={"conversation_id": conversation_id, "message": "current", "token": token},
+    )
+
+    assert response.status_code == 200
+    prompt_contents = [message["content"] for message in captured_input]
+    assert "old-message-too-long" not in prompt_contents
+    assert "recent" in prompt_contents
+    assert prompt_contents[-1] == "current"
+
+
 def test_chat_stream_persists_user_and_assistant_messages(client, monkeypatch):
     monkeypatch.setattr("app.routes.chat_routes._stream_openai_text", _fake_openai_stream)
     token, conversation_id = _create_authenticated_conversation(client)

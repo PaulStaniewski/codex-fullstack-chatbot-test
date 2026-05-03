@@ -673,6 +673,38 @@ def test_practice_history_ordered_newest_first(client, monkeypatch):
     assert [item["answer"] for item in history] == ["Newer answer", "Older answer"]
 
 
+def test_practice_history_supports_limit_and_offset_pagination(client, monkeypatch):
+    monkeypatch.setattr("app.routes.lesson_routes._stream_openai_text", _fake_feedback_stream)
+    token = _register_and_login(client, "practice-pagination@example.com")
+
+    for answer in ["First answer", "Second answer", "Third answer"]:
+        client.get(
+            "/lessons/docker_compose_basics/practice-feedback-stream",
+            params={"step_index": 5, "answer": answer, "token": token},
+        )
+
+    response = client.get(
+        "/lessons/docker_compose_basics/practice-history",
+        params={"limit": 1, "offset": 1},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 200
+    assert [item["answer"] for item in response.json()] == ["Second answer"]
+
+
+def test_practice_history_rejects_limits_over_maximum(client):
+    token = _register_and_login(client, "practice-pagination-limit@example.com")
+
+    response = client.get(
+        "/lessons/docker_compose_basics/practice-history",
+        params={"limit": 101},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 422
+
+
 def test_practice_history_requires_auth(client):
     response = client.get("/lessons/docker_compose_basics/practice-history")
 

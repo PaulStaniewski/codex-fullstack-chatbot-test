@@ -11,6 +11,8 @@ from app.database import get_db
 router = APIRouter(prefix="/conversations", tags=["conversations"])
 ALLOWED_CONVERSATION_MODES = {"chat", "learn", "interview"}
 EXPORT_FORMATS = {"txt", "md", "json"}
+DEFAULT_CONVERSATIONS_LIMIT = 50
+MAX_CONVERSATIONS_LIMIT = 100
 
 
 def _get_owned_conversation(db: Session, conversation_id: int, user_id: int) -> models.Conversation:
@@ -99,13 +101,21 @@ def create_conversation(
 
 @router.get("", response_model=list[schemas.ConversationRead])
 def list_conversations(
+    limit: int = Query(default=DEFAULT_CONVERSATIONS_LIMIT, ge=1, le=MAX_CONVERSATIONS_LIMIT),
+    offset: int = Query(default=0, ge=0),
     current_user: models.User = Depends(auth.get_current_user),
     db: Session = Depends(get_db),
 ):
     return (
         db.query(models.Conversation)
         .filter(models.Conversation.user_id == current_user.id)
-        .order_by(models.Conversation.is_pinned.desc(), models.Conversation.created_at.desc())
+        .order_by(
+            models.Conversation.is_pinned.desc(),
+            models.Conversation.created_at.desc(),
+            models.Conversation.id.desc(),
+        )
+        .offset(offset)
+        .limit(limit)
         .all()
     )
 

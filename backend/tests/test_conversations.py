@@ -254,3 +254,66 @@ def test_pinned_conversations_are_listed_first(client):
     assert conversations[0]["id"] == first["id"]
     assert conversations[0]["is_pinned"] is True
     assert conversations[1]["id"] == second["id"]
+
+
+def test_conversations_support_limit_and_offset_pagination(client):
+    token = _register_and_login(client, "pagination@example.com")
+    for title in ["First", "Second", "Third"]:
+        _create_conversation(client, token, title=title)
+
+    full_response = client.get(
+        "/conversations",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    paged_response = client.get(
+        "/conversations",
+        params={"limit": 2, "offset": 1},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert paged_response.status_code == 200
+    assert [item["id"] for item in paged_response.json()] == [
+        item["id"] for item in full_response.json()[1:3]
+    ]
+
+
+def test_messages_support_limit_and_offset_pagination(client):
+    token = _register_and_login(client, "message-pagination@example.com")
+    conversation = _create_conversation(client, token)
+    for index in range(5):
+        client.post(
+            "/messages",
+            json={
+                "conversation_id": conversation["id"],
+                "role": "user",
+                "content": f"message-{index}",
+            },
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+    response = client.get(
+        "/messages",
+        params={"conversation_id": conversation["id"], "limit": 2, "offset": 2},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 200
+    assert [message["content"] for message in response.json()] == ["message-2", "message-3"]
+
+
+def test_pagination_rejects_limits_over_maximum(client):
+    token = _register_and_login(client, "pagination-limit@example.com")
+
+    conversations_response = client.get(
+        "/conversations",
+        params={"limit": 101},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    messages_response = client.get(
+        "/messages",
+        params={"limit": 201},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert conversations_response.status_code == 422
+    assert messages_response.status_code == 422

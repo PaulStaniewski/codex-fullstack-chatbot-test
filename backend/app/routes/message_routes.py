@@ -6,6 +6,8 @@ from app.database import get_db
 
 
 router = APIRouter(prefix="/messages", tags=["messages"])
+DEFAULT_MESSAGES_LIMIT = 100
+MAX_MESSAGES_LIMIT = 200
 
 
 def _get_owned_conversation(db: Session, conversation_id: int, user_id: int) -> models.Conversation:
@@ -45,6 +47,8 @@ def create_message(
 @router.get("", response_model=list[schemas.MessageRead])
 def list_messages(
     conversation_id: int | None = Query(default=None),
+    limit: int = Query(default=DEFAULT_MESSAGES_LIMIT, ge=1, le=MAX_MESSAGES_LIMIT),
+    offset: int = Query(default=0, ge=0),
     current_user: models.User = Depends(auth.get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -52,4 +56,4 @@ def list_messages(
     if conversation_id is not None:
         _get_owned_conversation(db, conversation_id, current_user.id)
         query = query.filter(models.Message.conversation_id == conversation_id)
-    return query.order_by(models.Message.created_at.asc()).all()
+    return query.order_by(models.Message.created_at.asc(), models.Message.id.asc()).offset(offset).limit(limit).all()
